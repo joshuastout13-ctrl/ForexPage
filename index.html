@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ForexPage – Investment Dashboard</title>
+  <title>ForexTrack – Stone & Company Forex Fund</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -19,12 +19,14 @@
 
     header {
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      padding: 20px 40px;
+      padding: 28px 40px 24px;
       border-bottom: 2px solid #0f3460;
       text-align: center;
     }
-    header h1 { font-size: 2rem; color: #00d4ff; margin-bottom: 4px; letter-spacing: 2px; }
-    header p  { color: #8892b0; font-size: 0.9rem; }
+    header .welcome   { color: #8892b0; font-size: 0.85rem; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+    header h1         { font-size: 2.4rem; color: #00d4ff; margin-bottom: 4px; letter-spacing: 3px; font-weight: 800; }
+    header .fund-name { color: #ccd6f6; font-size: 1rem; letter-spacing: 1px; margin-bottom: 2px; }
+    header p          { color: #8892b0; font-size: 0.8rem; }
 
     main {
       flex: 1;
@@ -135,8 +137,10 @@
 <body>
 
 <header>
-  <h1>ForexPage</h1>
-  <p>Forex Investment Dashboard</p>
+  <p class="welcome">Welcome to</p>
+  <h1>ForexTrack</h1>
+  <p class="fund-name">Stone &amp; Company Forex Fund</p>
+  <p>Live Investment Dashboard</p>
 </header>
 
 <main>
@@ -179,7 +183,7 @@
 
 <script>
   document.getElementById('footer-year').textContent =
-    '\u00a9 ' + new Date().getFullYear() + ' ForexPage. All rights reserved.';
+    '\u00a9 ' + new Date().getFullYear() + ' ForexTrack \u2013 Stone & Company Forex Fund. All rights reserved.';
 
   const SAMPLE_DATA = [
     { pair:'EUR/USD', price:'1.0872', change:'+0.0023', changePercent:'+0.21%', high:'1.0895', low:'1.0841', flag:'🇪🇺🇺🇸' },
