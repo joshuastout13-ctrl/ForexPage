@@ -1,267 +1,450 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ForexTrack – Stone & Company Forex Fund</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-        Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-      background-color: #0f0f23;
-      color: #e0e0e0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      padding: 28px 40px 24px;
-      border-bottom: 2px solid #0f3460;
-      text-align: center;
-    }
-    header .welcome   { color: #8892b0; font-size: 0.85rem; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
-    header h1         { font-size: 2.4rem; color: #00d4ff; margin-bottom: 4px; letter-spacing: 3px; font-weight: 800; }
-    header .fund-name { color: #ccd6f6; font-size: 1rem; letter-spacing: 1px; margin-bottom: 2px; }
-    header p          { color: #8892b0; font-size: 0.8rem; }
-
-    main {
-      flex: 1;
-      padding: 24px;
-      max-width: 1200px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    footer {
-      background: #1a1a2e;
-      padding: 16px;
-      text-align: center;
-      color: #8892b0;
-      font-size: 0.8rem;
-      border-top: 1px solid #0f3460;
-    }
-
-    /* ── Summary cards ── */
-    .summary-section {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .summary-card {
-      background: linear-gradient(145deg, #16213e, #1a1a2e);
-      border: 1px solid #0f3460;
-      border-radius: 10px;
-      padding: 16px 20px;
-      text-align: center;
-    }
-    .summary-card h3 {
-      color: #8892b0;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-    .summary-card .value { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
-
-    /* ── Refresh row ── */
-    .refresh-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .dashboard-title    { font-size: 1.4rem; color: #ccd6f6; margin-bottom: 4px; }
-    .dashboard-subtitle { color: #8892b0; font-size: 0.85rem; }
-
-    .refresh-btn {
-      background: #0f3460;
-      color: #00d4ff;
-      border: 1px solid #00d4ff;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .refresh-btn:hover   { background: #00d4ff; color: #0f0f23; }
-    .refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-    /* ── Currency grid ── */
-    .currency-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-    }
-    .currency-card {
-      background: linear-gradient(145deg, #1a1a2e, #16213e);
-      border: 1px solid #0f3460;
-      border-radius: 12px;
-      padding: 20px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .currency-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0, 212, 255, 0.1);
-    }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .pair-name  { font-size: 1.2rem; font-weight: 700; color: #ccd6f6; }
-    .pair-flag  { font-size: 1.5rem; }
-    .card-price { font-size: 1.8rem; font-weight: 700; color: #e0e0e0; margin-bottom: 12px; }
-    .card-details { display: flex; justify-content: space-between; font-size: 0.85rem; }
-    .card-row   { display: flex; justify-content: space-between; margin-top: 8px; }
-    .change-positive { color: #00e676; font-weight: 600; }
-    .change-negative { color: #ff5252; font-weight: 600; }
-    .detail-label { color: #8892b0; }
-    .detail-value { color: #ccd6f6; font-weight: 500; }
-
-    /* ── Responsive ── */
-    @media (max-width: 600px) {
-      header { padding: 16px 20px; }
-      header h1 { font-size: 1.5rem; }
-      main { padding: 16px; }
-      .currency-grid { grid-template-columns: 1fr; }
-      .summary-section { grid-template-columns: 1fr 1fr; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>4xTrack — Forex Fund Tracker</title>
+<style>
+:root {
+  --bg: #0b1220;
+  --panel: #111a2e;
+  --text: #e5edf9;
+  --muted: #9fb0cc;
+  --accent: #4f8cff;
+  --accent-2: #7fb3ff;
+  --line: rgba(255,255,255,0.08);
+  --success: #1ec98f;
+  --danger: #ff5d6c;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(180deg, #08101d 0%, #0f172a 100%);
+  color: var(--text);
+}
+.header-wrap { padding: 44px 20px 24px; }
+.header {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.brand-kicker {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(79, 140, 255, 0.12);
+  color: var(--accent-2);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(127, 179, 255, 0.2);
+}
+.header h1 {
+  margin: 14px 0 10px;
+  font-size: 38px;
+  line-height: 1.1;
+}
+.header p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 760px;
+  line-height: 1.5;
+}
+.header-stat {
+  min-width: 260px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  backdrop-filter: blur(6px);
+}
+.header-stat .label { color: var(--muted); font-size: 13px; }
+.header-stat .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+.card {
+  background: rgba(17, 26, 46, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+}
+.card h2, .card h3 { margin-top: 0; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+input, select {
+  width: 100%;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+}
+input::placeholder { color: #7f8da8; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+button {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+}
+.primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #2d6df0 100%);
+  color: white;
+}
+.secondary {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.note { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.summary-box {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+  border: 1px solid var(--line);
+  padding: 20px;
+  border-radius: 18px;
+}
+.summary-box h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.summary-box p { margin: 10px 0 0; font-size: 30px; font-weight: 700; }
+.table-wrap { overflow-x: auto; }
+.table-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  min-width: 780px;
+}
+th, td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+th:first-child, td:first-child { text-align: left; }
+.footer-note { color: var(--muted); font-size: 12px; margin-top: 12px; line-height: 1.5; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.badge {
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 12px;
+}
+.pct.pos { color: var(--success); }
+.pct.neg { color: var(--danger); }
+@media (max-width: 700px) {
+  .header h1 { font-size: 30px; }
+  .summary-box p { font-size: 24px; }
+}
+</style>
 </head>
 <body>
 
-<header>
-  <p class="welcome">Welcome to</p>
-  <h1>ForexTrack</h1>
-  <p class="fund-name">Stone &amp; Company Forex Fund</p>
-  <p>Live Investment Dashboard</p>
-</header>
-
-<main>
-  <!-- Summary row -->
-  <div class="summary-section">
-    <div class="summary-card">
-      <h3>Total Pairs</h3>
-      <div class="value" id="total-pairs">8</div>
-    </div>
-    <div class="summary-card">
-      <h3>Gainers</h3>
-      <div class="value" id="gainers" style="color:#00e676">—</div>
-    </div>
-    <div class="summary-card">
-      <h3>Losers</h3>
-      <div class="value" id="losers" style="color:#ff5252">—</div>
-    </div>
-    <div class="summary-card">
-      <h3>Last Updated</h3>
-      <div class="value" id="last-updated" style="font-size:1rem">—</div>
-    </div>
-  </div>
-
-  <!-- Header + refresh -->
-  <div class="refresh-row">
+<div class="header-wrap">
+  <div class="header">
     <div>
-      <h2 class="dashboard-title">Currency Pairs</h2>
-      <p class="dashboard-subtitle">Live market overview &bull; Updates every 30 seconds</p>
+      <span class="brand-kicker">4xTrack • Investor Dashboard</span>
+      <h1>4xTrack Fund Tracker</h1>
+      <p>Track investor balances using month-by-month compounded performance. Each month’s gain is rolled into the following month’s starting balance, with optional monthly draws applied after gains.</p>
+      <div class="badge-row">
+        <span class="badge">Monthly Compounding</span>
+        <span class="badge">Investor Snapshot</span>
+        <span class="badge">Draw Tracking</span>
+        <span class="badge">Myfxbook Performance</span>
+      </div>
     </div>
-    <button class="refresh-btn" id="refresh-btn" onclick="refresh()">Refresh</button>
+
+    <div class="header-stat" id="perfCard">
+      <div class="label">Myfxbook Performance</div>
+      <div class="value" style="margin-top:10px">
+        Today: <span id="pToday">—</span><br />
+        This Week: <span id="pWeek">—</span><br />
+        This Month: <span id="pMonth">—</span><br />
+        This Year: <span id="pYear">—</span>
+      </div>
+      <div class="note" id="pMeta">Fetching…</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Investor Inputs</h2>
+    <div class="grid">
+      <div>
+        <label for="capital">Starting Capital</label>
+        <input type="number" id="capital" placeholder="100000" />
+      </div>
+      <div>
+        <label for="draw">Monthly Draw</label>
+        <input type="number" id="draw" placeholder="0" />
+      </div>
+      <div>
+        <label for="months">Months Active</label>
+        <select id="months">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12" selected>12</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="calculate()">Update Tracker</button>
+      <button class="secondary" onclick="loadExample()">Load Example</button>
+    </div>
+    <div class="note">This tool is built as a current investor tracker, not a future projection model.</div>
   </div>
 
-  <!-- Cards -->
-  <div class="currency-grid" id="currency-grid"></div>
-</main>
+  <div class="card">
+    <div class="table-title">
+      <div>
+        <h2>Monthly Return Ledger</h2>
+        <div class="note">Enter actual monthly fund performance percentages. These values are compounded in sequence.</div>
+      </div>
+      <button class="secondary" onclick="autoFillPlaceholder()">Auto-Fill Monthly Data</button>
+    </div>
+    <div class="month-grid">
+      <div><label for="m1">January</label><input id="m1" placeholder="Jan %" /></div>
+      <div><label for="m2">February</label><input id="m2" placeholder="Feb %" /></div>
+      <div><label for="m3">March</label><input id="m3" placeholder="Mar %" /></div>
+      <div><label for="m4">April</label><input id="m4" placeholder="Apr %" /></div>
+      <div><label for="m5">May</label><input id="m5" placeholder="May %" /></div>
+      <div><label for="m6">June</label><input id="m6" placeholder="Jun %" /></div>
+      <div><label for="m7">July</label><input id="m7" placeholder="Jul %" /></div>
+      <div><label for="m8">August</label><input id="m8" placeholder="Aug %" /></div>
+      <div><label for="m9">September</label><input id="m9" placeholder="Sep %" /></div>
+      <div><label for="m10">October</label><input id="m10" placeholder="Oct %" /></div>
+      <div><label for="m11">November</label><input id="m11" placeholder="Nov %" /></div>
+      <div><label for="m12">December</label><input id="m12" placeholder="Dec %" /></div>
+    </div>
+    <div class="footer-note">Auto-fill monthly ledger is not wired yet. Myfxbook card pulls Today / Week / Month / Year.</div>
+  </div>
 
-<footer>
-  <p id="footer-year"></p>
-</footer>
+  <div class="card">
+    <h2>Investor Summary</h2>
+    <div class="summary" id="summary">
+      <div class="summary-box"><h3>Ending Balance</h3><p>$0.00</p></div>
+      <div class="summary-box"><h3>Total Gain</h3><p>$0.00</p></div>
+      <div class="summary-box"><h3>Total Draws</h3><p>$0.00</p></div>
+      <div class="summary-box"><h3>Net Change</h3><p>$0.00</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-title">
+      <div>
+        <h2>Monthly Balance Breakdown</h2>
+        <div class="note">Each row reflects compounded performance for that month before the next month begins.</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div id="table"></div>
+    </div>
+  </div>
+
+</div>
 
 <script>
-  document.getElementById('footer-year').textContent =
-    '\u00a9 ' + new Date().getFullYear() + ' ForexTrack \u2013 Stone & Company Forex Fund. All rights reserved.';
+const monthLabels = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
 
-  const SAMPLE_DATA = [
-    { pair:'EUR/USD', price:'1.0872', change:'+0.0023', changePercent:'+0.21%', high:'1.0895', low:'1.0841', flag:'🇪🇺🇺🇸' },
-    { pair:'GBP/USD', price:'1.2634', change:'-0.0018', changePercent:'-0.14%', high:'1.2670', low:'1.2610', flag:'🇬🇧🇺🇸' },
-    { pair:'USD/JPY', price:'151.42', change:'+0.35',   changePercent:'+0.23%', high:'151.80', low:'150.95', flag:'🇺🇸🇯🇵' },
-    { pair:'USD/CHF', price:'0.8821', change:'-0.0012', changePercent:'-0.14%', high:'0.8845', low:'0.8805', flag:'🇺🇸🇨🇭' },
-    { pair:'AUD/USD', price:'0.6543', change:'+0.0031', changePercent:'+0.48%', high:'0.6560', low:'0.6510', flag:'🇦🇺🇺🇸' },
-    { pair:'USD/CAD', price:'1.3642', change:'+0.0015', changePercent:'+0.11%', high:'1.3665', low:'1.3620', flag:'🇺🇸🇨🇦' },
-    { pair:'NZD/USD', price:'0.6012', change:'-0.0008', changePercent:'-0.13%', high:'0.6035', low:'0.5998', flag:'🇳🇿🇺🇸' },
-    { pair:'EUR/GBP', price:'0.8606', change:'+0.0014', changePercent:'+0.16%', high:'0.8625', low:'0.8590', flag:'🇪🇺🇬🇧' },
-  ];
+function money(x) {
+  return Number(x).toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
 
-  const VARIATION = 0.002;
-  let currentData = JSON.parse(JSON.stringify(SAMPLE_DATA));
+function calculate() {
+  let capital = parseFloat(document.getElementById('capital').value) || 0;
+  let draw = parseFloat(document.getElementById('draw').value) || 0;
+  let months = parseInt(document.getElementById('months').value, 10);
 
-  function addVariation(data) {
-    return data.map(function(item) {
-      var basePrice = parseFloat(item.price);
-      var variation = (Math.random() - 0.5) * VARIATION * basePrice;
-      var newPrice  = basePrice + variation;
-      var changePct = (variation / basePrice) * 100;
-      var decimals  = item.price.includes('.') ? item.price.split('.')[1].length : 2;
-      return Object.assign({}, item, {
-        price:         newPrice.toFixed(decimals),
-        change:        (variation  >= 0 ? '+' : '') + variation.toFixed(decimals),
-        changePercent: (changePct  >= 0 ? '+' : '') + changePct.toFixed(2) + '%',
-      });
-    });
+  let balance = capital;
+  let totalGain = 0;
+  let totalDraw = 0;
+  let rows = '';
+
+  for (let i = 1; i <= months; i++) {
+    let rate = parseFloat(document.getElementById('m' + i).value) || 0;
+    let start = balance;
+    let gain = start * (rate / 100);
+
+    let endBeforeDraw = start + gain;
+    let appliedDraw = Math.min(draw, Math.max(0, endBeforeDraw));
+    let end = endBeforeDraw - appliedDraw;
+
+    balance = end;
+    totalGain += gain;
+    totalDraw += appliedDraw;
+
+    rows += `<tr>
+      <td>${monthLabels[i - 1]}</td>
+      <td>${money(start)}</td>
+      <td>${rate.toFixed(2)}%</td>
+      <td>${money(gain)}</td>
+      <td>${money(appliedDraw)}</td>
+      <td>${money(end)}</td>
+    </tr>`;
   }
 
-  function renderGrid(data) {
-    var grid = document.getElementById('currency-grid');
-    grid.innerHTML = data.map(function(p) {
-      var positive = p.change.startsWith('+');
-      return '<div class="currency-card">' +
-        '<div class="card-header">' +
-          '<span class="pair-name">' + p.pair + '</span>' +
-          '<span class="pair-flag">'  + p.flag + '</span>' +
-        '</div>' +
-        '<div class="card-price">' + p.price + '</div>' +
-        '<div class="card-details">' +
-          '<span class="' + (positive ? 'change-positive' : 'change-negative') + '">' +
-            p.change + ' (' + p.changePercent + ')' +
-          '</span>' +
-        '</div>' +
-        '<div class="card-row">' +
-          '<span><span class="detail-label">H: </span><span class="detail-value">' + p.high + '</span></span>' +
-          '<span><span class="detail-label">L: </span><span class="detail-value">' + p.low  + '</span></span>' +
-        '</div>' +
-      '</div>';
-    }).join('');
+  let netChange = balance - capital;
+
+  document.getElementById('summary').innerHTML = `
+    <div class="summary-box">
+      <h3>Ending Balance</h3>
+      <p>${money(balance)}</p>
+    </div>
+    <div class="summary-box">
+      <h3>Total Gain</h3>
+      <p>${money(totalGain)}</p>
+    </div>
+    <div class="summary-box">
+      <h3>Total Draws</h3>
+      <p>${money(totalDraw)}</p>
+    </div>
+    <div class="summary-box">
+      <h3>Net Change</h3>
+      <p>${money(netChange)}</p>
+    </div>
+  `;
+
+  document.getElementById('table').innerHTML = `
+    <table>
+      <tr>
+        <th>Month</th>
+        <th>Starting Balance</th>
+        <th>Return</th>
+        <th>Gain</th>
+        <th>Draw</th>
+        <th>Ending Balance</th>
+      </tr>
+      ${rows}
+    </table>
+  `;
+}
+
+function loadExample() {
+  document.getElementById('capital').value = 100000;
+  document.getElementById('draw').value = 2500;
+  document.getElementById('months').value = 4;
+  document.getElementById('m1').value = 1.20;
+  document.getElementById('m2').value = 0.80;
+  document.getElementById('m3').value = 1.10;
+  document.getElementById('m4').value = 0.75;
+  calculate();
+}
+
+function autoFillPlaceholder() {
+  alert('Monthly ledger auto-fill is not wired yet.');
+}
+
+function pctClass(v) {
+  if (v === null || Number.isNaN(v)) return '';
+  return v >= 0 ? 'pct pos' : 'pct neg';
+}
+
+function fmtPct(v) {
+  if (v === null || Number.isNaN(v)) return '—';
+  const sign = v > 0 ? '+' : '';
+  return `${sign}${Number(v).toFixed(2)}%`;
+}
+
+function setPct(id, v) {
+  const el = document.getElementById(id);
+  el.textContent = fmtPct(v);
+  el.className = pctClass(v);
+}
+
+async function loadMyfxbookPerformance() {
+  const meta = document.getElementById('pMeta');
+  meta.textContent = 'Fetching…';
+
+  try {
+    const r = await fetch('/api/myfxbook-summary', { cache: 'no-store' });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to load');
+
+    setPct('pToday', data.today);
+    setPct('pWeek', data.week);
+    setPct('pMonth', data.month);
+    setPct('pYear', data.year);
+
+    meta.textContent = `Updated: ${new Date(data.fetched_at).toLocaleString()}`;
+  } catch (e) {
+    meta.textContent = 'Could not load Myfxbook data yet.';
+    console.log('Myfxbook error:', e);
   }
+}
 
-  function updateSummary(data) {
-    var gainers = data.filter(function(p) { return p.change.startsWith('+'); }).length;
-    document.getElementById('total-pairs').textContent  = data.length;
-    document.getElementById('gainers').textContent      = gainers;
-    document.getElementById('losers').textContent       = data.length - gainers;
-    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
-  }
-
-  function refresh() {
-    var btn = document.getElementById('refresh-btn');
-    btn.disabled    = true;
-    btn.textContent = 'Updating\u2026';
-    currentData = addVariation(currentData);
-    renderGrid(currentData);
-    updateSummary(currentData);
-    btn.disabled    = false;
-    btn.textContent = 'Refresh';
-  }
-
-  // Initial render
-  renderGrid(currentData);
-  updateSummary(currentData);
-
-  // Auto-refresh every 30 seconds
-  setInterval(refresh, 30000);
+loadMyfxbookPerformance();
 </script>
+
 </body>
 </html>
