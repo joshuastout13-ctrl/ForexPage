@@ -1,450 +1,67 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>4xTrack — Forex Fund Tracker</title>
-<style>
-:root {
-  --bg: #0b1220;
-  --panel: #111a2e;
-  --text: #e5edf9;
-  --muted: #9fb0cc;
-  --accent: #4f8cff;
-  --accent-2: #7fb3ff;
-  --line: rgba(255,255,255,0.08);
-  --success: #1ec98f;
-  --danger: #ff5d6c;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(180deg, #08101d 0%, #0f172a 100%);
-  color: var(--text);
-}
-.header-wrap { padding: 44px 20px 24px; }
-.header {
-  max-width: 1180px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.brand-kicker {
-  display: inline-block;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: rgba(79, 140, 255, 0.12);
-  color: var(--accent-2);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid rgba(127, 179, 255, 0.2);
-}
-.header h1 {
-  margin: 14px 0 10px;
-  font-size: 38px;
-  line-height: 1.1;
-}
-.header p {
-  margin: 0;
-  color: var(--muted);
-  max-width: 760px;
-  line-height: 1.5;
-}
-.header-stat {
-  min-width: 260px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px;
-  backdrop-filter: blur(6px);
-}
-.header-stat .label { color: var(--muted); font-size: 13px; }
-.header-stat .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
-.container {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-.card {
-  background: rgba(17, 26, 46, 0.92);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
-}
-.card h2, .card h3 { margin-top: 0; }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-}
-.month-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-label {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-input, select {
-  width: 100%;
-  padding: 12px 13px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.09);
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  font-size: 15px;
-  outline: none;
-}
-input::placeholder { color: #7f8da8; }
-.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
-button {
-  padding: 12px 18px;
-  border: none;
-  border-radius: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 14px;
-}
-.primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #2d6df0 100%);
-  color: white;
-}
-.secondary {
-  background: rgba(255,255,255,0.08);
-  color: var(--text);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-.note { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
-.summary-box {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
-  border: 1px solid var(--line);
-  padding: 20px;
-  border-radius: 18px;
-}
-.summary-box h3 {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-.summary-box p { margin: 10px 0 0; font-size: 30px; font-weight: 700; }
-.table-wrap { overflow-x: auto; }
-.table-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 16px;
-  min-width: 780px;
-}
-th, td {
-  padding: 14px 12px;
-  border-bottom: 1px solid var(--line);
-  text-align: right;
-}
-th {
-  color: var(--muted);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-th:first-child, td:first-child { text-align: left; }
-.footer-note { color: var(--muted); font-size: 12px; margin-top: 12px; line-height: 1.5; }
-.badge-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-.badge {
-  padding: 9px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: var(--muted);
-  font-size: 12px;
-}
-.pct.pos { color: var(--success); }
-.pct.neg { color: var(--danger); }
-@media (max-width: 700px) {
-  .header h1 { font-size: 30px; }
-  .summary-box p { font-size: 24px; }
-}
-</style>
-</head>
-<body>
-
-<div class="header-wrap">
-  <div class="header">
-    <div>
-      <span class="brand-kicker">4xTrack • Investor Dashboard</span>
-      <h1>4xTrack Fund Tracker</h1>
-      <p>Track investor balances using month-by-month compounded performance. Each month’s gain is rolled into the following month’s starting balance, with optional monthly draws applied after gains.</p>
-      <div class="badge-row">
-        <span class="badge">Monthly Compounding</span>
-        <span class="badge">Investor Snapshot</span>
-        <span class="badge">Draw Tracking</span>
-        <span class="badge">Myfxbook Performance</span>
-      </div>
-    </div>
-
-    <div class="header-stat" id="perfCard">
-      <div class="label">Myfxbook Performance</div>
-      <div class="value" style="margin-top:10px">
-        Today: <span id="pToday">—</span><br />
-        This Week: <span id="pWeek">—</span><br />
-        This Month: <span id="pMonth">—</span><br />
-        This Year: <span id="pYear">—</span>
-      </div>
-      <div class="note" id="pMeta">Fetching…</div>
-    </div>
-  </div>
-</div>
-
-<div class="container">
-
-  <div class="card">
-    <h2>Investor Inputs</h2>
-    <div class="grid">
-      <div>
-        <label for="capital">Starting Capital</label>
-        <input type="number" id="capital" placeholder="100000" />
-      </div>
-      <div>
-        <label for="draw">Monthly Draw</label>
-        <input type="number" id="draw" placeholder="0" />
-      </div>
-      <div>
-        <label for="months">Months Active</label>
-        <select id="months">
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-          <option value="10">10</option>
-          <option value="11">11</option>
-          <option value="12" selected>12</option>
-        </select>
-      </div>
-    </div>
-    <div class="actions">
-      <button class="primary" onclick="calculate()">Update Tracker</button>
-      <button class="secondary" onclick="loadExample()">Load Example</button>
-    </div>
-    <div class="note">This tool is built as a current investor tracker, not a future projection model.</div>
-  </div>
-
-  <div class="card">
-    <div class="table-title">
-      <div>
-        <h2>Monthly Return Ledger</h2>
-        <div class="note">Enter actual monthly fund performance percentages. These values are compounded in sequence.</div>
-      </div>
-      <button class="secondary" onclick="autoFillPlaceholder()">Auto-Fill Monthly Data</button>
-    </div>
-    <div class="month-grid">
-      <div><label for="m1">January</label><input id="m1" placeholder="Jan %" /></div>
-      <div><label for="m2">February</label><input id="m2" placeholder="Feb %" /></div>
-      <div><label for="m3">March</label><input id="m3" placeholder="Mar %" /></div>
-      <div><label for="m4">April</label><input id="m4" placeholder="Apr %" /></div>
-      <div><label for="m5">May</label><input id="m5" placeholder="May %" /></div>
-      <div><label for="m6">June</label><input id="m6" placeholder="Jun %" /></div>
-      <div><label for="m7">July</label><input id="m7" placeholder="Jul %" /></div>
-      <div><label for="m8">August</label><input id="m8" placeholder="Aug %" /></div>
-      <div><label for="m9">September</label><input id="m9" placeholder="Sep %" /></div>
-      <div><label for="m10">October</label><input id="m10" placeholder="Oct %" /></div>
-      <div><label for="m11">November</label><input id="m11" placeholder="Nov %" /></div>
-      <div><label for="m12">December</label><input id="m12" placeholder="Dec %" /></div>
-    </div>
-    <div class="footer-note">Auto-fill monthly ledger is not wired yet. Myfxbook card pulls Today / Week / Month / Year.</div>
-  </div>
-
-  <div class="card">
-    <h2>Investor Summary</h2>
-    <div class="summary" id="summary">
-      <div class="summary-box"><h3>Ending Balance</h3><p>$0.00</p></div>
-      <div class="summary-box"><h3>Total Gain</h3><p>$0.00</p></div>
-      <div class="summary-box"><h3>Total Draws</h3><p>$0.00</p></div>
-      <div class="summary-box"><h3>Net Change</h3><p>$0.00</p></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="table-title">
-      <div>
-        <h2>Monthly Balance Breakdown</h2>
-        <div class="note">Each row reflects compounded performance for that month before the next month begins.</div>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <div id="table"></div>
-    </div>
-  </div>
-
-</div>
+<section class="card">
+    <h2>Join / Investor Intake</h2>
+    <form id="intake-form">
+        <div class="form-row">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" required />
+        </div>
+        <div class="form-row">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required />
+        </div>
+        <div class="form-row">
+            <label for="birthday">Birthday:</label>
+            <input type="date" id="birthday" name="birthday" />
+        </div>
+        <div class="form-row">
+            <label for="startingInvestment">Starting Investment:</label>
+            <input type="number" id="startingInvestment" name="startingInvestment" />
+        </div>
+        <div class="form-row">
+            <label for="additionalInvestment">Additional Investment:</label>
+            <input type="number" id="additionalInvestment" name="additionalInvestment" />
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+    <div class="form-message"></div>
+</section>
 
 <script>
-const monthLabels = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December'
-];
+    document.getElementById('intake-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        const messageDiv = document.querySelector('.form-message');
+        const button = this.querySelector('button');
 
-function money(x) {
-  return Number(x).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
+        button.disabled = true;
 
-function calculate() {
-  let capital = parseFloat(document.getElementById('capital').value) || 0;
-  let draw = parseFloat(document.getElementById('draw').value) || 0;
-  let months = parseInt(document.getElementById('months').value, 10);
-
-  let balance = capital;
-  let totalGain = 0;
-  let totalDraw = 0;
-  let rows = '';
-
-  for (let i = 1; i <= months; i++) {
-    let rate = parseFloat(document.getElementById('m' + i).value) || 0;
-    let start = balance;
-    let gain = start * (rate / 100);
-
-    let endBeforeDraw = start + gain;
-    let appliedDraw = Math.min(draw, Math.max(0, endBeforeDraw));
-    let end = endBeforeDraw - appliedDraw;
-
-    balance = end;
-    totalGain += gain;
-    totalDraw += appliedDraw;
-
-    rows += `<tr>
-      <td>${monthLabels[i - 1]}</td>
-      <td>${money(start)}</td>
-      <td>${rate.toFixed(2)}%</td>
-      <td>${money(gain)}</td>
-      <td>${money(appliedDraw)}</td>
-      <td>${money(end)}</td>
-    </tr>`;
-  }
-
-  let netChange = balance - capital;
-
-  document.getElementById('summary').innerHTML = `
-    <div class="summary-box">
-      <h3>Ending Balance</h3>
-      <p>${money(balance)}</p>
-    </div>
-    <div class="summary-box">
-      <h3>Total Gain</h3>
-      <p>${money(totalGain)}</p>
-    </div>
-    <div class="summary-box">
-      <h3>Total Draws</h3>
-      <p>${money(totalDraw)}</p>
-    </div>
-    <div class="summary-box">
-      <h3>Net Change</h3>
-      <p>${money(netChange)}</p>
-    </div>
-  `;
-
-  document.getElementById('table').innerHTML = `
-    <table>
-      <tr>
-        <th>Month</th>
-        <th>Starting Balance</th>
-        <th>Return</th>
-        <th>Gain</th>
-        <th>Draw</th>
-        <th>Ending Balance</th>
-      </tr>
-      ${rows}
-    </table>
-  `;
-}
-
-function loadExample() {
-  document.getElementById('capital').value = 100000;
-  document.getElementById('draw').value = 2500;
-  document.getElementById('months').value = 4;
-  document.getElementById('m1').value = 1.20;
-  document.getElementById('m2').value = 0.80;
-  document.getElementById('m3').value = 1.10;
-  document.getElementById('m4').value = 0.75;
-  calculate();
-}
-
-function autoFillPlaceholder() {
-  alert('Monthly ledger auto-fill is not wired yet.');
-}
-
-function pctClass(v) {
-  if (v === null || Number.isNaN(v)) return '';
-  return v >= 0 ? 'pct pos' : 'pct neg';
-}
-
-function fmtPct(v) {
-  if (v === null || Number.isNaN(v)) return '—';
-  const sign = v > 0 ? '+' : '';
-  return `${sign}${Number(v).toFixed(2)}%`;
-}
-
-function setPct(id, v) {
-  const el = document.getElementById(id);
-  el.textContent = fmtPct(v);
-  el.className = pctClass(v);
-}
-
-async function loadMyfxbookPerformance() {
-  const meta = document.getElementById('pMeta');
-  meta.textContent = 'Fetching…';
-
-  try {
-    const r = await fetch('/api/myfxbook-summary', { cache: 'no-store' });
-    const data = await r.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to load');
-
-    setPct('pToday', data.today);
-    setPct('pWeek', data.week);
-    setPct('pMonth', data.month);
-    setPct('pYear', data.year);
-
-    meta.textContent = `Updated: ${new Date(data.fetched_at).toLocaleString()}`;
-  } catch (e) {
-    meta.textContent = 'Could not load Myfxbook data yet.';
-    console.log('Myfxbook error:', e);
-  }
-}
-
-loadMyfxbookPerformance();
+        try {
+            const response = await fetch('/api/lead', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (result.ok) {
+                messageDiv.textContent = 'Lead submitted successfully!';
+            } else {
+                messageDiv.textContent = 'There was an error submitting your lead.';
+            }
+        } catch (error) {
+            messageDiv.textContent = 'Error: ' + error.message;
+        } finally {
+            button.disabled = false;
+        }
+    });
 </script>
 
-</body>
-</html>
+<style>
+.form-row {
+    margin-bottom: 10px;
+}
+.form-message {
+    margin-top: 10px;
+    color: red;
+}
+</style>
