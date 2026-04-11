@@ -10,11 +10,14 @@ const currencyPairs = [
   { pair: 'EUR/GBP', price: '0.8606', change: '+0.0014', changePercent: '+0.16%', high: '0.8625', low: '0.8590', flag: '🇪🇺🇬🇧' },
 ];
 
+/** Max ±0.1% random price variation to simulate live market movement */
+const VARIATION_FACTOR = 0.002;
+
 // Add small random variation to simulate live data
 function addVariation(data) {
   return data.map((item) => {
     const basePrice = parseFloat(item.price);
-    const variation = (Math.random() - 0.5) * 0.002 * basePrice;
+    const variation = (Math.random() - 0.5) * VARIATION_FACTOR * basePrice;
     const newPrice = basePrice + variation;
     const change = variation;
     const changePercent = (variation / basePrice) * 100;
