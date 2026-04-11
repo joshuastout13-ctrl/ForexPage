@@ -3,21 +3,24 @@
 A modern forex investment dashboard built with React and Node.js.
 
 ## Features
-- Real-time forex data visualization
-- Investment tracking and analytics
-- Responsive dashboard interface
-- RESTful API backend
+
+- Real-time forex currency pair data
+- Auto-refreshing dashboard (every 30 seconds)
+- Responsive dark-themed UI
+- RESTful API backend with Express
+- Summary cards for gainers/losers
 
 ## Tech Stack
-- **Frontend**: React, TypeScript, CSS
+
+- **Frontend**: React 18, TypeScript, CSS
 - **Backend**: Node.js, Express
-- **Database**: Ready for integration
 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
-- npm or yarn
+- npm
 
 ### Installation
 
@@ -39,12 +42,10 @@ npm install
 cd ..
 ```
 
-4. Create environment file:
+4. (Optional) Create an environment file:
 ```bash
 cp .env.example .env
 ```
-
-5. Update .env with your configuration
 
 ### Running the Application
 
@@ -52,38 +53,53 @@ cp .env.example .env
 ```bash
 npm start
 ```
-Runs on http://localhost:3000
+Opens at http://localhost:3000
 
 **Backend (Development):**
+Open a second terminal and run:
 ```bash
 cd server
 npm start
 ```
-Runs on http://localhost:5000
+Runs at http://localhost:5000
+
+The frontend works standalone with sample data. When the backend is running, it fetches data from the API instead.
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/forex/pairs` | Get all currency pairs |
+| GET | `/api/forex/pairs/:pair` | Get a specific pair (e.g. `EUR-USD`) |
+| GET | `/api/health` | Health check |
 
 ## Project Structure
+
 ```
 ForexPage/
-├── public/              # Static assets
-├── src/                 # React components
-│   ├── components/      # Reusable components
-│   ├── pages/          # Page components
-│   ├── App.tsx         # Main app component
-│   └── index.tsx       # Entry point
-├── server/             # Node.js/Express backend
-│   ├── routes/         # API routes
-│   ├── controllers/     # Request handlers
-│   └── server.js       # Express setup
-├── README.md
+├── public/
+│   └── index.html           # HTML entry point
+├── src/
+│   ├── components/
+│   │   └── Dashboard.tsx     # Forex dashboard component
+│   ├── App.tsx               # Main app component
+│   ├── App.css               # Styles
+│   ├── index.tsx             # React entry point
+│   └── react-app-env.d.ts   # TypeScript declarations
+├── server/
+│   ├── controllers/
+│   │   └── forexController.js  # Request handlers
+│   ├── routes/
+│   │   └── forexRoutes.js      # API routes
+│   ├── server.js               # Express server
+│   └── package.json
+├── .env.example
+├── .gitignore
 ├── package.json
-└── .env.example
-
+├── tsconfig.json
+└── README.md
 ```
 
-## Contributing
-1. Create a feature branch
-2. Make your changes
-3. Submit a pull request
-
 ## License
+
 MIT
