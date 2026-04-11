@@ -1,67 +1,52 @@
-<section class="card">
-    <h2>Join / Investor Intake</h2>
-    <form id="intake-form">
-        <div class="form-row">
-            <label for="name">Name:</label>
-            <input type="text" id="name" name="name" required />
-        </div>
-        <div class="form-row">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required />
-        </div>
-        <div class="form-row">
-            <label for="birthday">Birthday:</label>
-            <input type="date" id="birthday" name="birthday" />
-        </div>
-        <div class="form-row">
-            <label for="startingInvestment">Starting Investment:</label>
-            <input type="number" id="startingInvestment" name="startingInvestment" />
-        </div>
-        <div class="form-row">
-            <label for="additionalInvestment">Additional Investment:</label>
-            <input type="number" id="additionalInvestment" name="additionalInvestment" />
-        </div>
-        <button type="submit">Submit</button>
-    </form>
-    <div class="form-message"></div>
-</section>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Page</title>
+    <script src="./api/lead.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Forex Trading</h1>
+    </header>
+    <main>
+        <div class="currency-grid" id="currency-grid"></div>
+        <section id="investor-intake">
+            <h2>Investor Intake Form</h2>
+            <form id="intake-form">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+                <label for="birthday">Birthday:</label>
+                <input type="date" id="birthday" name="birthday" required>
+                <label for="startingInvestment">Starting Investment:</label>
+                <input type="number" id="startingInvestment" name="startingInvestment" required>
+                <label for="additionalInvestment">Additional Investment:</label>
+                <input type="number" id="additionalInvestment" name="additionalInvestment" required>
+                <button type="submit">Submit</button>
+            </form>
+        </section>
+    </main>
+    <script>
+        document.getElementById('intake-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
 
-<script>
-    document.getElementById('intake-form').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-        const messageDiv = document.querySelector('.form-message');
-        const button = this.querySelector('button');
-
-        button.disabled = true;
-
-        try {
             const response = await fetch('/api/lead', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
-            const result = await response.json();
-            if (result.ok) {
-                messageDiv.textContent = 'Lead submitted successfully!';
-            } else {
-                messageDiv.textContent = 'There was an error submitting your lead.';
-            }
-        } catch (error) {
-            messageDiv.textContent = 'Error: ' + error.message;
-        } finally {
-            button.disabled = false;
-        }
-    });
-</script>
 
-<style>
-.form-row {
-    margin-bottom: 10px;
-}
-.form-message {
-    margin-top: 10px;
-    color: red;
-}
-</style>
+            if (response.ok) {
+                alert('Form submitted successfully!');
+            } else {
+                alert('Form submission failed.');
+            }
+        });
+    </script>
+</body>
+</html>
