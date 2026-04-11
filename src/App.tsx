@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import Dashboard from './components/Dashboard';
+import Home from './pages/Home';
 
 const App: React.FC = () => {
   return (
@@ -10,7 +10,7 @@ const App: React.FC = () => {
         <p>Forex Investment Dashboard</p>
       </header>
       <main>
-        <Dashboard />
+        <Home />
       </main>
       <footer className="App-footer">
         <p>&copy; {new Date().getFullYear()} ForexPage. All rights reserved.</p>
