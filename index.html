@@ -124,7 +124,11 @@
     .detail-label { color: #8892b0; }
     .detail-value { color: #ccd6f6; font-weight: 500; }
 
-    /* ── Intake form (minimal, fits theme) ── */
+    /* ── Intake form (theme-matching) ── */
+    .intake-card {
+      margin-top: 18px;
+      text-align: left;
+    }
     .intake-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -143,6 +147,7 @@
       border: 1px solid #0f3460;
       background: #0f0f23;
       color: #e0e0e0;
+      outline: none;
     }
 
     /* ── Responsive ── */
@@ -197,8 +202,8 @@
   <!-- Cards -->
   <div class="currency-grid" id="currency-grid"></div>
 
-  <!-- Investor Intake -->
-  <section class="summary-card" style="text-align:left; margin-top: 18px;">
+  <!-- Investor Intake (PLACED HERE: below currency grid) -->
+  <section class="summary-card intake-card">
     <h3 style="margin-bottom:10px;">Investor Intake</h3>
 
     <form id="intake-form">
@@ -280,4 +285,91 @@
     grid.innerHTML = data.map(function(p) {
       var positive = p.change.startsWith('+');
       return '<div class="currency-card">' +
-        '<div class="card-header">
+        '<div class="card-header">' +
+          '<span class="pair-name">' + p.pair + '</span>' +
+          '<span class="pair-flag">'  + p.flag + '</span>' +
+        '</div>' +
+        '<div class="card-price">' + p.price + '</div>' +
+        '<div class="card-details">' +
+          '<span class="' + (positive ? 'change-positive' : 'change-negative') + '">' +
+            p.change + ' (' + p.changePercent + ')' +
+          '</span>' +
+        '</div>' +
+        '<div class="card-row">' +
+          '<span><span class="detail-label">H: </span><span class="detail-value">' + p.high + '</span></span>' +
+          '<span><span class="detail-label">L: </span><span class="detail-value">' + p.low  + '</span></span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function updateSummary(data) {
+    var gainers = data.filter(function(p) { return p.change.startsWith('+'); }).length;
+    document.getElementById('total-pairs').textContent  = data.length;
+    document.getElementById('gainers').textContent      = gainers;
+    document.getElementById('losers').textContent       = data.length - gainers;
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+  }
+
+  function refresh() {
+    var btn = document.getElementById('refresh-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Updating\u2026';
+    currentData = addVariation(currentData);
+    renderGrid(currentData);
+    updateSummary(currentData);
+    btn.disabled    = false;
+    btn.textContent = 'Refresh';
+  }
+
+  // Initial render
+  renderGrid(currentData);
+  updateSummary(currentData);
+
+  // Auto-refresh every 30 seconds
+  setInterval(refresh, 30000);
+
+  // Intake form submit -> /api/lead (PLACED HERE: end of script)
+  document.getElementById('intake-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const btn = document.getElementById('leadSubmitBtn');
+    const msg = document.getElementById('leadMsg');
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    msg.textContent = '';
+    msg.style.color = '#8892b0';
+
+    try {
+      const payload = {
+        name: document.getElementById('leadName').value.trim(),
+        email: document.getElementById('leadEmail').value.trim(),
+        birthday: document.getElementById('leadBirthday').value || null,
+        startingInvestment: document.getElementById('leadStarting').value || null,
+        additionalInvestment: document.getElementById('leadAdditional').value || null
+      };
+
+      const r = await fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error(data.error || 'Submit failed');
+
+      msg.style.color = '#00e676';
+      msg.textContent = 'Submitted successfully.';
+      e.target.reset();
+    } catch (err) {
+      msg.style.color = '#ff5252';
+      msg.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Submit';
+    }
+  });
+</script>
+</body>
+</html>
