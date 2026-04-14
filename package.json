@@ -1,0 +1,18 @@
+{
+  "name": "forex-dashboard",
+  "version": "1.0.0",
+  "description": "Forex trading dashboard with Google Sheets and MyFXBook integrations",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cookie": "^0.7.2",
+    "googleapis": "^144.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2"
+  },
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}

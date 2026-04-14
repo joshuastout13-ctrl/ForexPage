@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forex Dashboard</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3e;
+      --accent: #4f8ef7;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    #app { display: none; }
+    #login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 { font-size: 1.25rem; font-weight: 600; color: var(--accent); }
+
+    main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+
+    /* ── Login card ──────────────────────────────────────────────────────── */
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-card h2 { text-align: center; margin-bottom: 1.5rem; font-size: 1.4rem; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .form-group input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .form-group input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 0.5rem; padding: 0.75rem; }
+    .btn-ghost  { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+    .error-msg { color: var(--red); font-size: 0.85rem; margin-top: 0.75rem; text-align: center; min-height: 1.1em; }
+
+    /* ── Stats grid ──────────────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .stat-card .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 0.3rem; }
+    .stat-card .value.pos { color: var(--green); }
+    .stat-card .value.neg { color: var(--red); }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    .section { margin-bottom: 2.5rem; }
+    .section h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      background: var(--surface);
+      padding: 0.65rem 1rem;
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 0.65rem 1rem; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2em 0.55em;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .badge-buy  { background: rgba(34,197,94,0.15);  color: var(--green); }
+    .badge-sell { background: rgba(239,68,68,0.15);  color: var(--red);   }
+
+    /* ── Loading / empty states ──────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 1.2em; height: 1.2em;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty { color: var(--muted); text-align: center; padding: 2rem; }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      header { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login page ──────────────────────────────────────────────────────────── -->
+<div id="login-page">
+  <div class="login-card">
+    <h2>🔐 Forex Dashboard</h2>
+    <form id="login-form" autocomplete="on">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text"     id="username" name="username" autocomplete="username"     required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Sign in</button>
+      <p class="error-msg" id="login-error"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ── App shell (shown after login) ─────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <h1>📈 Forex Dashboard</h1>
+    <div style="display:flex;gap:0.75rem;align-items:center;">
+      <span id="header-username" style="color:var(--muted);font-size:0.9rem;"></span>
+      <button class="btn btn-ghost" id="logout-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stats row -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="label">Accounts</div><div class="value" id="stat-accounts">—</div></div>
+      <div class="stat-card"><div class="label">Open Positions</div><div class="value" id="stat-positions">—</div></div>
+      <div class="stat-card"><div class="label">30-Day Trades</div><div class="value" id="stat-trades">—</div></div>
+      <div class="stat-card"><div class="label">Log Entries</div><div class="value" id="stat-log">—</div></div>
+    </div>
+
+    <!-- Accounts -->
+    <div class="section">
+      <h2>Accounts</h2>
+      <div class="table-wrap">
+        <table id="accounts-table">
+          <thead><tr><th>Name</th><th>Broker</th><th>Balance</th><th>Equity</th><th>Gain %</th></tr></thead>
+          <tbody id="accounts-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Open positions -->
+    <div class="section">
+      <h2>Open Positions</h2>
+      <div class="table-wrap">
+        <table id="orders-table">
+          <thead><tr><th>Symbol</th><th>Type</th><th>Lots</th><th>Open Price</th><th>Current Price</th><th>Profit</th></tr></thead>
+          <tbody id="orders-body"><tr><td colspan="6" class="empty"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Trade history -->
+    <div class="section">
+      <h2>Trade History (30 days)</h2>
+      <div class="table-wrap">
+        <table id="history-table">
+          <thead><tr><th>Symbol</th><th>Type</th><th>Lots</th><th>Open</th><th>Close</th><th>Profit</th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="6" class="empty"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Google Sheets trading log -->
+    <div class="section" id="log-section">
+      <h2>Trading Log (Sheets)</h2>
+      <div class="table-wrap">
+        <table id="log-table">
+          <thead id="log-head"><tr><th>—</th></tr></thead>
+          <tbody id="log-body"><tr><td class="empty"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p style="color:var(--muted);font-size:0.78rem;text-align:right;" id="updated-at"></p>
+  </main>
+</div>
+
+<script>
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v) => v !== undefined && v !== null && v !== '' ? v : '—';
+  const fmtNum = (v, dec = 2) => isNaN(Number(v)) ? fmt(v) : Number(v).toFixed(dec);
+  const profitClass = (v) => Number(v) >= 0 ? 'pos' : 'neg';
+
+  function emptyRow(cols, msg = 'No data') {
+    return `<tr><td colspan="${cols}" class="empty">${msg}</td></tr>`;
+  }
+
+  // ── Auth state ─────────────────────────────────────────────────────────────
+  async function checkSession() {
+    try {
+      const res = await fetch('/api/me');
+      if (res.status === 401) return null;
+      if (!res.ok) return null;
+      return res.json();
+    } catch { return null; }
+  }
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  $('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('login-btn');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    $('login-error').textContent = '';
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: $('username').value.trim(),
+          password: $('password').value,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        $('login-error').textContent = data.error || 'Login failed';
+        return;
+      }
+
+      showApp(data);
+      loadDashboard();
+    } catch (err) {
+      $('login-error').textContent = 'Network error – please retry.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+
+  // ── Logout ─────────────────────────────────────────────────────────────────
+  $('logout-btn').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    $('app').style.display = 'none';
+    $('login-page').style.display = 'flex';
+  });
+
+  // ── Show / hide pages ──────────────────────────────────────────────────────
+  function showApp(data) {
+    $('login-page').style.display = 'none';
+    $('app').style.display = 'block';
+    $('header-username').textContent = data.username || '';
+  }
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+  function renderAccounts(accounts) {
+    if (!accounts.length) {
+      $('accounts-body').innerHTML = emptyRow(5);
+      return;
+    }
+    $('accounts-body').innerHTML = accounts.map((a) => `
+      <tr>
+        <td>${fmt(a.name)}</td>
+        <td>${fmt(a.broker)}</td>
+        <td>${fmtNum(a.balance)}</td>
+        <td>${fmtNum(a.equity)}</td>
+        <td class="${profitClass(a.gain)}">${fmtNum(a.gain)}%</td>
+      </tr>`).join('');
+  }
+
+  function renderOrders(orders) {
+    if (!orders.length) {
+      $('orders-body').innerHTML = emptyRow(6);
+      return;
+    }
+    $('orders-body').innerHTML = orders.map((o) => `
+      <tr>
+        <td>${fmt(o.symbol)}</td>
+        <td><span class="badge badge-${(o.type||'').toLowerCase()}">${fmt(o.type)}</span></td>
+        <td>${fmtNum(o.lots, 2)}</td>
+        <td>${fmtNum(o.openPrice, 5)}</td>
+        <td>${fmtNum(o.currentPrice, 5)}</td>
+        <td class="${profitClass(o.profit)}">${fmtNum(o.profit)}</td>
+      </tr>`).join('');
+  }
+
+  function renderHistory(history) {
+    if (!history.length) {
+      $('history-body').innerHTML = emptyRow(6);
+      return;
+    }
+    $('history-body').innerHTML = history.map((h) => `
+      <tr>
+        <td>${fmt(h.symbol)}</td>
+        <td><span class="badge badge-${(h.type||'').toLowerCase()}">${fmt(h.type)}</span></td>
+        <td>${fmtNum(h.lots, 2)}</td>
+        <td>${fmt(h.openTime)}</td>
+        <td>${fmt(h.closeTime)}</td>
+        <td class="${profitClass(h.profit)}">${fmtNum(h.profit)}</td>
+      </tr>`).join('');
+  }
+
+  function renderTradingLog(rows) {
+    if (!rows.length) {
+      $('log-body').innerHTML = emptyRow(1);
+      return;
+    }
+    const keys = Object.keys(rows[0]);
+    $('log-head').innerHTML = `<tr>${keys.map((k) => `<th>${k}</th>`).join('')}</tr>`;
+    $('log-body').innerHTML = rows.map((row) =>
+      `<tr>${keys.map((k) => `<td>${fmt(row[k])}</td>`).join('')}</tr>`
+    ).join('');
+  }
+
+  // ── Load dashboard data ────────────────────────────────────────────────────
+  async function loadDashboard() {
+    try {
+      const res = await fetch('/api/me');
+      if (res.status === 401) {
+        $('app').style.display = 'none';
+        $('login-page').style.display = 'flex';
+        return;
+      }
+
+      const data = await res.json();
+
+      $('stat-accounts').textContent  = (data.accounts  || []).length;
+      $('stat-positions').textContent = (data.openOrders|| []).length;
+      $('stat-trades').textContent    = (data.history   || []).length;
+      $('stat-log').textContent       = (data.tradingLog|| []).length;
+
+      renderAccounts(data.accounts   || []);
+      renderOrders  (data.openOrders || []);
+      renderHistory (data.history    || []);
+      renderTradingLog(data.tradingLog || []);
+
+      if (data.updatedAt) {
+        $('updated-at').textContent = 'Last updated: ' + new Date(data.updatedAt).toLocaleString();
+      }
+    } catch (err) {
+      console.error('loadDashboard error:', err);
+    }
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  (async () => {
+    const session = await checkSession();
+    if (session) {
+      showApp(session);
+      loadDashboard();
+    }
+    // else: login page is already visible by default
+  })();
+</script>
+</body>
+</html>
