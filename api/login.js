@@ -1,4 +1,4 @@
-import { readSheet, bool } from "../lib/sheets.js";
+import { readSheet, bool, filterInvestors } from "../lib/sheets.js";
 import { CONFIG } from "../lib/config.js";
 import { createSession, sessionCookie } from "../lib/auth.js";
 
@@ -16,33 +16,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing username or password" });
     }
 
-    const investors = await readSheet(CONFIG.tabs.investors);
+    let investors = await readSheet(CONFIG.tabs.investors);
+    const maskedId = CONFIG.googleSheetId.substring(0, 4) + "..." + CONFIG.googleSheetId.substring(CONFIG.googleSheetId.length - 4);
+    console.warn(`[Hyper-Log] Using Sheet ID: ${maskedId}`);
+    console.warn(`[Hyper-Log] Fetched ${investors.length} total rows from Investors tab.`);
+    
+    investors = filterInvestors(investors);
+    const foundUsers = investors.map(i => (i.portalusername ?? i.username ?? "N/A")).join(", ");
+    console.warn(`[Hyper-Log] Available usernames after filtering: [${foundUsers}]`);
+
+    const targetUser = username.toLowerCase();
 
     const investor = investors.find((row) => {
-      // Skip inactive investors (default to active if column is missing)
-      const activeVal = row.active ?? row.Active;
-      if (activeVal != null && activeVal !== "" && !bool(activeVal)) return false;
+      // Skip inactive investors — matches "Active" column (bool handles truthy/falsy)
+      if (!bool(row.active ?? row.Active)) return false;
 
-      const rowUser = String(
-        row.portalusername ?? row.username ?? ""
-      ).trim();
+      const rowUser = String(row.portalusername ?? row.username ?? "").trim().toLowerCase();
       const rowPass = String(
-        row.temppasswordprototypeonly ??
-          row.temppassword ??
-          row.password ??
-          row.portalpassword ??
-          ""
+        row.temppassword ?? 
+        row.password ?? 
+        row.temppasswordprototypeonly ?? 
+        ""
       ).trim();
 
-      return rowUser === username && rowPass === password;
+      return rowUser === targetUser && rowPass === password;
     });
 
     if (!investor) {
+      console.log(`[Login] Failed login attempt for user: "${username}"`);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    console.log(`[Login] Successful login for: "${username}"`);
+
     const investorId = String(
-      investor.investorid ?? investor.id ?? investor.portalusername ?? investor.username ?? ""
+      investor.investorid ?? 
+      investor.id ?? 
+      investor.portalusername ?? 
+      investor.investorsinvestorid ?? 
+      ""
     ).trim();
 
     const token = createSession({ investorId });

@@ -303,12 +303,16 @@
       document.getElementById("statusText").textContent = "Not logged in";
     }
 
-    function renderSummary(summary) {
+    function renderSummary(data) {
+      const summary = data.summary;
+      const investor = data.investor;
       const cards = [
         ["Starting Capital", money(summary.startingCapital)],
         ["Current Balance", money(summary.currentBalance)],
         ["Total Gain", money(summary.totalGain)],
-        ["Net Change", money(summary.netChange)]
+        ["Total Draws/Withdrawals", money(summary.totalWithdrawals)],
+        ["Net Change", money(summary.netChange)],
+        ["Investor Split", (investor.splitPct || 0) + "%"]
       ];
 
       document.getElementById("summaryGrid").innerHTML = cards.map(([label, value]) => `
@@ -336,7 +340,7 @@
       `).join("");
 
       document.getElementById("liveMeta").textContent =
-        `Other stats: Gain ${live.gain}, Abs. Gain ${live.absGain}, Daily ${live.daily}, Monthly ${live.monthly}. Updated ${new Date(live.fetchedAt).toLocaleString()}`;
+        `Source: ${live.source} · Updated: ${new Date(live.fetchedAt).toLocaleString()}`;
     }
 
     function renderMonths(monthlyHistory) {
@@ -395,11 +399,11 @@
       document.getElementById("loginCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
       document.getElementById("investorName").textContent =
-        `${data.investor.name} · Split ${data.investor.splitPct}%`;
+        `${data.investor.name} · Started ${data.investor.startDate || "N/A"}`;
       document.getElementById("statusText").textContent =
         `Logged in as ${data.investor.name}`;
 
-      renderSummary(data.summary);
+      renderSummary(data);
       renderLive(data.live, data.liveDollarGains);
       renderMonths(data.monthlyHistory);
       renderBreakdown(data.breakdown);
