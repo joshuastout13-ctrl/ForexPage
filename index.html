@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stone &amp; Company Forex Fund</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #c8a96e;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --radius:    10px;
+      --font:      'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+    }
+
+    /* ── LOGIN ── */
+    #login-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+
+    .login-card .logo {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+
+    .login-card h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 2rem;
+    }
+
+    .login-card label {
+      display: block;
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .login-card input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 1.1rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .login-card input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #0d1117;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 0.65rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+
+    .btn:hover  { opacity: 0.88; }
+    .btn:active { opacity: 0.75; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 0.4rem 0.9rem;
+    }
+
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    #login-form .btn { width: 100%; margin-top: 0.5rem; }
+
+    .error-msg {
+      margin-top: 0.9rem;
+      font-size: 0.85rem;
+      color: var(--red);
+      min-height: 1.2em;
+    }
+
+    /* ── DASHBOARD ── */
+    #dashboard-section { display: none; }
+
+    .dash-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .dash-header .brand {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+
+    .dash-header .investor-name {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .dash-main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    /* Live performance pills */
+    .metrics-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .metric-pill {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      min-width: 120px;
+    }
+
+    .metric-pill .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .metric-pill .value {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .metric-pill .value.pos { color: var(--green); }
+    .metric-pill .value.neg { color: var(--red); }
+
+    .myfxbook-link {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+      display: inline-block;
+    }
+
+    .myfxbook-link a { color: var(--accent); text-decoration: none; }
+    .myfxbook-link a:hover { text-decoration: underline; }
+
+    /* Summary row */
+    .summary-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .summary-item {
+      flex: 1;
+      min-width: 140px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+
+    .summary-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .summary-item .value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    /* Monthly returns table */
+    .returns-table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      text-align: right;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th:first-child { text-align: left; }
+
+    td {
+      text-align: right;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+    }
+
+    td:first-child { text-align: left; font-weight: 600; }
+
+    tr:last-child td { border-bottom: none; }
+
+    td.pos { color: var(--green); }
+    td.neg { color: var(--red); }
+    td.neutral { color: var(--muted); }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      color: var(--muted);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    @media (max-width: 500px) {
+      .dash-header { padding: 0.75rem 1rem; }
+      .card { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════  LOGIN  ═══════════════════════════ -->
+<section id="login-section">
+  <div class="login-card">
+    <p class="logo">Stone &amp; Company</p>
+    <h1>Forex Fund Portal</h1>
+    <form id="login-form" novalidate>
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" autocomplete="email"
+             placeholder="you@example.com" required />
+
+      <label for="pin">PIN</label>
+      <input type="password" id="pin" name="pin" autocomplete="current-password"
+             placeholder="••••••" required inputmode="numeric" />
+
+      <button class="btn" type="submit" id="login-btn">Sign In</button>
+      <p class="error-msg" id="login-error" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<!-- ════════════════════════  DASHBOARD  ════════════════════════ -->
+<section id="dashboard-section">
+  <header class="dash-header">
+    <span class="brand">Stone &amp; Company Forex Fund</span>
+    <div style="display:flex;align-items:center;gap:0.75rem">
+      <span class="investor-name" id="investor-name"></span>
+      <button class="btn btn-ghost" id="logout-btn">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="dash-main" id="dash-content">
+    <div class="loading-text"><span class="spinner"></span> Loading your data…</div>
+  </main>
+</section>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   Helpers
+───────────────────────────────────────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+
+function fmt(n, decimals = 2) {
+  if (n == null) return "—";
+  return Number(n).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
+function fmtPct(n) {
+  if (n == null) return "—";
+  const sign = n >= 0 ? "+" : "";
+  return sign + fmt(n) + "%";
+}
+
+function fmtUSD(n) {
+  if (n == null) return "—";
+  return "$" + fmt(n);
+}
+
+function pctClass(n) {
+  if (n == null) return "neutral";
+  return n > 0 ? "pos" : n < 0 ? "neg" : "neutral";
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   On load: check session
+───────────────────────────────────────────────────────────────── */
+window.addEventListener("DOMContentLoaded", async () => {
+  const data = await fetchMe();
+  if (data) {
+    showDashboard(data);
+  } else {
+    showLogin();
+  }
+});
+
+async function fetchMe() {
+  try {
+    const res = await fetch("/api/me");
+    if (res.status === 401) return null;
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Login
+───────────────────────────────────────────────────────────────── */
+function showLogin() {
+  $("login-section").style.display = "";
+  $("dashboard-section").style.display = "none";
+}
+
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("login-btn");
+  const errEl = $("login-error");
+  const email = $("email").value.trim();
+  const pin   = $("pin").value.trim();
+
+  errEl.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, pin })
+    });
+
+    const body = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = body.error || "Login failed. Please try again.";
+      return;
+    }
+
+    // Fetch dashboard data
+    const data = await fetchMe();
+    if (data) {
+      showDashboard(data);
+    } else {
+      errEl.textContent = "Session error. Please try again.";
+    }
+  } catch {
+    errEl.textContent = "Network error. Please check your connection.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign In";
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────
+   Logout
+───────────────────────────────────────────────────────────────── */
+$("logout-btn").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  $("pin").value = "";
+  $("login-error").textContent = "";
+  showLogin();
+});
+
+/* ─────────────────────────────────────────────────────────────────
+   Dashboard rendering
+───────────────────────────────────────────────────────────────── */
+function showDashboard(data) {
+  $("login-section").style.display = "none";
+  $("dashboard-section").style.display = "";
+  $("investor-name").textContent = data.investor?.name || data.investor?.email || "";
+  $("dash-content").innerHTML = buildDashboardHTML(data);
+}
+
+function buildDashboardHTML(data) {
+  return [
+    buildMyfxbookCard(data.myfxbook),
+    buildSummaryCard(data.summary),
+    buildMonthlyReturnsCard(data.monthlyReturns)
+  ].join("");
+}
+
+/* ── Myfxbook Card ── */
+function buildMyfxbookCard(mx) {
+  if (!mx) return "";
+
+  const metrics = [
+    { label: "Gain",      value: mx.gain,     pct: true  },
+    { label: "Drawdown",  value: mx.drawdown, pct: true  },
+    { label: "Win Rate",  value: mx.winRate,  pct: false },
+    { label: "Trades",    value: mx.trades,   pct: false },
+    { label: "Balance",   value: mx.balance,  pct: false },
+    { label: "Profit",    value: mx.profit,   pct: false },
+    { label: "Pips",      value: mx.pips,     pct: false }
+  ].filter((m) => m.value != null);
+
+  const pills = metrics.length
+    ? metrics.map((m) => {
+        const raw = parseFloat(String(m.value).replace(/[%,$]/g, ""));
+        const cls = isNaN(raw) ? "" : raw > 0 ? " pos" : raw < 0 ? " neg" : "";
+        return `<div class="metric-pill">
+          <div class="label">${m.label}</div>
+          <div class="value${cls}">${m.value}</div>
+        </div>`;
+      }).join("")
+    : `<p class="empty-state">${mx.error ? "Live data unavailable" : "No data"}</p>`;
+
+  const ts = mx.fetchedAt
+    ? `Updated ${new Date(mx.fetchedAt).toLocaleTimeString()}`
+    : "";
+
+  return `<div class="card">
+    <h2>Live Performance</h2>
+    <div class="metrics-grid">${pills}</div>
+    <p class="myfxbook-link">${ts ? ts + " · " : ""}
+      <a href="https://www.myfxbook.com/members/PCSplus/stone-company/11915183"
+         target="_blank" rel="noopener">View on Myfxbook ↗</a></p>
+  </div>`;
+}
+
+/* ── Account Summary Card ── */
+function buildSummaryCard(summary) {
+  if (!summary) return "";
+  return `<div class="card">
+    <h2>Your Account Summary</h2>
+    <div class="summary-row">
+      <div class="summary-item">
+        <div class="label">Total Deposited</div>
+        <div class="value">${fmtUSD(summary.totalDeposited)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Total Withdrawn</div>
+        <div class="value">${fmtUSD(summary.totalWithdrawn)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Net Capital</div>
+        <div class="value">${fmtUSD(summary.netDeposited)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Monthly Returns Card ── */
+function buildMonthlyReturnsCard(returns) {
+  if (!returns?.length) {
+    return `<div class="card"><h2>Monthly Returns</h2>
+      <p class="empty-state">No return data available.</p></div>`;
+  }
+
+  // Group by year
+  const byYear = {};
+  for (const r of returns) {
+    if (!byYear[r.year]) byYear[r.year] = {};
+    byYear[r.year][r.month] = r.returnPct;
+  }
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const headerCells = MONTHS.map((m) => `<th>${m}</th>`).join("") + "<th>YTD</th>";
+
+  const rows = Object.keys(byYear).sort((a, b) => b - a).map((year) => {
+    const months = byYear[year];
+    let ytd = 1;
+    let hasAny = false;
+
+    const cells = MONTHS.map((_, i) => {
+      const mo = i + 1;
+      const v = months[mo];
+      if (v != null) {
+        ytd *= 1 + v / 100;
+        hasAny = true;
+        return `<td class="${pctClass(v)}">${fmtPct(v)}</td>`;
+      }
+      return `<td class="neutral">—</td>`;
+    }).join("");
+
+    const ytdPct = hasAny ? (ytd - 1) * 100 : null;
+    const ytdCell = `<td class="${pctClass(ytdPct)}">${fmtPct(ytdPct)}</td>`;
+
+    return `<tr><td>${year}</td>${cells}${ytdCell}</tr>`;
+  }).join("");
+
+  return `<div class="card">
+    <h2>Monthly Returns</h2>
+    <div class="returns-table-wrap">
+      <table>
+        <thead><tr><th>Year</th>${headerCells}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+</script>
+</body>
+</html>
