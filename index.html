@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stone and Company Forex Fund</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 640px) {
+      .hero { grid-template-columns: 1fr; }
+      .grid2 { grid-template-columns: 1fr !important; }
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 24px;
+    }
+
+    .kicker {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #8b949e;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 14px;
+    }
+
+    .muted { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+    .badge {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      font-size: 11px;
+      padding: 3px 10px;
+      color: #c9d1d9;
+    }
+
+    .value { font-weight: 700; color: #f0f6fc; }
+    .value.green { color: #3fb950; }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .right {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Login */
+    .login-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 540px) {
+      .login-grid { grid-template-columns: 1fr; }
+    }
+
+    input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #c9d1d9;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #58a6ff; }
+
+    button {
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      padding: 8px 18px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #2ea043; }
+
+    button.secondary {
+      background: #21262d;
+      border-color: #30363d;
+      color: #c9d1d9;
+    }
+
+    button.secondary:hover { background: #30363d; }
+
+    /* Summary & live grids */
+    .summary-grid,
+    .live-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .metric .label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+    .metric .value { font-size: 18px; font-weight: 700; color: #f0f6fc; }
+    .metric .subvalue { font-size: 12px; color: #3fb950; margin-top: 2px; }
+
+    /* Month grid */
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 10px;
+    }
+
+    .month-box {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .month-box .month { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+    .month-box .pct { font-size: 15px; font-weight: 700; color: #3fb950; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 700px;
+    }
+
+    th {
+      background: #21262d;
+      color: #8b949e;
+      font-weight: 600;
+      padding: 8px 12px;
+      text-align: right;
+      border-bottom: 1px solid #30363d;
+    }
+
+    th:first-child { text-align: left; }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #21262d;
+      text-align: right;
+      color: #c9d1d9;
+    }
+
+    td:first-child { text-align: left; color: #f0f6fc; font-weight: 500; }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #161b22; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="card">
+        <span class="kicker">Investor Portal</span>
+        <h1>Stone and Company Forex Fund</h1>
+        <div class="muted">
+          Simple first version: investor login, live Myfxbook headline stats,
+          monthly history from Google Sheets, and split-adjusted current balance.
+        </div>
+        <div class="badges">
+          <span class="badge">HTML Only Front End</span>
+          <span class="badge">Google Sheets Data</span>
+          <span class="badge">Myfxbook Live Cards</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="muted">Connection Status</div>
+        <div id="status" class="value green" style="font-size:30px;font-weight:700;margin-top:8px;">
+          Ready
+        </div>
+        <div id="statusText" class="muted">Not logged in</div>
+      </div>
+    </div>
+
+    <div id="loginCard" class="card">
+      <h2>Investor Login</h2>
+      <div class="login-grid">
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Username</div>
+          <input id="username" placeholder="Investor username">
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Password</div>
+          <input id="password" type="password" placeholder="Password">
+        </div>
+        <div>
+          <button id="loginBtn">Login</button>
+        </div>
+      </div>
+      <div id="loginError" class="muted" style="color:#ff8f8f;margin-top:10px;"></div>
+    </div>
+
+    <div id="dashboard" class="hidden">
+      <div class="grid2">
+        <div class="card">
+          <div class="right">
+            <div>
+              <h2>Investor Account</h2>
+              <div id="investorName" class="muted"></div>
+            </div>
+            <button id="logoutBtn" class="secondary">Logout</button>
+          </div>
+          <div class="summary-grid" id="summaryGrid" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="card">
+          <h2>Live Fund Performance</h2>
+          <div class="live-grid" id="liveGrid"></div>
+          <div id="liveMeta" class="muted" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Historical Monthly Returns</h2>
+        <div class="muted">
+          These are pulled from your Google Sheet and used for the monthly compounding logic.
+        </div>
+        <div class="month-grid" id="monthGrid" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Monthly Balance Breakdown</h2>
+        <div class="muted">
+          One-time withdrawals reduce that month's starting balance before the return is applied.
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="breakdownTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function money(n) {
+      return Number(n || 0).toLocaleString(undefined, {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function pct(n) {
+      const v = Number(n || 0);
+      return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+    }
+
+    async function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      document.getElementById("loginError").textContent = "";
+
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById("loginError").textContent =
+          data.error || "Login failed";
+        return;
+      }
+
+      await loadDashboard();
+    }
+
+    async function logout() {
+      await fetch("/api/logout", { method: "POST" });
+      document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("loginCard").classList.remove("hidden");
+      document.getElementById("statusText").textContent = "Not logged in";
+    }
+
+    function renderSummary(summary) {
+      const cards = [
+        ["Starting Capital", money(summary.startingCapital)],
+        ["Current Balance", money(summary.currentBalance)],
+        ["Total Gain", money(summary.totalGain)],
+        ["Net Change", money(summary.netChange)]
+      ];
+
+      document.getElementById("summaryGrid").innerHTML = cards.map(([label, value]) => `
+        <div class="metric">
+          <div class="label">${label}</div>
+          <div class="value">${value}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderLive(live, liveDollarGains) {
+      const items = [
+        ["Today", live.today, liveDollarGains.today],
+        ["This Week", live.week, liveDollarGains.week],
+        ["This Month", live.month, liveDollarGains.month],
+        ["This Year", live.year, liveDollarGains.year]
+      ];
+
+      document.getElementById("liveGrid").innerHTML = items.map(([label, value, dollars]) => `
+        <div class="metric">
+          <div class="label">${label}</div>
+          <div class="value">${value}</div>
+          <div class="subvalue">${money(dollars)} gain</div>
+        </div>
+      `).join("");
+
+      document.getElementById("liveMeta").textContent =
+        `Other stats: Gain ${live.gain}, Abs. Gain ${live.absGain}, Daily ${live.daily}, Monthly ${live.monthly}. Updated ${new Date(live.fetchedAt).toLocaleString()}`;
+    }
+
+    function renderMonths(monthlyHistory) {
+      document.getElementById("monthGrid").innerHTML = monthlyHistory.map((m) => `
+        <div class="month-box">
+          <div class="month">${m.month}</div>
+          <div class="pct">${pct(m.grossReturnPct)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderBreakdown(rows) {
+      const head = `
+        <tr>
+          <th>Month</th>
+          <th>Starting Balance</th>
+          <th>Gross Return</th>
+          <th>Investor Return</th>
+          <th>Gain</th>
+          <th>Deposits</th>
+          <th>Recurring Draw</th>
+          <th>One-Time Withdrawal</th>
+          <th>Ending Balance</th>
+        </tr>
+      `;
+
+      const body = rows.map((r) => `
+        <tr>
+          <td>${r.month}</td>
+          <td>${money(r.startingBalance)}</td>
+          <td>${pct(r.grossReturnPct)}</td>
+          <td>${pct(r.effectiveReturnPct)}</td>
+          <td>${money(r.gain)}</td>
+          <td>${money(r.deposits)}</td>
+          <td>${money(r.recurringDraw)}</td>
+          <td>${money(r.oneTimeWithdrawal)}</td>
+          <td>${money(r.endingBalance)}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("breakdownTable").innerHTML = head + body;
+    }
+
+    async function loadDashboard() {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById("loginCard").classList.remove("hidden");
+        document.getElementById("dashboard").classList.add("hidden");
+        document.getElementById("statusText").textContent =
+          data.error || "Please log in";
+        return;
+      }
+
+      document.getElementById("loginCard").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      document.getElementById("investorName").textContent =
+        `${data.investor.name} · Split ${data.investor.splitPct}%`;
+      document.getElementById("statusText").textContent =
+        `Logged in as ${data.investor.name}`;
+
+      renderSummary(data.summary);
+      renderLive(data.live, data.liveDollarGains);
+      renderMonths(data.monthlyHistory);
+      renderBreakdown(data.breakdown);
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", login);
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") login();
+    });
+    loadDashboard().catch(() => {});
+  </script>
+</body>
+</html>
