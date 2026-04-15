@@ -17,9 +17,18 @@ export default async function handler(req, res) {
     }
 
     let investors = await readSheet(CONFIG.tabs.investors);
-    const maskedId = CONFIG.googleSheetId.substring(0, 4) + "..." + CONFIG.googleSheetId.substring(CONFIG.googleSheetId.length - 4);
-    console.warn(`[Hyper-Log] Using Sheet ID: ${maskedId}`);
-    console.warn(`[Hyper-Log] Fetched ${investors.length} total rows from Investors tab.`);
+    
+    // [Hyper-Audit] Logging structure
+    if (investors.length > 0) {
+      console.warn(`[Hyper-Audit] Column Keys detected: [${Object.keys(investors[0]).join(", ")}]`);
+      const firstRow = investors[0];
+      const uKey = "portalusername";
+      const pKey = "temppasswordprototypeonly";
+      console.warn(`[Hyper-Audit] Row 1 Sample: { ${uKey}: "${firstRow[uKey]}", ${pKey}: "${String(firstRow[pKey] || "").substring(0, 2)}***" }`);
+    }
+
+    const unfiltered = investors.map(i => i.portalusername ?? i.username ?? "N/A").join(", ");
+    console.warn(`[Hyper-Audit] ALL usernames before filtering: [${unfiltered}]`);
     
     investors = filterInvestors(investors);
     const foundUsers = investors.map(i => (i.portalusername ?? i.username ?? "N/A")).join(", ");
