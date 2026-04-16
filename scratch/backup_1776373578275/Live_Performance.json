@@ -1,0 +1,62 @@
+[
+  {
+    "Live Performance (Myfxbook feed or manual fallback) Metric": "Today",
+    "liveperformancemyfxbookfeedormanualfallbackmetric": "Today",
+    "Value %": "0.00",
+    "value": "0.00",
+    "Source": "Myfxbook / example",
+    "source": "Myfxbook / example",
+    "Last Updated": "",
+    "lastupdated": "",
+    "Override?": "FALSE",
+    "override": "FALSE",
+    "Notes": "Use live pull; value shown is placeholder/example",
+    "notes": "Use live pull; value shown is placeholder/example",
+    "": ""
+  },
+  {
+    "Live Performance (Myfxbook feed or manual fallback) Metric": "This Week",
+    "liveperformancemyfxbookfeedormanualfallbackmetric": "This Week",
+    "Value %": "0.45",
+    "value": "0.45",
+    "Source": "Myfxbook / example",
+    "source": "Myfxbook / example",
+    "Last Updated": "",
+    "lastupdated": "",
+    "Override?": "FALSE",
+    "override": "FALSE",
+    "Notes": "Use live pull; value shown is placeholder/example",
+    "notes": "Use live pull; value shown is placeholder/example",
+    "": ""
+  },
+  {
+    "Live Performance (Myfxbook feed or manual fallback) Metric": "This Month",
+    "liveperformancemyfxbookfeedormanualfallbackmetric": "This Month",
+    "Value %": "0.75",
+    "value": "0.75",
+    "Source": "Myfxbook / example",
+    "source": "Myfxbook / example",
+    "Last Updated": "",
+    "lastupdated": "",
+    "Override?": "FALSE",
+    "override": "FALSE",
+    "Notes": "Use live pull; value shown is placeholder/example",
+    "notes": "Use live pull; value shown is placeholder/example",
+    "": ""
+  },
+  {
+    "Live Performance (Myfxbook feed or manual fallback) Metric": "This Year",
+    "liveperformancemyfxbookfeedormanualfallbackmetric": "This Year",
+    "Value %": "7.67",
+    "value": "7.67",
+    "Source": "Myfxbook / example",
+    "source": "Myfxbook / example",
+    "Last Updated": "",
+    "lastupdated": "",
+    "Override?": "FALSE",
+    "override": "FALSE",
+    "Notes": "Use live pull; value shown is placeholder/example",
+    "notes": "Use live pull; value shown is placeholder/example",
+    "": ""
+  }
+]
