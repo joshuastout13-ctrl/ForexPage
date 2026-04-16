@@ -166,6 +166,16 @@
     .hidden{display:none}
     .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .green{color:var(--success)}
+    .projection-row{opacity:0.65;font-style:italic}
+    .projection-tag{
+      font-size:10px;
+      background:rgba(255,255,255,0.1);
+      padding:2px 6px;
+      border-radius:4px;
+      margin-left:6px;
+      color:var(--muted);
+      font-weight:normal;
+    }
     @media(max-width:980px){
       .hero,.grid2{grid-template-columns:1fr}
       .live-grid,.summary-grid{grid-template-columns:repeat(2,1fr)}
@@ -174,6 +184,8 @@
     @media(max-width:640px){
       .live-grid,.summary-grid{grid-template-columns:1fr 1fr}
       .month-grid{grid-template-columns:repeat(2,1fr)}
+      th,td{padding:10px 8px;font-size:13px}
+      .metric .value{font-size:22px}
     }
   </style>
 </head>
@@ -368,8 +380,11 @@
       `;
 
       const body = rows.map((r) => `
-        <tr>
-          <td>${r.month}</td>
+        <tr class="${r.isProjection ? "projection-row" : ""}">
+          <td>
+            ${r.month}
+            ${r.isProjection ? '<span class="projection-tag">Projection</span>' : ""}
+          </td>
           <td>${money(r.startingBalance)}</td>
           <td>${pct(r.grossReturnPct)}</td>
           <td>${pct(r.effectiveReturnPct)}</td>
