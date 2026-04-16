@@ -191,12 +191,17 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="card" style="margin-bottom:18px;">
-      <span class="kicker">Investor Portal</span>
-      <h1>Stone and Company Forex Fund</h1>
+    <div class="hero">
+      <div class="card">
+        <span class="kicker">Investor Portal</span>
+        <h1>Stone and Company Forex Fund</h1>
+      </div>
+      <div id="statusCard" class="card">
+        <div class="muted">Connection Status</div>
+        <div id="status" class="value green" style="font-size:30px;font-weight:700;margin-top:8px;">Ready</div>
+        <div id="statusText" class="muted">Not logged in</div>
+      </div>
     </div>
-    <div id="status" class="hidden"></div>
-    <div id="statusText" class="hidden"></div>
 
     <div id="loginCard" class="card">
       <h2>Investor Login</h2>
@@ -394,7 +399,8 @@
       document.getElementById("loginCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
       document.getElementById("investorName").textContent =
-        `${data.investor.name} · Started ${data.investor.startDate || "N/A"}`;
+        `Started ${data.investor.startDate || "N/A"}`;
+      document.getElementById("status").textContent = "Ready";
       document.getElementById("statusText").textContent =
         `Logged in as ${data.investor.name}`;
 
