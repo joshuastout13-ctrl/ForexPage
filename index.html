@@ -401,8 +401,7 @@
       document.getElementById("investorName").textContent =
         `Started ${data.investor.startDate || "N/A"}`;
       document.getElementById("status").textContent = "Ready";
-      document.getElementById("statusText").textContent =
-        `Logged in as ${data.investor.name}`;
+      document.getElementById("statusText").textContent = "";
 
       renderSummary(data);
       renderLive(data.live, data.liveDollarGains);
