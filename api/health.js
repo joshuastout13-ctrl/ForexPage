@@ -1,9 +1,5 @@
 import { CONFIG } from "../lib/config.js";
 import { readSheet } from "../lib/sheets.js";
-import { getMyfxbookLive } from "../lib/myfxbook.js";
-
-import { CONFIG } from "../lib/config.js";
-import { readSheet } from "../lib/sheets.js";
 import { supabase } from "../lib/supabase.js";
 import { getMyfxbookLive } from "../lib/myfxbook.js";
 
