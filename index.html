@@ -191,28 +191,12 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="hero">
-      <div class="card">
-        <span class="kicker">Investor Portal</span>
-        <h1>Stone and Company Forex Fund</h1>
-        <div class="muted">
-          Simple investor portal: login, monthly history from Google Sheets,
-          and split-adjusted current balance calculations.
-        </div>
-        <div class="badges">
-          <span class="badge">HTML Only Front End</span>
-          <span class="badge">Google Sheets Data</span>
-          <span class="badge">Monthly Compounding</span>
-        </div>
-      </div>
-      <div class="card">
-        <div class="muted">Connection Status</div>
-        <div id="status" class="value green" style="font-size:30px;font-weight:700;margin-top:8px;">
-          Ready
-        </div>
-        <div id="statusText" class="muted">Not logged in</div>
-      </div>
+    <div class="card" style="margin-bottom:18px;">
+      <span class="kicker">Investor Portal</span>
+      <h1>Stone and Company Forex Fund</h1>
     </div>
+    <div id="status" class="hidden"></div>
+    <div id="statusText" class="hidden"></div>
 
     <div id="loginCard" class="card">
       <h2>Investor Login</h2>
@@ -254,17 +238,13 @@
 
       <div class="card">
         <h2>Historical Monthly Returns</h2>
-        <div class="muted">
-          These are pulled from your Google Sheet and used for the monthly compounding logic.
-        </div>
+
         <div class="month-grid" id="monthGrid" style="margin-top:14px;"></div>
       </div>
 
       <div class="card">
         <h2>Monthly Balance Breakdown</h2>
-        <div class="muted">
-          One-time withdrawals reduce that month's starting balance before the return is applied.
-        </div>
+
         <div style="overflow-x:auto;">
           <table id="breakdownTable"></table>
         </div>
