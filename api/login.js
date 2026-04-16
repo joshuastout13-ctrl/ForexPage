@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       investor.portalusername ?? 
       investor.investorsinvestorid ?? 
       ""
-    ).trim();
+    ).trim().toLowerCase();
 
     const token = createSession({ investorId });
     res.setHeader("Set-Cookie", sessionCookie(token));
