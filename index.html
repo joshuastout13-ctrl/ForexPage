@@ -408,11 +408,11 @@
       document.getElementById("loginCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
       
-      const startDateStr = String(data.investor.opendate ?? data.investor.startdate ?? data.investor.date ?? "").split(' ')[0];
-      document.getElementById("statusText").textContent = `Welcome, ${(data.investor.name || "").split(' ')[0]}`;
+      const firstName = (data.investor.name || "").split(' ')[0];
+      document.getElementById("statusText").textContent = `Welcome, ${firstName}`;
       
       document.getElementById("investorName").textContent =
-        `Started ${startDateStr || "N/A"}`;
+        `Started ${data.investor.startDate || "N/A"}`;
       document.getElementById("status").textContent = "Ready";
 
       renderSummary(data);
