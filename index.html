@@ -423,10 +423,16 @@
       const ctx = document.getElementById('performanceChart').getContext('2d');
       if (perfChart) perfChart.destroy();
 
-      const historical = data.breakdown.filter(r => !r.isProjection && r.startingBalance > 0);
-      const labels = historical.map(r => r.month);
-      const pctData = historical.map(r => r.effectiveReturnPct);
-      const dollarGains = historical.map(r => r.gain);
+      // Use all months from breakdown to ensure Jan-Dec are always visible
+      const fullBreakdown = data.breakdown;
+      const labels = fullBreakdown.map(r => r.month);
+      const pctData = fullBreakdown.map(r => r.isProjection ? null : r.effectiveReturnPct);
+      const dollarGains = fullBreakdown.map(r => r.gain);
+
+      // Create a premium gradient for the bars
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, 'rgba(79, 140, 255, 0.8)');
+      gradient.addColorStop(1, 'rgba(79, 140, 255, 0.1)');
 
       perfChart = new Chart(ctx, {
         type: 'bar',
@@ -435,11 +441,13 @@
           datasets: [{
             label: 'Monthly Return %',
             data: pctData,
-            backgroundColor: 'rgba(79, 140, 255, 0.6)',
+            backgroundColor: gradient,
             borderColor: '#4f8cff',
-            borderWidth: 2,
-            borderRadius: 8,
-            hoverBackgroundColor: 'rgba(79, 140, 255, 0.8)',
+            borderWidth: 1,
+            borderRadius: 6,
+            hoverBackgroundColor: 'rgba(79, 140, 255, 1)',
+            barPercentage: 0.5, // Make bars thinner
+            categoryPercentage: 0.8
           }]
         },
         options: {
@@ -448,6 +456,11 @@
           plugins: {
             legend: { display: false },
             tooltip: {
+              enabled: true,
+              filter: function(tooltipItem) {
+                // Only show tooltip if there's actual data
+                return tooltipItem.raw !== null;
+              },
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
               titleColor: '#e7eefb',
               bodyColor: '#e7eefb',
@@ -470,6 +483,7 @@
           scales: {
             y: {
               beginAtZero: true,
+              suggestedMax: 5, // Keep scale consistent
               grid: { color: 'rgba(255, 255, 255, 0.05)' },
               ticks: { 
                 color: '#9fb0cc',
@@ -478,7 +492,10 @@
             },
             x: {
               grid: { display: false },
-              ticks: { color: '#9fb0cc' }
+              ticks: { 
+                color: '#9fb0cc',
+                font: { size: 10 }
+              }
             }
           }
         }
