@@ -406,6 +406,10 @@
 
       document.getElementById("loginCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
+      
+      const firstName = (data.investor.name || "").split(' ')[0];
+      document.getElementById("statusText").textContent = `Welcome, ${firstName}`;
+      
       document.getElementById("investorName").textContent =
         `Started ${data.investor.startDate || "N/A"}`;
       document.getElementById("status").textContent = "Ready";
