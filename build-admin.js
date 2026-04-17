@@ -1,0 +1,701 @@
+const fs = require('fs');
+
+const css = `
+    :root{
+      --bg:#08101d;
+      --bg2:#0f172a;
+      --panel:rgba(17,26,46,.94);
+      --line:rgba(255,255,255,.08);
+      --text:#e7eefb;
+      --muted:#9fb0cc;
+      --accent:#4f8cff;
+      --accent2:#7fb3ff;
+      --success:#22c55e;
+      --danger:#ef4444;
+      --warning:#eab308;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+      background-attachment:fixed;
+      color:var(--text);
+      min-height:100vh;
+    }
+    .wrap{max-width:1440px;margin:0 auto;padding:24px 20px 48px}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:22px;
+      box-shadow:0 12px 40px rgba(0,0,0,.22);
+      margin-bottom:18px;
+    }
+    h1,h2,h3{margin:0 0 10px}
+    .muted{color:var(--muted);line-height:1.5}
+    .kicker{
+      display:inline-block;
+      padding:7px 12px;
+      border-radius:999px;
+      background:rgba(79,140,255,.12);
+      color:var(--accent2);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      border:1px solid rgba(127,179,255,.2);
+      margin-bottom:12px;
+    }
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+    input, select, textarea{
+      width:100%; padding:12px 13px; border-radius:12px;
+      border:1px solid var(--line); background:rgba(255,255,255,.04);
+      color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+    button{
+      padding:12px 16px; border:none; border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),#2f6df0);
+      color:#fff; font-weight:700; cursor:pointer;
+      transition:transform 0.1s, opacity 0.2s;
+    }
+    button:active{transform:scale(0.98)}
+    button[disabled]{opacity:0.5;cursor:not-allowed}
+    .secondary{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);}
+    .danger{background:linear-gradient(135deg,var(--danger),#c53030);}
+    .warning{background:linear-gradient(135deg,var(--warning),#b45309);}
+    
+    table{width:100%;min-width:1000px;border-collapse:collapse;}
+    th,td{padding:14px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;}
+    th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+    tr:last-child td{border-bottom:none}
+    
+    .hidden{display:none !important}
+    .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .green{color:var(--success)}
+    .red{color:var(--danger)}
+    
+    .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:bold;text-transform:uppercase;}
+    .badge.active{background:rgba(34,197,94,0.15);color:var(--success)}
+    .badge.inactive{background:rgba(239,68,68,0.15);color:var(--danger)}
+    .badge.pending{background:rgba(234,179,8,0.15);color:var(--warning)}
+
+    /* Modal styling */
+    .modal-overlay{
+      position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+      display:flex; justify-content:center; align-items:flex-start;
+      padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh;
+    }
+    .modal{
+      background:var(--panel); border:1px solid var(--line);
+      border-radius:22px; padding:24px; width:100%; max-width:600px;
+      box-shadow:0 20px 40px rgba(0,0,0,.4);
+    }
+    .form-group{margin-bottom:16px;}
+    .form-group label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;}
+    
+    /* Layout */
+    .dashboard-layout { display:flex; gap:24px; min-height:calc(100vh - 120px); align-items:flex-start; }
+    .sidebar { flex:0 0 240px; position:sticky; top:24px; }
+    .main-content { flex:1; min-width:0; }
+    
+    .nav-btn {
+      display:block; width:100%; text-align:left; padding:12px 16px;
+      background:transparent; border:1px solid transparent; color:var(--muted);
+      border-radius:12px; margin-bottom:8px; font-weight:600;
+      transition:0.2s;
+    }
+    .nav-btn:hover { background:rgba(255,255,255,.03); }
+    .nav-btn.active { background:rgba(79,140,255,.1); color:var(--text); border-color:rgba(127,179,255,.2); }
+
+    /* Toggles */
+    .toggle-switch{position:relative;width:44px;height:24px;background:rgba(255,255,255,0.1);border-radius:12px;cursor:pointer;transition:0.3s;}
+    .toggle-switch.on{background:var(--success)}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;}
+    .toggle-switch.on .toggle-knob{transform:translateX(20px);}
+`;
+
+const htmlBody = `
+  <div class="wrap">
+    
+    <!-- LOGIN VIEW -->
+    <div id="loginView" class="card" style="max-width:600px;margin:10vh auto;">
+      <div class="kicker">Admin Portal</div>
+      <h2>Secure Login</h2>
+      <div class="muted" style="margin-bottom:20px;">Enter your admin credentials.</div>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="loginUser" placeholder="admin" autofocus />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="loginPass" type="password" placeholder="••••••••" />
+      </div>
+      <div id="loginError" class="muted" style="color:var(--danger);margin-bottom:16px;"></div>
+      <button id="loginBtn" style="width:100%">Authenticate</button>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboardView" class="hidden">
+      <div class="right" style="margin-bottom:24px;">
+        <div>
+          <div class="kicker">Admin Portal</div>
+          <h1>Stone & Company Management</h1>
+        </div>
+        <div class="right">
+          <div id="adminName" class="muted">Logged in as Admin</div>
+          <button id="logoutBtn" class="secondary">Logout</button>
+        </div>
+      </div>
+
+      <div class="dashboard-layout">
+        <!-- SIDEBAR -->
+        <div class="sidebar card" style="padding:16px;">
+          <button class="nav-btn active" data-tab="investors">1. Investors</button>
+          <button class="nav-btn" data-tab="accounts">2. Accounts</button>
+          <button class="nav-btn" data-tab="deposits">3. Deposits</button>
+          <button class="nav-btn" data-tab="withdrawals">4. Withdrawals</button>
+          <button class="nav-btn" data-tab="returns">5. Monthly Returns</button>
+          <button class="nav-btn" data-tab="performance">6. Live Performance</button>
+          <button class="nav-btn" data-tab="snapshots">7. Snapshots</button>
+        </div>
+
+        <!-- MAIN TABLE -->
+        <div class="main-content card">
+          <div class="right" style="margin-bottom:20px;">
+            <h2 id="viewTitle" style="margin:0">Investors Directory</h2>
+            <div class="right">
+              <input id="searchBar" placeholder="Search..." style="max-width:200px" />
+              <button id="addEntityBtn">+ Add New</button>
+            </div>
+          </div>
+          <div id="loadingIndicator" class="muted hidden" style="padding:20px;text-align:center;">Loading data...</div>
+          <div style="overflow-x:auto;">
+            <table id="dataTable">
+              <thead id="dataHead"></thead>
+              <tbody id="dataBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERIC ENTITY MODAL -->
+  <div id="entityModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 id="modalTitle" style="margin:0">Add Item</h2>
+        <button class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
+      </div>
+      <form id="entityForm">
+        <input type="hidden" id="formAction" />
+        <input type="hidden" id="formId" />
+        
+        <div id="dynamicFormFields"></div>
+        <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;margin-top:16px;"></div>
+        
+        <div style="margin-top:24px;text-align:right;">
+          <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+          <button type="submit" id="saveEntityBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- STATUS/DELETE CONFIRM MODAL -->
+  <div id="statusModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:400px;text-align:center">
+      <h2 id="statusModalTitle">Confirm Action</h2>
+      <p id="statusModalText" class="muted" style="margin-bottom:24px;">Are you sure?</p>
+      <div class="right" style="justify-content:center">
+        <button class="secondary closeModalBtn">Cancel</button>
+        <button id="confirmStatusBtn" class="danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+`;
+
+const jsBody = \`
+    // App State
+    let state = {
+      admin: null,
+      tab: 'investors',
+      data: {
+        investors: [],
+        accounts: [],
+        deposits: [],
+        withdrawals: [],
+        returns: [],
+        performance: [],
+        snapshots: []
+      },
+      search: '',
+      targetId: null,      // For deletes/voids
+      targetAction: null,  // Type of confirmation
+      targetContext: null  // Which tab it triggered on
+    };
+
+    function money(n) { return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"}); }
+    function query(q) { return document.querySelector(q); }
+
+    const api = {
+      async request(endpoint, options = {}) {
+        const res = await fetch(endpoint, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...(options.headers||{}) }
+        });
+        const d = await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(d.error || 'API Error');
+        return d;
+      },
+      login: (u,p) => api.request('/api/admin/login', { method:'POST', body: JSON.stringify({username:u,password:p})}),
+      logout: () => api.request('/api/admin/logout', { method:'POST' }),
+      me: () => api.request('/api/admin/me')
+    };
+
+    async function init() {
+      try {
+        const res = await api.me();
+        state.admin = res.admin;
+        showDashboard();
+      } catch(e) {
+        document.getElementById('dashboardView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+      }
+    }
+
+    function showDashboard() {
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('dashboardView').classList.remove('hidden');
+      document.getElementById('adminName').textContent = \`Logged in as \${state.admin.name}\`;
+      loadTab(state.tab);
+    }
+
+    // --- Tab Manager ---
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.addEventListener('click', (e) => {
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        state.tab = e.currentTarget.dataset.tab;
+        
+        const titles = {
+          investors: 'Investors Directory',
+          accounts: 'Investor Accounts',
+          deposits: 'Deposits ledger',
+          withdrawals: 'Withdrawals ledger',
+          returns: 'Monthly Returns',
+          performance: 'Live Performance Overrides',
+          snapshots: 'Historical Snapshots (Read Only)'
+        };
+        document.getElementById('viewTitle').textContent = titles[state.tab];
+        
+        // Hide add button for snapshots
+        document.getElementById('addEntityBtn').style.display = (state.tab === 'snapshots' || state.tab === 'performance') ? 'none' : 'inline-block';
+        
+        loadTab(state.tab);
+      });
+    });
+
+    async function loadTab(tab) {
+      document.getElementById('loadingIndicator').classList.remove('hidden');
+      document.getElementById('dataHead').innerHTML = '';
+      document.getElementById('dataBody').innerHTML = '';
+      try {
+        let endpoint = '';
+        if(tab==='investors') endpoint = '/api/admin/investors';
+        else if(tab==='accounts') endpoint = '/api/admin/accounts';
+        else if(tab==='deposits') endpoint = '/api/admin/deposits';
+        else if(tab==='withdrawals') endpoint = '/api/admin/withdrawals';
+        else if(tab==='returns') endpoint = '/api/admin/monthly-returns';
+        else if(tab==='performance') endpoint = '/api/admin/live-performance';
+        else if(tab==='snapshots') endpoint = '/api/admin/snapshots';
+
+        if(endpoint) {
+          const res = await api.request(endpoint);
+          state.data[tab] = res[tab==='returns'?'monthlyReturns':(tab==='performance'?'livePerformance':tab)] || [];
+        }
+        
+        // Ensure investors are loaded if we are on accounts, deposits or withdrawals for dropdowns
+        if (['accounts', 'deposits', 'withdrawals'].includes(tab) && state.data.investors.length===0) {
+           const invRes = await api.request('/api/admin/investors');
+           state.data.investors = invRes.investors || [];
+        }
+        if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
+           const accRes = await api.request('/api/admin/accounts');
+           state.data.accounts = accRes.accounts || [];
+        }
+
+        renderTable();
+      } catch(e) {
+        alert('Failed to load data: ' + e.message);
+      } finally {
+        document.getElementById('loadingIndicator').classList.add('hidden');
+      }
+    }
+
+    function renderTable() {
+      const hd = document.getElementById('dataHead');
+      const bd = document.getElementById('dataBody');
+      const s = state.search.toLowerCase();
+      let d = state.data[state.tab];
+
+      if (state.tab === 'investors') {
+        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Split</th><th>Draw</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => {
+          const stClass = i.active ? 'active' : 'inactive';
+          return \`<tr>
+            <td><span class="badge \${stClass}">\${i.active?'Active':'Inactive'}</span></td>
+            <td>\${i.id}</td><td>\${i.first_name} \${i.last_name}</td><td>\${i.portal_username}</td>
+            <td>\${i.split_pct}%</td><td>\${money(i.monthly_draw)}</td>
+            <td>
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
+              <button class="action-btn" style="background:\${i.active?'var(--danger)':'var(--success)'}" data-action="\${i.active?'deactivate':'reactivate'}" data-id="\${i.id}">\${i.active?'Deactivate':'Reactivate'}</button>
+            </td>
+          </tr>\`;
+        }).join('');
+      }
+      else if (state.tab === 'accounts') {
+        hd.innerHTML = \`<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Date</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.name}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => \`<tr>
+            <td><span class="badge \${i.status==='Active'?'active':'inactive'}">\${i.status}</span></td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.name}</td><td>\${money(i.starting_capital)}</td><td>\${i.open_date}</td>
+            <td><button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button></td>
+          </tr>\`).join('');
+      }
+      else if (state.tab === 'deposits') {
+        hd.innerHTML = \`<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => {
+          const cls = i.type==='VOID'?'inactive':'active';
+          return \`<tr>
+            <td><span class="badge \${cls}">\${i.type}</span></td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.date}</td>
+            <td>
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
+              \${i.type!=='VOID'? \`<button class="danger action-btn" data-action="void" data-id="\${i.id}">Void</button>\` : ''}
+            </td>
+          </tr>\`;
+        }).join('');
+      }
+      else if (state.tab === 'withdrawals') {
+        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => {
+          let cls = 'pending';
+          if(i.status==='Approved' || i.status==='Completed') cls='active';
+          if(i.status==='Cancelled') cls='inactive';
+          return \`<tr>
+            <td><span class="badge \${cls}">\${i.status}</span></td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.month} \${i.year}</td>
+            <td>
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
+              \${i.status!=='Cancelled'? \`<button class="danger action-btn" data-action="cancel_wd" data-id="\${i.id}">Cancel</button>\` : ''}
+            </td>
+          </tr>\`;
+        }).join('');
+      }
+      else if (state.tab === 'returns') {
+        hd.innerHTML = \`<tr><th>Year/Month</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.year} \${i.month}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => \`<tr>
+            <td>\${i.month} \${i.year}</td><td>\${i.gross_return_pct}%</td><td>\${i.source}</td><td>\${i.locked?'Yes':'No'}</td><td>\${new Date(i.last_updated).toLocaleDateString()}</td>
+            <td><button class="secondary action-btn" data-action="edit_return" data-id="\${i.year}_\${i.month_number}">Edit</button></td>
+          </tr>\`).join('');
+      }
+      else if (state.tab === 'performance') {
+        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Override</th><th>Updated</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.metric}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => \`<tr>
+            <td>\${i.metric}</td><td>\${i.value_pct}%</td><td>\${i.source}</td><td>\${i.is_override?'Yes':'No'}</td><td>\${new Date(i.updated_at).toLocaleDateString()}</td>
+            <td><button class="secondary action-btn" data-action="edit_perf" data-id="\${i.metric}">Edit</button></td>
+          </tr>\`).join('');
+      }
+      else if (state.tab === 'snapshots') {
+        hd.innerHTML = \`<tr><th>Date</th><th>Investor</th><th>Account</th><th>Open Bal</th><th>Return %</th><th>Gain</th><th>Close Bal</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.investor_id} \${i.account_id} \${i.month} \${i.year}\`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => \`<tr>
+            <td>\${i.month} \${i.year}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td>
+            <td>\${money(i.opening_balance)}</td><td>\${i.effective_return_pct}%</td><td>\${money(i.gain_amount)}</td><td>\${money(i.ending_balance)}</td>
+          </tr>\`).join('');
+      }
+
+      if(d.length === 0) {
+        bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>\`;
+      }
+    }
+
+    document.getElementById('dataBody').onclick = function(e) {
+      const btn = e.target.closest('.action-btn');
+      if(!btn) return;
+      const { action, id } = btn.dataset;
+      
+      if(action === 'edit' || action === 'edit_return' || action === 'edit_perf') {
+        openModal(state.tab, 'edit', id);
+      } else {
+        openConfirm(state.tab, action, id);
+      }
+    };
+
+    // --- Dynamic Modal System ---
+    function openModal(tab, action, id) {
+      const title = document.getElementById('modalTitle');
+      const wrap = document.getElementById('dynamicFormFields');
+      document.getElementById('formAction').value = action;
+      document.getElementById('formId').value = id || '';
+      document.getElementById('modalError').textContent = '';
+      
+      let html = '';
+      let record = {};
+      
+      if(action === 'edit' || action === 'edit_return' || action === 'edit_perf') {
+        title.textContent = \`Edit \${tab.slice(0,-1)}\`;
+        if(tab === 'returns') {
+           const [y, m] = id.split('_');
+           record = state.data[tab].find(r => r.year == y && r.month_number == m) || {};
+        } else if (tab === 'performance') {
+           record = state.data[tab].find(r => r.metric == id) || {};
+        } else {
+           record = state.data[tab].find(r => r.id === id) || {};
+        }
+      } else {
+        title.textContent = \`Add \${tab.slice(0,-1)}\`;
+      }
+
+      function getInvOpts() {
+         return state.data.investors.map(i => \`<option value="\${i.id}" \${record.investor_id===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('');
+      }
+      function getAccOpts() {
+         return state.data.accounts.map(a => \`<option value="\${a.id}" \${record.account_id===a.id?'selected':''}>\${a.name} (\${a.id}) - Inv \${a.investor_id}</option>\`).join('');
+      }
+
+      if (tab === 'investors') {
+        html = \`
+          <div class="grid2">
+            <div class="form-group"><label>First Name</label><input id="f_first_name" value="\${record.first_name||''}" required /></div>
+            <div class="form-group"><label>Last Name</label><input id="f_last_name" value="\${record.last_name||''}" required /></div>
+            <div class="form-group"><label>Email</label><input id="f_email" type="email" value="\${record.email||''}" /></div>
+            <div class="form-group"><label>Portal Username</label><input id="f_portal_username" value="\${record.portal_username||''}" required /></div>
+            <div class="form-group"><label>Role</label><select id="f_role"><option \${record.role==='Admin'?'selected':''}>Investor</option><option \${record.role==='Admin'?'selected':''}>Admin</option></select></div>
+            <div class="form-group"><label>Temp Password</label><input id="f_temp_password" placeholder="Leave blank to keep current" /></div>
+            <div class="form-group"><label>Split %</label><input id="f_split_pct" type="number" step="0.1" value="\${record.split_pct||50}" required /></div>
+            <div class="form-group"><label>Monthly Draw ($)</label><input id="f_monthly_draw" type="number" step="1" value="\${record.monthly_draw||0}" required /></div>
+            <div class="form-group"><label>Start Date</label><input id="f_start_date" type="date" value="\${record.start_date||''}" required /></div>
+          </div>
+          \${action==='add' ? \`<div class="form-group"><label>Starting Capital ($) [Auto-creates linked account]</label><input id="f_starting_capital" type="number" step="0.01" /></div>\` : ''}
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      } 
+      else if (tab === 'accounts') {
+        html = \`
+          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account Name</label><input id="f_name" value="\${record.name||''}" required /></div>
+          \${action==='add' ? \`<div class="form-group"><label>Starting Capital ($)</label><input id="f_starting_capital" type="number" value="0" required /></div>\` : ''}
+          \${action==='edit' ? \`<div class="form-group"><label>Override Capital ($)</label><input id="f_starting_capital" type="number" value="\${record.starting_capital||0}" required /></div>\` : ''}
+          <div class="grid2">
+            <div class="form-group"><label>Open Date</label><input id="f_open_date" type="date" value="\${record.open_date||''}" required /></div>
+            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Active'?'selected':''}>Active</option><option \${record.status==='Closed'?'selected':''}>Closed</option></select></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      }
+      else if (tab === 'deposits') {
+        html = \`
+          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account</label><select id="f_account_id" required>\${getAccOpts()}</select></div>
+          <div class="grid2">
+            <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
+            <div class="form-group"><label>Date</label><input id="f_date" type="date" value="\${record.date||''}" required /></div>
+            <div class="form-group"><label>Type</label><select id="f_type"><option \${record.type==='Deposit'?'selected':''}>Deposit</option><option \${record.type==='Initial'?'selected':''}>Initial</option><option \${record.type==='VOID'?'selected':''}>VOID</option></select></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      }
+      else if (tab === 'withdrawals') {
+        html = \`
+          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account</label><select id="f_account_id" required>\${getAccOpts()}</select></div>
+          <div class="grid2">
+            <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
+            <div class="form-group"><label>Request Date</label><input id="f_request_date" type="date" value="\${record.request_date||''}" required /></div>
+            <div class="form-group"><label>Effective Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required /></div>
+            <div class="form-group"><label>Effective Month Number (1-12)</label><input id="f_month_number" type="number" min="1" max="12" value="\${record.month_number||new Date().getMonth()+1}" required /></div>
+            <div class="form-group"><label>Effective Month Name</label><input id="f_month" value="\${record.month||''}" required /></div>
+            <div class="form-group"><label>Status</label><select id="f_status">
+              <option \${record.status==='Pending'?'selected':''}>Pending</option>
+              <option \${record.status==='Approved'?'selected':''}>Approved</option>
+              <option \${record.status==='Completed'?'selected':''}>Completed</option>
+              <option \${record.status==='Cancelled'?'selected':''}>Cancelled</option>
+            </select></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      }
+      else if (tab === 'returns') {
+        html = \`
+          <div class="grid2">
+            <div class="form-group"><label>Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required \${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Month Number</label><input id="f_month_number" type="number" min="1" max="12" value="\${record.month_number||''}" required \${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Month Name</label><input id="f_month" value="\${record.month||''}" required \${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Gross Return PCT (%)</label><input id="f_gross_return_pct" type="number" step="0.001" value="\${record.gross_return_pct||0}" required /></div>
+            <div class="form-group"><label>Source</label><select id="f_source"><option \${record.source==='Manual'?'selected':''}>Manual</option><option \${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
+            <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" \${!record.locked?'selected':''}>No</option><option value="true" \${record.locked?'selected':''}>Yes</option></select></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      }
+      else if (tab === 'performance') {
+        html = \`
+          <div class="form-group"><label>Metric</label><input id="f_metric" value="\${record.metric}" readonly /></div>
+          <div class="form-group"><label>Value %</label><input id="f_value_pct" type="number" step="0.01" value="\${record.value_pct}" required /></div>
+          <div class="grid2">
+             <div class="form-group"><label>Source</label><input id="f_source" value="\${record.source||''}" /></div>
+             <div class="form-group"><label>Is Override</label><select id="f_is_override"><option value="true" \${record.is_override?'selected':''}>Yes</option><option value="false" \${!record.is_override?'selected':''}>No</option></select></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
+        \`;
+      }
+
+      wrap.innerHTML = html;
+      document.getElementById('entityModal').classList.remove('hidden');
+    }
+
+    function openConfirm(tab, action, id) {
+      state.targetContext = tab;
+      state.targetAction = action;
+      state.targetId = id;
+      document.getElementById('statusModalTitle').textContent = 'Confirm Action';
+      document.getElementById('statusModalText').textContent = \`Are you sure you want to \${action} this record (\${id})?\`;
+      document.getElementById('statusModal').classList.remove('hidden');
+    }
+
+    // --- Submissions ---
+    document.getElementById('entityForm').addEventListener('submit', async (e) => {
+       e.preventDefault();
+       const btn = document.getElementById('saveEntityBtn');
+       const err = document.getElementById('modalError');
+       const action = document.getElementById('formAction').value;
+       const id = document.getElementById('formId').value;
+       const tab = state.tab;
+       
+       let payload = {};
+       err.textContent = '';
+       btn.disabled = true;
+       btn.textContent = 'Saving...';
+
+       try {
+         // Gather generic form values
+         const fields = ['first_name', 'last_name', 'email', 'portal_username', 'role', 'temp_password', 'split_pct', 'monthly_draw', 'start_date', 'starting_capital', 'notes', 'investor_id', 'name', 'open_date', 'status', 'account_id', 'amount', 'date', 'type', 'request_date', 'year', 'month_number', 'month', 'gross_return_pct', 'source', 'locked', 'value_pct', 'is_override'];
+         
+         fields.forEach(f => {
+           const el = document.getElementById('f_'+f);
+           if(el && el.value !== '') {
+              let v = el.value;
+              if (el.tagName === 'SELECT') {
+                if (v==='true') v = true;
+                else if (v==='false') v = false;
+              }
+              // Map snake_case DOM id to camelCase Payload or snake_case payload depending on backend
+              // actually the API routes were built mostly expecting camelCase for main fields, 
+              // BUT my backend accepts both correctly via req.body destruct for many.
+              // Let's explicitly format the payload logic here:
+              payload[f.replace(/_([a-z])/g, g => g[1].toUpperCase())] = v; // camelCase
+              payload[f] = v; // snake_case also sent
+           }
+         });
+
+         let endpoint = '';
+         let method = action.startsWith('edit') ? 'PATCH' : 'POST';
+         
+         if(tab==='investors') endpoint = \`/api/admin/investors\${method==='PATCH'?'/'+id:''}\`;
+         else if(tab==='accounts') endpoint = \`/api/admin/accounts\${method==='PATCH'?'/'+id:''}\`;
+         else if(tab==='deposits') endpoint = \`/api/admin/deposits\${method==='PATCH'?'/'+id:''}\`;
+         else if(tab==='withdrawals') endpoint = \`/api/admin/withdrawals\${method==='PATCH'?'/'+id:''}\`;
+         else if(tab==='returns') {
+           endpoint = \`/api/admin/monthly-returns\`; 
+           if(method==='PATCH') payload.year = id.split('_')[0];
+           if(method==='PATCH') payload.monthNumber = id.split('_')[1];
+         }
+         else if(tab==='performance') {
+           endpoint = \`/api/admin/live-performance\`;
+           payload.metric = id;
+         }
+
+         await api.request(endpoint, { method, body: JSON.stringify(payload) });
+         
+         document.getElementById('entityModal').classList.add('hidden');
+         loadTab(tab); 
+       } catch(ex) {
+         err.textContent = ex.message;
+       } finally {
+         btn.disabled = false;
+         btn.textContent = 'Save Changes';
+       }
+    });
+
+    document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
+       const btn = e.target;
+       btn.disabled = true;
+       btn.textContent = 'Processing...';
+       try {
+         const { targetContext: tab, targetAction: action, targetId: id } = state;
+         let endpoint = '';
+         
+         if (action === 'deactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
+         else if (action === 'reactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
+         else if (action === 'void') endpoint = \`/api/admin/deposits/\${id}/void\`;
+         else if (action === 'cancel_wd') endpoint = \`/api/admin/withdrawals/\${id}/cancel\`;
+
+         await api.request(endpoint, { method: 'POST', body: JSON.stringify({ action }) }); // Action ignored in void/cancel but sent just in case
+         document.getElementById('statusModal').classList.add('hidden');
+         loadTab(tab);
+       } catch(ex) {
+         alert(ex.message);
+       } finally {
+         btn.disabled = false;
+         btn.textContent = 'Confirm';
+       }
+    });
+
+    document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
+
+    // Listeners
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const u = document.getElementById('loginUser').value;
+      const p = document.getElementById('loginPass').value;
+      try { await api.login(u,p); init(); } 
+      catch(e) { document.getElementById('loginError').textContent = e.message; }
+    });
+    document.getElementById('logoutBtn').addEventListener('click', async() => {
+      await api.logout(); window.location.reload();
+    });
+    document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
+    }));
+    document.getElementById('searchBar').addEventListener('input', (e) => {
+      state.search = e.target.value; renderTable();
+    });
+
+    // Boot
+    init();
+\`;
+
+const out = \`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Dashboard - Stone and Company</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>\${css}</style>
+</head>
+<body>
+  \${htmlBody}
+  <script>\${jsBody}</script>
+</body>
+</html>\`;
+
+fs.writeFileSync('admin.html', out);
+console.log('Successfully wrote dynamic admin.html');
