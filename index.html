@@ -345,8 +345,8 @@
         </div>
       `).join("");
 
-      document.getElementById("liveMeta").textContent =
-        `Updated: ${new Date(live.fetchedAt).toLocaleString()}`;
+      document.getElementById("liveMeta").textContent = `Source: ${data.source || 'Unknown'} | Updated: ${new Date().toLocaleString()}`;
+      console.log("[Dashboard] Raw Data:", data);
     }
 
     function renderMonths(monthlyHistory) {
