@@ -407,13 +407,12 @@
       document.getElementById("loginCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
       
-      const firstName = (data.investor.name || "").split(' ')[0];
-      document.getElementById("statusText").textContent = `Welcome, ${firstName}`;
+      const startDateStr = String(data.investor.opendate ?? data.investor.startdate ?? data.investor.date ?? "").split(' ')[0];
+      document.getElementById("statusText").textContent = `Welcome, ${(data.investor.name || "").split(' ')[0]}`;
       
       document.getElementById("investorName").textContent =
-        `Started ${data.investor.startDate || "N/A"}`;
+        `Started ${startDateStr || "N/A"}`;
       document.getElementById("status").textContent = "Ready";
-      document.getElementById("statusText").textContent = "";
 
       renderSummary(data);
       renderLive(data.live, data.liveDollarGains);
