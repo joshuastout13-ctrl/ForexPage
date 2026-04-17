@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Dashboard - Stone and Company</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#08101d;
+      --bg2:#0f172a;
+      --panel:rgba(17,26,46,.94);
+      --line:rgba(255,255,255,.08);
+      --text:#e7eefb;
+      --muted:#9fb0cc;
+      --accent:#4f8cff;
+      --accent2:#7fb3ff;
+      --success:#22c55e;
+      --danger:#ef4444;
+      --warning:#eab308;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+      background-attachment:fixed;
+      color:var(--text);
+      min-height:100vh;
+    }
+    .wrap{max-width:1280px;margin:0 auto;padding:24px 20px 48px}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:22px;
+      box-shadow:0 12px 40px rgba(0,0,0,.22);
+      margin-bottom:18px;
+    }
+    h1,h2,h3{margin:0 0 10px}
+    .muted{color:var(--muted);line-height:1.5}
+    .kicker{
+      display:inline-block;
+      padding:7px 12px;
+      border-radius:999px;
+      background:rgba(79,140,255,.12);
+      color:var(--accent2);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      border:1px solid rgba(127,179,255,.2);
+      margin-bottom:12px;
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+    }
+    .login-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+      gap:12px;
+      align-items:end;
+    }
+    input, select, textarea{
+      width:100%;
+      padding:12px 13px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      font-size:15px;
+      outline:none;
+      transition:border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color:var(--accent);
+    }
+    button{
+      padding:12px 16px;
+      border:none;
+      border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),#2f6df0);
+      color:#fff;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform 0.1s, opacity 0.2s;
+    }
+    button:active{transform:scale(0.98)}
+    button[disabled]{opacity:0.5;cursor:not-allowed}
+    .secondary{
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--line);
+      color:var(--text);
+    }
+    .danger{
+      background:linear-gradient(135deg,var(--danger),#c53030);
+    }
+    .warning{
+      background:linear-gradient(135deg,var(--warning),#b45309);
+    }
+    
+    table{
+      width:100%;
+      min-width:1000px;
+      border-collapse:collapse;
+    }
+    th,td{
+      padding:14px 12px;
+      border-bottom:1px solid var(--line);
+      text-align:left;
+      font-size:14px;
+    }
+    th{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      white-space:nowrap;
+    }
+    tr:last-child td{border-bottom:none}
+    
+    .hidden{display:none !important}
+    .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .green{color:var(--success)}
+    .red{color:var(--danger)}
+    
+    .badge{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:6px;
+      font-size:11px;
+      font-weight:bold;
+      text-transform:uppercase;
+    }
+    .badge.active{background:rgba(34,197,94,0.15);color:var(--success)}
+    .badge.inactive{background:rgba(239,68,68,0.15);color:var(--danger)}
+
+    /* Modal styling */
+    .modal-overlay{
+      position:fixed;
+      top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.6);
+      backdrop-filter:blur(4px);
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      padding-top:5vh;
+      z-index:1000;
+      overflow-y:auto;
+    }
+    .modal{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:24px;
+      width:100%;
+      max-width:600px;
+      box-shadow:0 20px 40px rgba(0,0,0,.4);
+      margin-bottom:5vh;
+    }
+    .form-group{margin-bottom:16px;}
+    .form-group label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;}
+    
+    .tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px;}
+    .tab{
+      padding:8px 16px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:bold;
+      font-size:14px;
+      color:var(--muted);
+      background:transparent;
+      border:1px solid transparent;
+    }
+    .tab.active{
+      background:rgba(255,255,255,0.08);
+      color:var(--text);
+      border-color:var(--line);
+    }
+    
+    #searchBar{
+      max-width:300px;
+      background:rgba(0,0,0,0.2);
+    }
+
+    /* Toggles */
+    .toggle-switch{
+      position:relative;
+      width:44px;
+      height:24px;
+      background:rgba(255,255,255,0.1);
+      border-radius:12px;
+      cursor:pointer;
+      transition:0.3s;
+    }
+    .toggle-switch.on{background:var(--success)}
+    .toggle-knob{
+      position:absolute;
+      top:2px; left:2px;
+      width:20px; height:20px;
+      background:#fff;
+      border-radius:50%;
+      transition:0.3s;
+    }
+    .toggle-switch.on .toggle-knob{
+      transform:translateX(20px);
+    }
+    
+    @media(max-width:980px){
+      .grid2{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    
+    <!-- LOGIN VIEW -->
+    <div id="loginView" class="card" style="max-width:600px;margin:10vh auto;">
+      <div class="kicker">Admin Portal</div>
+      <h2>Secure Login</h2>
+      <div class="muted" style="margin-bottom:20px;">Enter your admin credentials.</div>
+      
+      <div class="form-group">
+        <label>Username</label>
+        <input id="loginUser" placeholder="admin" autofocus />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="loginPass" type="password" placeholder="••••••••" />
+      </div>
+      
+      <div id="loginError" class="muted" style="color:var(--danger);margin-bottom:16px;"></div>
+      <button id="loginBtn" style="width:100%">Authenticate</button>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboardView" class="hidden">
+      <div class="right" style="margin-bottom:24px;">
+        <div>
+          <div class="kicker">Admin Portal</div>
+          <h1>Stone & Company Management</h1>
+        </div>
+        <div class="right">
+          <div id="adminName" class="muted">Logged in as Admin</div>
+          <button id="logoutBtn" class="secondary">Logout</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="right" style="margin-bottom:20px;align-items:flex-end;">
+          <div>
+            <h2>Investors Directory</h2>
+            <div class="tabs" id="filterTabs" style="margin-bottom:0;border:none;padding:0;">
+              <button class="tab active" data-filter="all">All</button>
+              <button class="tab" data-filter="active">Active</button>
+              <button class="tab" data-filter="inactive">Inactive</button>
+            </div>
+          </div>
+          <div class="right">
+            <input id="searchBar" placeholder="Search by name, ID or email..." />
+            <button id="addInvestorBtn">+ Add Investor</button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table id="investorsTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Investor ID</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Split %</th>
+                <th>Mo. Draw</th>
+                <th>Start Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="investorsBody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+        <div id="loadingIndicator" class="muted" style="padding:20px;text-align:center;">Loading investors...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Investor Form Modal -->
+  <div id="investorModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 id="modalTitle">Add Investor</h2>
+        <button class="secondary closeModalBtn" style="padding:6px 12px;">✕</button>
+      </div>
+
+      <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;"></div>
+
+      <form id="investorForm">
+        <input type="hidden" id="formAction" value="add" />
+        <input type="hidden" id="formId" value="" />
+
+        <div class="grid2">
+          <div class="form-group">
+            <label>First Name</label>
+            <input id="fName" required />
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input id="lName" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="form-group">
+            <label>Email</label>
+            <input id="fEmail" type="email" />
+          </div>
+          <div class="form-group">
+            <label>Portal Username</label>
+            <input id="fUsername" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="form-group">
+            <label>Role</label>
+            <select id="fRole">
+              <option value="Investor">Investor</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group" id="passGroup">
+            <label>Temp Password</label>
+            <input id="fPass" placeholder="Leave blank to keep existing" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="form-group">
+            <label>Split %</label>
+            <input id="fSplit" type="number" step="0.1" required />
+          </div>
+          <div class="form-group">
+            <label>Monthly Draw ($)</label>
+            <input id="fDraw" type="number" step="0.01" value="0" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input id="fStart" type="date" required />
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;justify-content:center;">
+            <label>Active Status</label>
+            <div id="fActiveToggle" class="toggle-switch on">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" id="startingCapitalGroup">
+          <label>Starting Capital ($) <span class="muted">- creates new account automatically</span></label>
+          <input id="fCapital" type="number" step="0.01" />
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="fNotes" rows="2"></textarea>
+        </div>
+
+        <div style="margin-top:24px;text-align:right;">
+          <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+          <button type="submit" id="saveInvestorBtn">Save Investor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Status Toggle Confirm Modal -->
+  <div id="statusModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:400px;">
+      <h2 id="statusModalTitle">Deactivate Investor?</h2>
+      <p id="statusModalText" class="muted" style="margin-bottom:24px;">
+        Are you sure? This will withdraw their access to the portal immediately. No historical data will be deleted.
+      </p>
+      
+      <div class="right" style="justify-content:flex-end;">
+         <button class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+         <button id="confirmStatusBtn" class="danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // App State
+    let state = {
+      admin: null,
+      investors: [],
+      filter: 'all', // all, active, inactive
+      search: '',
+      targetInvestorId: null,
+      targetAction: null // 'deactivate' or 'reactivate'
+    };
+
+    // DOM Elements
+    const views = {
+      login: document.getElementById('loginView'),
+      dash: document.getElementById('dashboardView')
+    };
+    const modals = {
+      investor: document.getElementById('investorModal'),
+      status: document.getElementById('statusModal')
+    };
+
+    function money(n) { return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"}); }
+    function query(q) { return document.querySelector(q); }
+
+    // --- API Service ---
+    const api = {
+      async request(endpoint, options = {}) {
+        const res = await fetch(endpoint, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...(options.headers||{}) }
+        });
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.error || 'API Error');
+        return data;
+      },
+      login: (u,p) => api.request('/api/admin/login', { method:'POST', body: JSON.stringify({username:u,password:p})}),
+      logout: () => api.request('/api/admin/logout', { method:'POST' }),
+      me: () => api.request('/api/admin/me'),
+      getInvestors: () => api.request('/api/admin/investors'),
+      createInvestor: (p) => api.request('/api/admin/investors', { method:'POST', body: JSON.stringify(p)}),
+      updateInvestor: (id, p) => api.request(`/api/admin/investors/${id}`, { method:'PATCH', body: JSON.stringify(p)}),
+      toggleStatus: (id, action) => api.request(`/api/admin/investors/${id}/status`, { method:'POST', body: JSON.stringify({action})})
+    };
+
+    // --- Boot Sequence ---
+    async function init() {
+      try {
+        const res = await api.me();
+        state.admin = res.admin;
+        showDashboard();
+      } catch(e) {
+        views.dash.classList.add('hidden');
+        views.login.classList.remove('hidden');
+      }
+    }
+
+    // --- UI Renderers ---
+    function showDashboard() {
+      views.login.classList.add('hidden');
+      views.dash.classList.remove('hidden');
+      document.getElementById('adminName').textContent = `Logged in as ${state.admin.name}`;
+      loadInvestors();
+    }
+
+    async function loadInvestors() {
+      document.getElementById('loadingIndicator').classList.remove('hidden');
+      try {
+        const res = await api.getInvestors();
+        state.investors = res.investors;
+        renderTable();
+      } catch(e) {
+        alert('Failed to load investors: ' + e.message);
+      } finally {
+        document.getElementById('loadingIndicator').classList.add('hidden');
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('investorsBody');
+      const filtered = state.investors.filter(inv => {
+        // Status filter
+        if(state.filter === 'active' && inv.active !== true) return false;
+        if(state.filter === 'inactive' && inv.active === true) return false;
+        
+        // Search filter
+        if(state.search) {
+          const s = state.search.toLowerCase();
+          const matchString = `${inv.id} ${inv.first_name} ${inv.last_name} ${inv.email} ${inv.portal_username}`.toLowerCase();
+          if(!matchString.includes(s)) return false;
+        }
+        return true;
+      });
+
+      tbody.innerHTML = filtered.map(inv => {
+        const name = [inv.first_name, inv.last_name].filter(Boolean).join(' ') || '-';
+        const stClass = inv.active ? 'active' : 'inactive';
+        const stText = inv.active ? 'Active' : 'Inactive';
+        const toggleBtn = inv.active 
+          ? `<button class="secondary action-btn" data-action="deactivate" data-id="${inv.id}" style="padding:6px 10px;font-size:12px;">Deactivate</button>`
+          : `<button class="action-btn" data-action="reactivate" data-id="${inv.id}" style="padding:6px 10px;font-size:12px;background:#22c55e">Reactivate</button>`;
+
+        return `
+          <tr>
+            <td><span class="badge ${stClass}">${stText}</span></td>
+            <td style="font-family:monospace;color:var(--accent2)">${inv.id}</td>
+            <td><strong>${name}</strong></td>
+            <td>${inv.portal_username || '-'}</td>
+            <td class="muted">${inv.email || '-'}</td>
+            <td>${inv.split_pct}%</td>
+            <td>${money(inv.monthly_draw)}</td>
+            <td>${inv.start_date || '-'}</td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="secondary edit-btn" data-id="${inv.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+                ${toggleBtn}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if(filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No investors found matching criteria.</td></tr>`;
+      }
+      
+      bindTableActions();
+    }
+
+    // --- Action Handlers ---
+    
+    // Login
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const u = document.getElementById('loginUser').value;
+      const p = document.getElementById('loginPass').value;
+      const err = document.getElementById('loginError');
+      err.textContent = 'Authenticating...';
+      try {
+        await api.login(u,p);
+        err.textContent = '';
+        init();
+      } catch(e) { err.textContent = e.message; }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async() => {
+      await api.logout();
+      window.location.reload();
+    });
+
+    // Filtering & Searching
+    document.getElementById('searchBar').addEventListener('input', (e) => {
+      state.search = e.target.value;
+      renderTable();
+    });
+
+    document.querySelectorAll('.tabs .tab').forEach(t => {
+      t.addEventListener('click', (e) => {
+        document.querySelectorAll('.tabs .tab').forEach(bt=>bt.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        state.filter = e.currentTarget.dataset.filter;
+        renderTable();
+      });
+    });
+
+    // Open Add Modal
+    document.getElementById('addInvestorBtn').addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = 'Add New Investor';
+      document.getElementById('formAction').value = 'add';
+      document.getElementById('investorForm').reset();
+      document.getElementById('fActiveToggle').classList.add('on');
+      document.getElementById('startingCapitalGroup').style.display = 'block';
+      document.getElementById('fPass').required = true;
+      modals.investor.classList.remove('hidden');
+    });
+
+    // Table buttons binding
+    function bindTableActions() {
+      // Event delegation handles dynamic buttons flawlessly
+      const tbody = document.getElementById('investorsBody');
+      tbody.onclick = function(e) {
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) return openEditModal(editBtn.dataset.id);
+
+        const actionBtn = e.target.closest('.action-btn');
+        if (actionBtn) return openStatusModal(actionBtn.dataset.id, actionBtn.dataset.action);
+      };
+    }
+
+    function openEditModal(id) {
+      const inv = state.investors.find(i => i.id === id);
+      if(!inv) return;
+      
+      document.getElementById('modalTitle').textContent = 'Edit Investor';
+      document.getElementById('formAction').value = 'edit';
+      document.getElementById('formId').value = id;
+      
+      document.getElementById('fName').value = inv.first_name || '';
+      document.getElementById('lName').value = inv.last_name || '';
+      document.getElementById('fEmail').value = inv.email || '';
+      document.getElementById('fUsername').value = inv.portal_username || '';
+      document.getElementById('fPass').value = ''; // Don't show password
+      document.getElementById('fPass').required = false; 
+      document.getElementById('fRole').value = inv.role || 'Investor';
+      document.getElementById('fSplit').value = inv.split_pct || 0;
+      document.getElementById('fDraw').value = inv.monthly_draw || 0;
+      document.getElementById('fStart').value = inv.start_date || '';
+      document.getElementById('fNotes').value = inv.notes || '';
+      
+      const tog = document.getElementById('fActiveToggle');
+      if(inv.active) tog.classList.add('on'); else tog.classList.remove('on');
+      
+      document.getElementById('startingCapitalGroup').style.display = 'none';
+      modals.investor.classList.remove('hidden');
+    }
+
+    function openStatusModal(id, action) {
+      state.targetInvestorId = id;
+      state.targetAction = action;
+      
+      const inv = state.investors.find(i=>i.id===id);
+      const name = inv ? `${inv.first_name} ${inv.last_name}` : 'Unknown';
+      
+      document.getElementById('statusModalTitle').textContent = action === 'deactivate' ? 'Deactivate Investor?' : 'Reactivate Investor?';
+      document.getElementById('statusModalText').textContent = action === 'deactivate'
+        ? `Are you sure you want to deactivate ${name}? They will immediately lose access to the portal.`
+        : `Are you sure you want to reactivate ${name}? They will regain access to the portal.`;
+        
+      const btn = document.getElementById('confirmStatusBtn');
+      btn.className = action === 'deactivate' ? 'danger' : '';
+      if(action==='reactivate') btn.style.background = 'var(--success)';
+      
+      modals.status.classList.remove('hidden');
+    }
+
+    // Custom Toggle Switch logic
+    document.getElementById('fActiveToggle').addEventListener('click', function() {
+      this.classList.toggle('on');
+    });
+
+    // Close Modals
+    document.querySelectorAll('.closeModalBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modals.investor.classList.add('hidden');
+        modals.status.classList.add('hidden');
+        document.getElementById('modalError').textContent = '';
+      });
+    });
+
+    // Form Submit
+    document.getElementById('investorForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const action = document.getElementById('formAction').value;
+      const id = document.getElementById('formId').value;
+      const btn = document.getElementById('saveInvestorBtn');
+      const err = document.getElementById('modalError');
+      err.textContent = '';
+      
+      const payload = {
+        firstName: document.getElementById('fName').value,
+        lastName: document.getElementById('lName').value,
+        email: document.getElementById('fEmail').value,
+        portalUsername: document.getElementById('fUsername').value,
+        role: document.getElementById('fRole').value,
+        splitPct: document.getElementById('fSplit').value,
+        monthlyDraw: document.getElementById('fDraw').value,
+        startDate: document.getElementById('fStart').value,
+        active: document.getElementById('fActiveToggle').classList.contains('on'),
+        notes: document.getElementById('fNotes').value
+      };
+      
+      const pass = document.getElementById('fPass').value;
+      if(pass) payload.tempPassword = pass;
+      
+      if(action === 'add') {
+         payload.startingCapital = document.getElementById('fCapital').value;
+      }
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        
+        if (action === 'add') {
+          await api.createInvestor(payload);
+        } else {
+          await api.updateInvestor(id, payload);
+        }
+        
+        modals.investor.classList.add('hidden');
+        loadInvestors(); // Refresh
+      } catch(ex) {
+        err.textContent = ex.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Investor';
+      }
+    });
+
+    // Confirm Status Change
+    document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
+      const btn = e.target;
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Applying...';
+        await api.toggleStatus(state.targetInvestorId, state.targetAction);
+        modals.status.classList.add('hidden');
+        loadInvestors(); // Refresh
+      } catch(ex) {
+        alert(ex.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm';
+      }
+    });
+
+    // Init app
+    init();
+
+  </script>
+</body>
+</html>
