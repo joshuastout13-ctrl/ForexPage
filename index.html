@@ -310,15 +310,15 @@
     }
 
     function renderSummary(data) {
-      const summary = data.summary;
-      const investor = data.investor;
+      const summary = data.summary || {};
+      const investor = data.investor || {};
       const cards = [
-        ["Starting Capital", money(summary.startingCapital)],
-        ["Current Balance", money(summary.currentBalance)],
-        ["Total Gain", money(summary.totalGain)],
-        ["Total Draws/Withdrawals", money(summary.totalWithdrawals)],
-        ["Net Change", money(summary.netChange)],
-        ["Investor Split", (investor.splitPct || 0) + "%"]
+        ["Starting Capital", money(summary.startingCapital ?? summary.starting_capital)],
+        ["Current Balance", money(summary.currentBalance ?? summary.current_balance)],
+        ["Total Gain", money(summary.totalGain ?? summary.total_gain)],
+        ["Total Draws/Withdrawals", money(summary.totalWithdrawals ?? summary.total_withdrawals)],
+        ["Net Change", money(summary.netChange ?? summary.net_change)],
+        ["Investor Split", (investor.splitPct || investor.split_pct || 0) + "%"]
       ];
 
       document.getElementById("summaryGrid").innerHTML = cards.map(([label, value]) => `
