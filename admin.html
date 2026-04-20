@@ -43,9 +43,25 @@
     .dashboard-layout { display:flex; gap:24px; min-height:calc(100vh - 120px); align-items:flex-start; }
     .sidebar { flex:0 0 240px; position:sticky; top:24px; }
     .main-content { flex:1; min-width:0; }
-    .nav-btn { display:block; width:100%; text-align:left; padding:12px 16px; background:transparent; border:1px solid transparent; color:var(--muted); border-radius:12px; margin-bottom:8px; font-weight:600; transition:0.2s; }
+    .nav-btn { display:block; width:100%; text-align:left; padding:12px 16px; background:transparent; border:1px solid transparent; color:var(--muted); border-radius:12px; margin-bottom:8px; font-weight:600; transition:0.2s; white-space:nowrap; }
     .nav-btn:hover { background:rgba(255,255,255,.03); }
     .nav-btn.active { background:rgba(79,140,255,.1); color:var(--text); border-color:rgba(127,179,255,.2); }
+
+    @media (max-width: 980px) {
+      .wrap { padding:12px 10px 48px; }
+      .right.header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .dashboard-layout { flex-direction: column; gap: 16px; }
+      .sidebar { 
+        position: relative; top: 0; flex: none; width: 100%; 
+        display: flex; overflow-x: auto; padding: 8px !important; gap: 8px;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      .sidebar::-webkit-scrollbar { display: none; }
+      .sidebar .nav-btn { margin-bottom: 0; padding: 10px 14px; font-size: 13px; flex: 0 0 auto; width: auto; }
+      .grid2 { grid-template-columns: 1fr; }
+      .modal { padding: 16px; border-radius: 16px; }
+      h1 { font-size: 1.5rem; }
+    }
   </style>
 </head>
 <body>
@@ -74,11 +90,16 @@
           <button class="nav-btn" data-tab="returns">5. Monthly Returns</button>
           <button class="nav-btn" data-tab="performance">6. Live Performance</button>
           <button class="nav-btn" data-tab="snapshots">7. Snapshots</button>
+          <button class="nav-btn" data-tab="history">8. Historical Data</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
             <h2 id="viewTitle" style="margin:0">Investors Directory</h2>
-            <div class="right"><input id="searchBar" placeholder="Search..." style="max-width:200px" /><button id="addEntityBtn">+ Add New</button></div>
+            <div id="viewActions" class="right">
+              <input id="searchBar" placeholder="Search..." style="max-width:200px" />
+              <button id="addEntityBtn">+ Add New</button>
+              <button id="importBtn" class="secondary hidden">Bulk Import</button>
+            </div>
           </div>
           <div id="loadingIndicator" class="muted hidden" style="padding:20px;text-align:center;">Loading data...</div>
           <div style="overflow-x:auto;">
@@ -108,6 +129,25 @@
     </div>
   </div>
 
+  <div id="importModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 style="margin:0">Bulk Import History</h2>
+        <button class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
+      </div>
+      <div class="muted" style="margin-bottom:20px;">Upload a CSV file with columns: month_number, year, opening_balance, deposits, withdrawals, gross_return_pct, manual_gain_amount, notes.</div>
+      <div class="form-group">
+        <label>Select CSV File</label>
+        <input type="file" id="csvFileInput" accept=".csv" />
+      </div>
+      <div id="importPreview" class="muted" style="margin-top:16px;max-height:200px;overflow:auto;font-size:12px;"></div>
+      <div style="margin-top:24px;text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="processImportBtn">Start Import</button>
+      </div>
+    </div>
+  </div>
+
   <div id="statusModal" class="modal-overlay hidden">
     <div class="modal" style="max-width:400px;text-align:center">
       <h2 id="statusModalTitle">Confirm Action</h2>
@@ -122,8 +162,8 @@
   <script>
     let state = {
       admin: null, tab: 'investors',
-      data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [] },
-      search: '', targetId: null, targetAction: null, targetContext: null
+      data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [] },
+      search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear()
     };
 
     function money(n) { return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"}); }
@@ -151,7 +191,7 @@
     function showDashboard() {
       document.getElementById('loginView').classList.add('hidden');
       document.getElementById('dashboardView').classList.remove('hidden');
-      document.getElementById('adminName').textContent = \`Logged in as \${state.admin.name}\`;
+      document.getElementById('adminName').textContent = `Logged in as ${state.admin.name}`;
       loadTab(state.tab);
     }
 
@@ -161,9 +201,10 @@
         e.currentTarget.classList.add('active');
         state.tab = e.currentTarget.dataset.tab;
         
-        const titles = { investors: 'Investors Directory', accounts: 'Investor Accounts', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots' };
+        const titles = { investors: 'Investors Directory', accounts: 'Investor Accounts', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
         document.getElementById('viewTitle').textContent = titles[state.tab];
-        document.getElementById('addEntityBtn').style.display = (['snapshots','performance'].includes(state.tab)) ? 'none' : 'inline-block';
+        document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
+        document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         loadTab(state.tab);
       });
     });
@@ -172,14 +213,23 @@
       document.getElementById('loadingIndicator').classList.remove('hidden');
       document.getElementById('dataHead').innerHTML = ''; document.getElementById('dataBody').innerHTML = '';
       try {
-        const endpoints = { investors: '/api/admin/investors', accounts: '/api/admin/accounts', deposits: '/api/admin/deposits', withdrawals: '/api/admin/withdrawals', returns: '/api/admin/monthly-returns', performance: '/api/admin/live-performance', snapshots: '/api/admin/snapshots' };
+        const endpoints = { 
+          investors: '/api/admin/investors', 
+          accounts: '/api/admin/accounts', 
+          deposits: '/api/admin/deposits', 
+          withdrawals: '/api/admin/withdrawals', 
+          returns: '/api/admin/monthly-returns', 
+          performance: '/api/admin/live-performance', 
+          snapshots: '/api/admin/snapshots',
+          history: `/api/admin/historical-data?investorId=${state.filterInvestor}&year=${state.filterYear}`
+        };
         
-        if (endpoints[tab]) {
+        if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
           const res = await api.request(endpoints[tab]);
-          state.data[tab] = res[tab==='returns'?'monthlyReturns':(tab==='performance'?'livePerformance':tab)] || [];
+          state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
         }
         
-        if (['accounts', 'deposits', 'withdrawals'].includes(tab) && state.data.investors.length===0) {
+        if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
            const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
         }
         if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
@@ -196,79 +246,122 @@
       let d = state.data[state.tab];
 
       if (state.tab === 'investors') {
-        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Split</th><th>Draw</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td><span class="badge \${i.active?'active':'inactive'}">\${i.active?'Active':'Inactive'}</span></td>
-            <td>\${i.id}</td><td>\${i.first_name} \${i.last_name}</td><td>\${i.portal_username}</td><td>\${i.split_pct}%</td><td>\${money(i.monthly_draw)}</td>
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Split</th><th>Draw</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.id} ${i.first_name} ${i.last_name} ${i.email}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td><span class="badge ${i.active?'active':'inactive'}">${i.active?'Active':'Inactive'}</span></td>
+            <td>${i.id}</td><td>${i.first_name} ${i.last_name}</td><td>${i.portal_username}</td><td>${i.split_pct}%</td><td>${money(i.monthly_draw)}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
-              <button class="action-btn" style="padding:6px 10px;font-size:12px;background:\${i.active?'var(--danger)':'var(--success)'}" data-action="\${i.active?'deactivate':'reactivate'}" data-id="\${i.id}">\${i.active?'Deactivate':'Reactivate'}</button>
+              <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              <button class="action-btn" style="padding:6px 10px;font-size:12px;background:${i.active?'var(--danger)':'var(--success)'}" data-action="${i.active?'deactivate':'reactivate'}" data-id="${i.id}">${i.active?'Deactivate':'Reactivate'}</button>
             </td>
-          </tr>\`).join('');
+          </tr>`).join('');
       } else if (state.tab === 'accounts') {
-        hd.innerHTML = \`<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Date</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.name}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td><span class="badge \${i.status==='Active'?'active':'inactive'}">\${i.status}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.name}</td><td>\${money(i.starting_capital)}</td><td>\${i.open_date}</td>
-            <td><button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button></td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Date</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.name}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td><span class="badge ${i.status==='Active'?'active':'inactive'}">${i.status}</span></td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.name}</td><td>${money(i.starting_capital)}</td><td>${i.open_date}</td>
+            <td><button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button></td>
+          </tr>`).join('');
       } else if (state.tab === 'deposits') {
-        hd.innerHTML = \`<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td><span class="badge \${i.type==='VOID'?'inactive':'active'}">\${i.type}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.date}</td>
+        hd.innerHTML = `<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td><span class="badge ${i.type==='VOID'?'inactive':'active'}">${i.type}</span></td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td><td>${i.date}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
-              \${i.type!=='VOID'? \`<button class="danger action-btn" data-action="void" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Void</button>\` : ''}
+              <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              ${i.type!=='VOID'? `<button class="danger action-btn" data-action="void" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Void</button>` : ''}
             </td>
-          </tr>\`).join('');
+          </tr>`).join('');
       } else if (state.tab === 'withdrawals') {
-        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
-          return \`<tr>
-            <td><span class="badge \${cls}">\${i.status}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.month} \${i.year}</td>
+          return `<tr>
+            <td><span class="badge ${cls}">${i.status}</span></td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td><td>${i.month} ${i.year}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
-              \${i.status!=='Cancelled'? \`<button class="danger action-btn" data-action="cancel_wd" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Cancel</button>\` : ''}
+              <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              ${i.status!=='Cancelled'? `<button class="danger action-btn" data-action="cancel_wd" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Cancel</button>` : ''}
             </td>
-          </tr>\`;
+          </tr>`;
         }).join('');
       } else if (state.tab === 'returns') {
-        hd.innerHTML = \`<tr><th>Date</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.year} \${i.month}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month} \${i.year}</td><td>\${i.gross_return_pct}%</td><td>\${i.source}</td><td>\${i.locked?'Yes':'No'}</td><td>\${new Date(i.last_updated).toLocaleDateString()}</td>
-            <td><button class="secondary action-btn" data-action="edit_return" data-id="\${i.year}_\${i.month_number}" style="padding:6px 10px;font-size:12px">Edit</button></td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Date</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.year} ${i.month}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.month} ${i.year}</td><td>${i.gross_return_pct}%</td><td>${i.source}</td><td>${i.locked?'Yes':'No'}</td><td>${new Date(i.last_updated).toLocaleDateString()}</td>
+            <td><button class="secondary action-btn" data-action="edit_return" data-id="${i.year}_${i.month_number}" style="padding:6px 10px;font-size:12px">Edit</button></td>
+          </tr>`).join('');
       } else if (state.tab === 'performance') {
-        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Override</th><th>Updated</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.metric}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.metric}</td><td>\${i.value_pct}%</td><td>\${i.source}</td><td>\${i.is_override?'Yes':'No'}</td><td>\${new Date(i.updated_at).toLocaleDateString()}</td>
-            <td><button class="secondary action-btn" data-action="edit_perf" data-id="\${i.metric}" style="padding:6px 10px;font-size:12px">Edit</button></td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Override</th><th>Updated</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.metric}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.metric}</td><td>${i.value_pct}%</td><td>${i.source}</td><td>${i.is_override?'Yes':'No'}</td><td>${new Date(i.updated_at).toLocaleDateString()}</td>
+            <td><button class="secondary action-btn" data-action="edit_perf" data-id="${i.metric}" style="padding:6px 10px;font-size:12px">Edit</button></td>
+          </tr>`).join('');
       } else if (state.tab === 'snapshots') {
-        hd.innerHTML = \`<tr><th>Date</th><th>Investor</th><th>Account</th><th>Open Bal</th><th>Return %</th><th>Gain</th><th>Close Bal</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.investor_id} \${i.account_id} \${i.month} \${i.year}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month} \${i.year}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td>
-            <td>\${money(i.opening_balance)}</td><td>\${i.effective_return_pct}%</td><td>\${money(i.gain_amount)}</td><td>\${money(i.ending_balance)}</td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Date</th><th>Investor</th><th>Account</th><th>Open Bal</th><th>Return %</th><th>Gain</th><th>Close Bal</th></tr>`;
+        d = d.filter(i => !s || `${i.investor_id} ${i.account_id} ${i.month} ${i.year}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.month} ${i.year}</td><td>${i.investor_id}</td><td>${i.account_id}</td>
+            <td>${money(i.opening_balance)}</td><td>${i.effective_return_pct}%</td><td>${money(i.gain_amount)}</td><td>${money(i.ending_balance)}</td>
+          </tr>`).join('');
+      } else if (state.tab === 'history') {
+        hd.innerHTML = `<tr><th>Month</th><th>Opening</th><th>Deps/Wds</th><th>Gross %</th><th>Manual Gain</th><th>Total Gain</th><th>Draw</th><th>Ending</th><th>Action</th></tr>`;
+        if(!state.filterInvestor) {
+          bd.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px">
+            <div class="muted" style="margin-bottom:12px">Select an investor and year to manage history:</div>
+            <div style="display:flex;justify-content:center;gap:10px;">
+              <select id="histInvSel" style="max-width:200px">${state.data.investors.map(i => `<option value="${i.id}">${i.first_name} ${i.last_name}</option>`).join('')}</select>
+              <input id="histYearSel" type="number" value="${state.filterYear}" style="width:100px" />
+              <button onclick="state.filterInvestor=document.getElementById('histInvSel').value; state.filterYear=document.getElementById('histYearSel').value; loadTab('history')">Load History</button>
+            </div>
+          </td></tr>`;
+        } else {
+          bd.innerHTML = `<tr><td colspan="9" style="background:rgba(255,255,255,.02);padding:12px;">
+             <div class="right">
+               <span class="muted">Investor ID: ${state.filterInvestor} | Year: ${state.filterYear}</span>
+               <div class="right">
+                 <button class="secondary" onclick="state.filterInvestor=''; loadTab('history')">Change Investor</button>
+                 <button id="recalcBtn" class="secondary" style="background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.2)">Recalculate Remaining Year</button>
+               </div>
+             </div>
+          </td></tr>`;
+          bd.innerHTML += d.map(i => `<tr>
+              <td style="font-weight:600">${i.month}</td>
+              <td>${money(i.opening_balance)}</td>
+              <td>+${money(i.deposits)} / -${money(i.withdrawals)}</td>
+              <td>${i.gross_return_pct}%</td>
+              <td>${i.is_manual ? `<span style="color:var(--success)">${money(i.manual_gain_amount)}</span>` : '<span class="muted">Auto</span>'}</td>
+              <td>${money(i.ending_balance - (i.opening_balance + i.deposits - i.withdrawals) + i.recurring_draw)}</td>
+              <td>${money(i.recurring_draw)}</td>
+              <td style="font-weight:600">${money(i.ending_balance)}</td>
+              <td><button class="secondary action-btn" data-action="edit_history" data-id="${i.month_number}" style="padding:4px 8px;font-size:11px">Edit</button></td>
+            </tr>`).join('');
+          
+          setTimeout(() => {
+            if(document.getElementById('recalcBtn')) {
+              document.getElementById('recalcBtn').onclick = async () => {
+                 if(!confirm('Recalculate balances from this point forward? Manual entries will be preserved but balances will be cascaded. Ensure you have entered correct Gross Returns for the fund first.')) return;
+                 try { await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); loadTab('history'); }
+                 catch(e) { alert(e.message); }
+              };
+            }
+          }, 0);
+        }
       }
 
-      if(d.length === 0) bd.innerHTML = \`<tr><td colspan="7" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>\`;
+      if(d.length === 0) bd.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>`;
     }
 
     document.getElementById('dataBody').onclick = function(e) {
       const btn = e.target.closest('.action-btn'); if(!btn) return;
       const { action, id } = btn.dataset;
-      if(['edit','edit_return','edit_perf'].includes(action)) openModal(state.tab, action, id);
+      if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
       else openConfirm(state.tab, action, id);
     };
 
@@ -278,73 +371,87 @@
       
       let html = '', record = {};
       if(action.startsWith('edit')) {
-        document.getElementById('modalTitle').textContent = \`Edit Item\`;
+        document.getElementById('modalTitle').textContent = `Edit Item`;
         if(tab === 'returns') { const [y, m] = id.split('_'); record = state.data[tab].find(r => r.year==y && r.month_number==m) || {}; }
         else if(tab === 'performance') record = state.data[tab].find(r => r.metric == id) || {};
         else record = state.data[tab].find(r => r.id === id) || {};
-      } else document.getElementById('modalTitle').textContent = \`Add Item\`;
+      } else document.getElementById('modalTitle').textContent = `Add Item`;
 
-      const getInvOpts = () => state.data.investors.map(i => \`<option value="\${i.id}" \${record.investor_id===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('');
-      const getAccOpts = () => state.data.accounts.map(a => \`<option value="\${a.id}" \${record.account_id===a.id?'selected':''}>\${a.name} - Inv \${a.investor_id}</option>\`).join('');
+      const getInvOpts = () => state.data.investors.map(i => `<option value="${i.id}" ${record.investor_id===i.id?'selected':''}>${i.first_name} ${i.last_name} (${i.id})</option>`).join('');
+      const getAccOpts = () => state.data.accounts.map(a => `<option value="${a.id}" ${record.account_id===a.id?'selected':''}>${a.name} - Inv ${a.investor_id}</option>`).join('');
 
       if(tab === 'investors') {
-        html = \`<div class="grid2">
-            <div class="form-group"><label>First Name</label><input id="f_firstName" value="\${record.first_name||''}" required /></div>
-            <div class="form-group"><label>Last Name</label><input id="f_lastName" value="\${record.last_name||''}" required /></div>
-            <div class="form-group"><label>Email</label><input id="f_email" type="email" value="\${record.email||''}" /></div>
-            <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="\${record.portal_username||''}" required /></div>
-            <div class="form-group"><label>Role</label><select id="f_role"><option \${record.role==='Admin'?'selected':''}>Investor</option><option \${record.role==='Admin'?'selected':''}>Admin</option></select></div>
+        html = `<div class="grid2">
+            <div class="form-group"><label>First Name</label><input id="f_firstName" value="${record.first_name||''}" required /></div>
+            <div class="form-group"><label>Last Name</label><input id="f_lastName" value="${record.last_name||''}" required /></div>
+            <div class="form-group"><label>Email</label><input id="f_email" type="email" value="${record.email||''}" /></div>
+            <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="${record.portal_username||''}" required /></div>
+            <div class="form-group"><label>Role</label><select id="f_role"><option ${record.role==='Admin'?'selected':''}>Investor</option><option ${record.role==='Admin'?'selected':''}>Admin</option></select></div>
             <div class="form-group"><label>Temp Password</label><input id="f_tempPassword" placeholder="Leave blank to keep" /></div>
-            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="\${record.split_pct||50}" required /></div>
-            <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="\${record.monthly_draw||0}" required /></div>
-            <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="\${record.start_date||''}" required /></div>
+            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="${record.split_pct||50}" required /></div>
+            <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="${record.monthly_draw||0}" required /></div>
+            <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="${record.start_date||''}" required /></div>
           </div>
-          \${action==='add' ? \`<div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" /></div>\` : ''}
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+          ${action==='add' ? `<div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" /></div>` : ''}
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'accounts') {
-        html = \`<div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account Name</label><input id="f_name" value="\${record.name||''}" required /></div>
-          <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="\${record.starting_capital||0}" required /></div>
+        html = `<div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account Name</label><input id="f_name" value="${record.name||''}" required /></div>
+          <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="${record.starting_capital||0}" required /></div>
           <div class="grid2">
-            <div class="form-group"><label>Open Date</label><input id="f_openDate" type="date" value="\${record.open_date||''}" required /></div>
-            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Active'?'selected':''}>Active</option><option \${record.status==='Closed'?'selected':''}>Closed</option></select></div>
+            <div class="form-group"><label>Open Date</label><input id="f_openDate" type="date" value="${record.open_date||''}" required /></div>
+            <div class="form-group"><label>Status</label><select id="f_status"><option ${record.status==='Active'?'selected':''}>Active</option><option ${record.status==='Closed'?'selected':''}>Closed</option></select></div>
           </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'deposits' || tab === 'withdrawals') {
-        html = \`<div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account</label><select id="f_accountId" required>\${getAccOpts()}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
-          \${tab==='deposits' ? \`
+        html = `<div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account</label><select id="f_accountId" required>${getAccOpts()}</select></div>
+          <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="${record.amount||0}" required /></div>
+          ${tab==='deposits' ? `
             <div class="grid2">
-              <div class="form-group"><label>Date</label><input id="f_date" type="date" value="\${record.date||''}" required /></div>
-              <div class="form-group"><label>Type</label><select id="f_type"><option \${record.type==='Deposit'?'selected':''}>Deposit</option><option \${record.type==='Initial'?'selected':''}>Initial</option><option \${record.type==='VOID'?'selected':''}>VOID</option></select></div>
+              <div class="form-group"><label>Date</label><input id="f_date" type="date" value="${record.date||''}" required /></div>
+              <div class="form-group"><label>Type</label><select id="f_type"><option ${record.type==='Deposit'?'selected':''}>Deposit</option><option ${record.type==='Initial'?'selected':''}>Initial</option><option ${record.type==='VOID'?'selected':''}>VOID</option></select></div>
             </div>
-          \` : \`
+          ` : `
             <div class="grid2">
-              <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="\${record.request_date||''}" required /></div>
-              <div class="form-group"><label>Eff. Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required /></div>
-              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||new Date().getMonth()+1}" required /></div>
-              <div class="form-group"><label>Month Name</label><input id="f_month" value="\${record.month||''}" required /></div>
+              <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="${record.request_date||''}" required /></div>
+              <div class="form-group"><label>Eff. Year</label><input id="f_year" type="number" value="${record.year||new Date().getFullYear()}" required /></div>
+              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||new Date().getMonth()+1}" required /></div>
+              <div class="form-group"><label>Month Name</label><input id="f_month" value="${record.month||''}" required /></div>
             </div>
-            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Pending'?'selected':''}>Pending</option><option \${record.status==='Approved'?'selected':''}>Approved</option><option \${record.status==='Completed'?'selected':''}>Completed</option><option \${record.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
-          \`}
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+            <div class="form-group"><label>Status</label><select id="f_status"><option ${record.status==='Pending'?'selected':''}>Pending</option><option ${record.status==='Approved'?'selected':''}>Approved</option><option ${record.status==='Completed'?'selected':''}>Completed</option><option ${record.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
+          `}
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'returns') {
-        html = \`<div class="grid2">
-            <div class="form-group"><label>Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||''}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Month Name</label><input id="f_month" value="\${record.month||''}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="\${record.gross_return_pct||0}" required /></div>
-            <div class="form-group"><label>Source</label><select id="f_source"><option \${record.source==='Manual'?'selected':''}>Manual</option><option \${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
-            <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" \${!record.locked?'selected':''}>No</option><option value="true" \${record.locked?'selected':''}>Yes</option></select></div>
-          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+        html = `<div class="grid2">
+            <div class="form-group"><label>Year</label><input id="f_year" type="number" value="${record.year||new Date().getFullYear()}" required ${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||''}" required ${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Month Name</label><input id="f_month" value="${record.month||''}" required ${action==='edit_return'?'readonly':''} /></div>
+            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="${record.gross_return_pct||0}" required /></div>
+            <div class="form-group"><label>Source</label><select id="f_source"><option ${record.source==='Manual'?'selected':''}>Manual</option><option ${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
+            <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" ${!record.locked?'selected':''}>No</option><option value="true" ${record.locked?'selected':''}>Yes</option></select></div>
+          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'performance') {
-        html = \`<div class="form-group"><label>Metric</label><input id="f_metric" value="\${record.metric}" readonly /></div>
-          <div class="form-group"><label>Value %</label><input id="f_valuePct" type="number" step="0.01" value="\${record.value_pct}" required /></div>
+        html = `<div class="form-group"><label>Metric</label><input id="f_metric" value="${record.metric}" readonly /></div>
+          <div class="form-group"><label>Value %</label><input id="f_valuePct" type="number" step="0.01" value="${record.value_pct}" required /></div>
           <div class="grid2">
-             <div class="form-group"><label>Source</label><input id="f_source" value="\${record.source||''}" /></div>
-             <div class="form-group"><label>Is Override</label><select id="f_isOverride"><option value="true" \${record.is_override?'selected':''}>Yes</option><option value="false" \${!record.is_override?'selected':''}>No</option></select></div>
-          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+             <div class="form-group"><label>Source</label><input id="f_source" value="${record.source||''}" /></div>
+             <div class="form-group"><label>Is Override</label><select id="f_isOverride"><option value="true" ${record.is_override?'selected':''}>Yes</option><option value="false" ${!record.is_override?'selected':''}>No</option></select></div>
+          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
+      } else if (tab === 'history') {
+        record = state.data[tab].find(r => r.month_number == id) || {};
+        html = `<div class="grid2">
+            <div class="form-group"><label>Month</label><input value="${record.month}" readonly /></div>
+            <div class="form-group"><label>Opening Balance ($)</label><input id="f_openingBalance" type="number" step="0.01" value="${record.opening_balance}" required /></div>
+            <div class="form-group"><label>Deposits ($)</label><input id="f_deposits" type="number" step="0.01" value="${record.deposits}" /></div>
+            <div class="form-group"><label>Withdrawals ($)</label><input id="f_withdrawals" type="number" step="0.01" value="${record.withdrawals}" /></div>
+            <div class="form-group"><label>Recurring Draw ($)</label><input id="f_recurringDraw" type="number" step="0.01" value="${record.recurring_draw}" /></div>
+            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="${record.gross_return_pct}" /></div>
+            <div class="form-group"><label>Manual Gain ($ Override)</label><input id="f_manualGainAmount" type="number" step="0.01" value="${record.manual_gain_amount||''}" placeholder="Leave blank for auto" /></div>
+            <div class="form-group"><label>Manual Return % Override</label><input id="f_manualReturnPct" type="number" step="0.001" value="${record.manual_return_pct||''}" placeholder="Leave blank for auto" /></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>
+          <div class="muted" style="margin-top:10px;font-size:12px">Note: Saving will mark this month as manual and update the ending balance. Use "Recalculate Forward" afterward to cascade balances.</div>`;
       }
 
       document.getElementById('dynamicFormFields').innerHTML = html;
@@ -354,7 +461,7 @@
     function openConfirm(tab, action, id) {
       state.targetContext = tab; state.targetAction = action; state.targetId = id;
       document.getElementById('statusModalTitle').textContent = 'Confirm Action';
-      document.getElementById('statusModalText').textContent = \`Are you sure you want to \${action} record \${id}?\`;
+      document.getElementById('statusModalText').textContent = `Are you sure you want to ${action} record ${id}?`;
       document.getElementById('statusModal').classList.remove('hidden');
     }
 
@@ -365,7 +472,7 @@
        const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
 
        try {
-         const fields = ['firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric'];
+         const fields = ['firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct'];
          fields.forEach(f => {
            const el = document.getElementById('f_'+f);
            if(el && el.value !== '') {
@@ -376,12 +483,17 @@
          });
 
          let endpoint = '', method = action.startsWith('edit') ? 'PATCH' : 'POST';
-         if(tab==='investors') endpoint = \`/api/admin/investors\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='accounts') endpoint = \`/api/admin/accounts\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='deposits') endpoint = \`/api/admin/deposits\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='withdrawals') endpoint = \`/api/admin/withdrawals\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='returns') { endpoint = \`/api/admin/monthly-returns\`; }
-         else if(tab==='performance') { endpoint = \`/api/admin/live-performance\`; payload.metric = id; }
+         if(tab==='investors') endpoint = `/api/admin/investors${method==='PATCH'?'/'+id:''}`;
+         else if(tab==='accounts') endpoint = `/api/admin/accounts${method==='PATCH'?'/'+id:''}`;
+         else if(tab==='deposits') endpoint = `/api/admin/deposits${method==='PATCH'?'/'+id:''}`;
+         else if(tab==='withdrawals') endpoint = `/api/admin/withdrawals${method==='PATCH'?'/'+id:''}`;
+         else if(tab==='returns') { endpoint = `/api/admin/monthly-returns`; }
+         else if(tab==='performance') { endpoint = `/api/admin/live-performance`; payload.metric = id; }
+         else if(tab==='history') { 
+           endpoint = `/api/admin/historical-data`; 
+           payload.investorId = state.filterInvestor; payload.year = state.filterYear; payload.monthNumber = id;
+           payload.isManual = true;
+         }
 
          await api.request(endpoint, { method, body: JSON.stringify(payload) });
          document.getElementById('entityModal').classList.add('hidden');
@@ -395,10 +507,10 @@
        try {
          const { targetContext: tab, targetAction: action, targetId: id } = state;
          let endpoint = '';
-         if (action === 'deactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
-         else if (action === 'reactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
-         else if (action === 'void') endpoint = \`/api/admin/deposits/\${id}/void\`;
-         else if (action === 'cancel_wd') endpoint = \`/api/admin/withdrawals/\${id}/cancel\`;
+         if (action === 'deactivate') endpoint = `/api/admin/investors/${id}/status`;
+         else if (action === 'reactivate') endpoint = `/api/admin/investors/${id}/status`;
+         else if (action === 'void') endpoint = `/api/admin/deposits/${id}/void`;
+         else if (action === 'cancel_wd') endpoint = `/api/admin/withdrawals/${id}/cancel`;
 
          await api.request(endpoint, { method: 'POST', body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
@@ -412,6 +524,36 @@
     document.getElementById('loginBtn').addEventListener('click', async () => { try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); } catch(e) { document.getElementById('loginError').textContent = e.message; } });
     document.getElementById('logoutBtn').addEventListener('click', async() => { await api.logout(); window.location.reload(); });
     document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
+
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('importPreview').innerHTML = '';
+      document.getElementById('csvFileInput').value = '';
+      document.getElementById('importModal').classList.remove('hidden');
+    });
+
+    document.getElementById('processImportBtn').addEventListener('click', async () => {
+      const file = document.getElementById('csvFileInput').files[0];
+      if(!file) return alert('Select a file');
+      const btn = document.getElementById('processImportBtn');
+      btn.disabled = true; btn.textContent = 'Importing...';
+
+      try {
+        const text = await file.text();
+        const lines = text.split('\n').map(l => l.split(',').map(c => c.trim()));
+        const header = lines[0];
+        const rows = lines.slice(1).filter(l => l.length > 1).map(l => {
+          let r = { investor_id: state.filterInvestor };
+          header.forEach((h, i) => { if(l[i]) r[h.trim()] = l[i]; });
+          return r;
+        });
+
+        const res = await api.request('/api/admin/historical-data/import', { method:'POST', body: JSON.stringify({ rows }) });
+        alert(`Successfully imported ${res.importedCount} records.`);
+        document.getElementById('importModal').classList.add('hidden');
+        loadTab('history');
+      } catch(e) { alert('Import failed: ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = 'Start Import'; }
+    });
 
     init();
   </script>

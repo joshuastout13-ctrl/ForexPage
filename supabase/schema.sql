@@ -104,6 +104,29 @@ CREATE TABLE IF NOT EXISTS snapshots (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 8. Historical Monthly Data (Manual Overrides)
+CREATE TABLE IF NOT EXISTS investor_monthly_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  investor_id TEXT REFERENCES investors(id),
+  account_id TEXT REFERENCES investor_accounts(id),
+  year INTEGER,
+  month_number INTEGER,
+  month TEXT,
+  opening_balance NUMERIC(15, 2),
+  deposits NUMERIC(15, 2) DEFAULT 0,
+  withdrawals NUMERIC(15, 2) DEFAULT 0,
+  gross_return_pct NUMERIC(5, 2) DEFAULT 0,
+  manual_gain_amount NUMERIC(15, 2),
+  manual_return_pct NUMERIC(5, 2),
+  recurring_draw NUMERIC(12, 2) DEFAULT 0,
+  ending_balance NUMERIC(15, 2),
+  is_manual BOOLEAN DEFAULT FALSE,
+  notes TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(investor_id, year, month_number)
+);
+
 -- Enable Row Level Security (RLS)
 -- For this first phase, we'll keep it simple as requested: service role for backend, 
 -- but we can add policies later if needed.
@@ -114,5 +137,6 @@ ALTER TABLE withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_returns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE live_performance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE investor_monthly_history ENABLE ROW LEVEL SECURITY;
 
 -- Note: Since we are using service_role for the API, we don't need complex policies yet.
