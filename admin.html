@@ -170,8 +170,13 @@
     const api = {
       async request(endpoint, options = {}) {
         const res = await fetch(endpoint, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers||{}) } });
-        const d = await res.json().catch(()=>({}));
-        if(!res.ok) throw new Error(d.error || 'API Error');
+        let d = {};
+        try { d = await res.json(); } catch(e) { d = { error: 'Server Error' }; }
+        if(!res.ok) {
+           const msg = d.error || `HTTP ${res.status}`;
+           console.error('API Error:', msg, d);
+           throw new Error(msg);
+        }
         return d;
       },
       login: (u,p) => api.request('/api/admin/login', { method:'POST', body: JSON.stringify({username:u,password:p})}),
@@ -503,7 +508,10 @@
          await api.request(endpoint, { method, body: JSON.stringify(payload) });
          document.getElementById('entityModal').classList.add('hidden');
          loadTab(tab); 
-       } catch(ex) { err.textContent = ex.message; } 
+       } catch(ex) { 
+         err.textContent = ex.message; 
+         alert('Save Failed: ' + ex.message);
+       } 
        finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
     });
 
@@ -521,7 +529,7 @@
          await api.request(endpoint, { method, body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
          loadTab(tab);
-       } catch(ex) { alert(ex.message); } 
+       } catch(ex) { alert('Action Failed: ' + ex.message); } 
        finally { btn.disabled = false; btn.textContent = 'Confirm'; }
     });
 
