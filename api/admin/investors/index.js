@@ -1,5 +1,5 @@
-import { verifyAdminSession } from "../../lib/adminAuth.js";
-import { supabase } from "../../lib/supabase.js";
+import { verifyAdminSession } from "../../../lib/adminAuth.js";
+import { supabase, readSupabaseTable } from "../../../lib/supabase.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {

@@ -1,5 +1,5 @@
-import { verifyAdminSession } from "../../lib/adminAuth.js";
-import { supabase } from "../../lib/supabase.js";
+import { verifyAdminSession } from "../../../lib/adminAuth.js";
+import { supabase } from "../../../lib/supabase.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -8,9 +8,9 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
-      const { data, error } = await supabase.from("deposits").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("withdrawals").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return res.status(200).json({ deposits: data });
+      return res.status(200).json({ withdrawals: data });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -21,21 +21,24 @@ export default async function handler(req, res) {
       const body = req.body || {};
       
       const payload = {
-        id: `dep_${crypto.randomBytes(4).toString("hex")}`,
+        id: `wd_${crypto.randomBytes(4).toString("hex")}`,
         investor_id: body.investorId,
         account_id: body.accountId,
-        date: body.date || new Date().toISOString().split('T')[0],
+        request_date: body.requestDate || new Date().toISOString().split('T')[0],
+        year: Number(body.year || new Date().getFullYear()),
+        month_number: Number(body.monthNumber || new Date().getMonth() + 1),
+        month: body.month || "Unknown",
         amount: Number(body.amount || 0),
-        type: body.type || "Deposit", // Deposit, Initial, etc
+        status: body.status || "Pending", // Pending, Approved, Completed, Cancelled
         notes: body.notes || ""
       };
 
       if (!payload.investor_id || !payload.account_id) throw new Error("investorId and accountId are required");
 
-      const { data, error } = await supabase.from("deposits").insert([payload]).select();
+      const { data, error } = await supabase.from("withdrawals").insert([payload]).select();
       if (error) throw error;
 
-      return res.status(200).json({ success: true, deposit: data[0] });
+      return res.status(200).json({ success: true, withdrawal: data[0] });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
