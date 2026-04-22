@@ -1,5 +1,5 @@
-import { verifyAdminSession } from "../../../../lib/adminAuth.js";
-import { supabase } from "../../../../lib/supabase.js";
+import { verifyAdminSession } from "../../../../../lib/adminAuth.js";
+import { supabase } from "../../../../../lib/supabase.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);

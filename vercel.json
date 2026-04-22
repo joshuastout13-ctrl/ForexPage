@@ -4,5 +4,11 @@
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync-myfxbook",
+      "schedule": "0 5,9,17 * * *"
+    }
   ]
 }

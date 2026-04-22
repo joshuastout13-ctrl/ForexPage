@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS investor_accounts (
   investor_id TEXT REFERENCES investors(id),
   name TEXT,
   starting_capital NUMERIC(15, 2) DEFAULT 0.00,
+  total_cash_in NUMERIC(15, 2) DEFAULT 0.00,
   open_date DATE,
   status TEXT DEFAULT 'Active',
   notes TEXT,

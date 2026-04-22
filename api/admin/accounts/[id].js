@@ -1,5 +1,5 @@
-import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { verifyAdminSession } from "../../../../lib/adminAuth.js";
+import { supabase } from "../../../../lib/supabase.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -16,6 +16,7 @@ export default async function handler(req, res) {
       if (body.investorId !== undefined) updates.investor_id = body.investorId;
       if (body.name !== undefined) updates.name = body.name;
       if (body.startingCapital !== undefined) updates.starting_capital = Number(body.startingCapital);
+      if (body.totalCashIn !== undefined) updates.total_cash_in = Number(body.totalCashIn);
       if (body.openDate !== undefined) updates.open_date = body.openDate;
       if (body.status !== undefined) updates.status = body.status;
       if (body.notes !== undefined) updates.notes = body.notes;

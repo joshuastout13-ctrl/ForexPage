@@ -1,5 +1,5 @@
-import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { verifyAdminSession } from "../../../../lib/adminAuth.js";
+import { supabase } from "../../../../lib/supabase.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -29,6 +29,25 @@ export default async function handler(req, res) {
       if (error) throw error;
 
       return res.status(200).json({ success: true, investor: data[0] });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  if (req.method === "DELETE") {
+    try {
+      // 1. Delete associated records first (Manual cascade)
+      await supabase.from("deposits").delete().eq("investor_id", id);
+      await supabase.from("withdrawals").delete().eq("investor_id", id);
+      await supabase.from("snapshots").delete().eq("investor_id", id);
+      await supabase.from("investor_monthly_history").delete().eq("investor_id", id);
+      await supabase.from("investor_accounts").delete().eq("investor_id", id);
+      
+      // 2. Delete the investor
+      const { error } = await supabase.from("investors").delete().eq("id", id);
+      if (error) throw error;
+
+      return res.status(200).json({ success: true, message: "Investor and all associated data deleted" });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

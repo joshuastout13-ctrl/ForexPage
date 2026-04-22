@@ -254,6 +254,7 @@
             <td>
               <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
               <button class="action-btn" style="padding:6px 10px;font-size:12px;background:${i.active?'var(--danger)':'var(--success)'}" data-action="${i.active?'deactivate':'reactivate'}" data-id="${i.id}">${i.active?'Deactivate':'Reactivate'}</button>
+              <button class="danger action-btn" data-action="delete_user" data-id="${i.id}" style="padding:6px 10px;font-size:12px;margin-left:4px">Delete</button>
             </td>
           </tr>`).join('');
       } else if (state.tab === 'accounts') {
@@ -362,6 +363,7 @@
       const btn = e.target.closest('.action-btn'); if(!btn) return;
       const { action, id } = btn.dataset;
       if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
+      else if(action==='delete_user') openConfirm(state.tab, action, id);
       else openConfirm(state.tab, action, id);
     };
 
@@ -397,7 +399,10 @@
       } else if (tab === 'accounts') {
         html = `<div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
           <div class="form-group"><label>Account Name</label><input id="f_name" value="${record.name||''}" required /></div>
-          <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="${record.starting_capital||0}" required /></div>
+          <div class="grid2">
+            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="${record.starting_capital||0}" required /></div>
+            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="${record.total_cash_in||record.totalcashin||0}" required /></div>
+          </div>
           <div class="grid2">
             <div class="form-group"><label>Open Date</label><input id="f_openDate" type="date" value="${record.open_date||''}" required /></div>
             <div class="form-group"><label>Status</label><select id="f_status"><option ${record.status==='Active'?'selected':''}>Active</option><option ${record.status==='Closed'?'selected':''}>Closed</option></select></div>
@@ -461,7 +466,7 @@
     function openConfirm(tab, action, id) {
       state.targetContext = tab; state.targetAction = action; state.targetId = id;
       document.getElementById('statusModalTitle').textContent = 'Confirm Action';
-      document.getElementById('statusModalText').textContent = `Are you sure you want to ${action} record ${id}?`;
+      document.getElementById('statusModalText').textContent = `Are you sure you want to ${action.replace('_',' ')} record ${id}?`;
       document.getElementById('statusModal').classList.remove('hidden');
     }
 
@@ -472,7 +477,7 @@
        const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
 
        try {
-         const fields = ['firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct'];
+         const fields = ['firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct'];
          fields.forEach(f => {
            const el = document.getElementById('f_'+f);
            if(el && el.value !== '') {
@@ -506,13 +511,14 @@
        const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
        try {
          const { targetContext: tab, targetAction: action, targetId: id } = state;
-         let endpoint = '';
+         let endpoint = '', method = 'POST';
          if (action === 'deactivate') endpoint = `/api/admin/investors/${id}/status`;
          else if (action === 'reactivate') endpoint = `/api/admin/investors/${id}/status`;
+         else if (action === 'delete_user') { endpoint = `/api/admin/investors/${id}`; method = 'DELETE'; }
          else if (action === 'void') endpoint = `/api/admin/deposits/${id}/void`;
          else if (action === 'cancel_wd') endpoint = `/api/admin/withdrawals/${id}/cancel`;
 
-         await api.request(endpoint, { method: 'POST', body: JSON.stringify({ action }) });
+         await api.request(endpoint, { method, body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
          loadTab(tab);
        } catch(ex) { alert(ex.message); } 
@@ -523,6 +529,7 @@
     document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
     document.getElementById('loginBtn').addEventListener('click', async () => { try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); } catch(e) { document.getElementById('loginError').textContent = e.message; } });
     document.getElementById('logoutBtn').addEventListener('click', async() => { await api.logout(); window.location.reload(); });
+    document.getElementById('statusModal').querySelector('.closeModalBtn').addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
     document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
 
     document.getElementById('importBtn').addEventListener('click', () => {
