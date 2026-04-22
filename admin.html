@@ -171,11 +171,14 @@
       async request(endpoint, options = {}) {
         const res = await fetch(endpoint, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers||{}) } });
         let d = {};
-        try { d = await res.json(); } catch(e) { d = { error: 'Server Error' }; }
+        const text = await res.text();
+        try { d = JSON.parse(text); } catch(e) { d = { error: 'Server returned non-JSON response', raw: text }; }
         if(!res.ok) {
            const msg = d.error || `HTTP ${res.status}`;
            console.error('API Error:', msg, d);
-           throw new Error(msg);
+           // Show first 100 chars of raw response if it's a server error
+           const debugInfo = d.raw ? `\n\nContent: ${d.raw.slice(0, 150)}...` : '';
+           throw new Error(`${msg}${debugInfo}`);
         }
         return d;
       },
