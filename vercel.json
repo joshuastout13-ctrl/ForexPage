@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-myfxbook",
-      "schedule": "0 5,9,17 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

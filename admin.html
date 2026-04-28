@@ -398,7 +398,15 @@
             <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="${record.portal_username||''}" required /></div>
             <div class="form-group"><label>Role</label><select id="f_role"><option ${record.role==='Admin'?'selected':''}>Investor</option><option ${record.role==='Admin'?'selected':''}>Admin</option></select></div>
             <div class="form-group"><label>Temp Password</label><input id="f_tempPassword" placeholder="Leave blank to keep" /></div>
-            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="${record.split_pct||50}" required /></div>
+            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="${record.split_pct !== undefined ? record.split_pct : 100}" required /></div>
+            <div id="commissionDistributionContainer" style="grid-column: 1 / -1; margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h4 style="margin:0;">Commission Distribution</h4>
+                <div id="commissionStatus" class="badge pending">Calculating...</div>
+              </div>
+              <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
+              <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
+            </div>
             <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="${record.monthly_draw||0}" required /></div>
             <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="${record.start_date||''}" required /></div>
           </div>
@@ -469,6 +477,53 @@
 
       document.getElementById('dynamicFormFields').innerHTML = html;
       document.getElementById('entityModal').classList.remove('hidden');
+
+      if (tab === 'investors') {
+        const rules = record.commissionRules || [];
+        const rowsContainer = document.getElementById('commissionRows');
+        const addBtn = document.getElementById('addCommissionBtn');
+        const splitInput = document.getElementById('f_splitPct');
+        const statusEl = document.getElementById('commissionStatus');
+        
+        const updateStatus = () => {
+          let split = parseFloat(splitInput.value) || 0;
+          let sumCommissions = 0;
+          document.querySelectorAll('.comm-row-pct').forEach(inp => sumCommissions += (parseFloat(inp.value)||0));
+          let total = split + sumCommissions;
+          
+          if (Math.abs(total - 100) < 0.01) {
+             statusEl.className = 'badge active'; statusEl.textContent = '100% Allocated';
+             document.getElementById('saveEntityBtn').disabled = false;
+          } else {
+             statusEl.className = 'badge inactive'; statusEl.textContent = `Total: ${total.toFixed(1)}% (Needs 100%)`;
+             document.getElementById('saveEntityBtn').disabled = true;
+          }
+          const rowCount = document.querySelectorAll('.comm-row').length;
+          addBtn.style.display = rowCount >= 4 ? 'none' : 'inline-block';
+        };
+
+        const addRow = (recipientId = '', pct = '') => {
+          if (document.querySelectorAll('.comm-row').length >= 4) return;
+          const div = document.createElement('div'); div.className = 'comm-row right';
+          div.innerHTML = `
+            <select class="comm-row-user" required style="flex:1; padding:8px; font-size:13px;">
+              <option value="" disabled ${!recipientId?'selected':''}>Select User</option>
+              ${state.data.investors.map(i => `<option value="${i.id}" ${recipientId===i.id?'selected':''}>${i.first_name} ${i.last_name} (${i.id})</option>`).join('')}
+            </select>
+            <input class="comm-row-pct" type="number" step="0.1" placeholder="%" value="${pct}" required style="width:80px; padding:8px; font-size:13px;" />
+            <button type="button" class="danger remove-comm-btn" style="padding:8px 12px; font-size:13px;">✕</button>
+          `;
+          rowsContainer.appendChild(div);
+          div.querySelector('.remove-comm-btn').onclick = () => { div.remove(); updateStatus(); };
+          div.querySelector('.comm-row-pct').oninput = updateStatus;
+          updateStatus();
+        };
+
+        rules.forEach(r => addRow(r.recipient_id, r.percent));
+        addBtn.onclick = () => addRow();
+        splitInput.oninput = updateStatus;
+        updateStatus();
+      }
     }
 
     function openConfirm(tab, action, id) {
@@ -494,6 +549,15 @@
               payload[f] = v;
            }
          });
+         
+         if (tab === 'investors') {
+            payload.commissionRules = [];
+            document.querySelectorAll('.comm-row').forEach(row => {
+               const rec = row.querySelector('.comm-row-user').value;
+               const pct = parseFloat(row.querySelector('.comm-row-pct').value);
+               if (rec && !isNaN(pct)) payload.commissionRules.push({ recipientId: rec, percent: pct });
+            });
+         }
 
          let endpoint = '', method = action.startsWith('edit') ? 'PATCH' : 'POST';
          if(tab==='investors') endpoint = `/api/admin/investors${method==='PATCH'?'/'+id:''}`;

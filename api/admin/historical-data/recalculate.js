@@ -34,11 +34,13 @@ export default async function handler(req, res) {
       .order("month_number", { ascending: true });
     if (histErr) throw histErr;
 
-    // 3. Fetch all Deposits, Withdrawals, and Fund Returns for the year
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns} ] = await Promise.all([
+    // 3. Fetch all Deposits, Withdrawals, Fund Returns, Commission Rules, and Commission Earnings
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
       supabase.from("deposits").select("*").eq("investor_id", investorId),
       supabase.from("withdrawals").select("*").eq("investor_id", investorId).eq("status", "Approved"),
-      supabase.from("monthly_returns").select("*").eq("year", targetYear)
+      supabase.from("monthly_returns").select("*").eq("year", targetYear),
+      supabase.from("commission_rules").select("*").eq("investor_id", investorId),
+      supabase.from("commission_earnings").select("*").eq("recipient_id", investorId).eq("year", targetYear)
     ]);
 
     // Map data by month
@@ -56,6 +58,9 @@ export default async function handler(req, res) {
     });
     const fundRetByM = {}; allReturns?.forEach(r => {
       fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
+    });
+    const commEarningsByM = {}; commEarnings?.forEach(e => {
+      commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
     });
 
     // 4. Iterate from startMonth to 12
@@ -80,6 +85,17 @@ export default async function handler(req, res) {
     for (let m = startMonth; m <= 12; m++) {
       const existing = history.find(h => h.month_number === m);
       
+      // Add commissions earned in the PREVIOUS month to the opening balance of THIS month
+      // Only do this if we are carrying over from m-1. For startMonth, currentBalance already includes it if it was in the DB.
+      // Wait, if we are looping, currentBalance is the ending_balance of m-1.
+      const earnedPrevMonth = (m > 1) ? (commEarningsByM[m - 1] || 0) : 0;
+      if (m > startMonth) {
+        currentBalance += earnedPrevMonth;
+      } else if (m === startMonth && startMonth > 1 && !existing) {
+         // If we are starting mid-year and regenerating, we'd need it. But usually history exists.
+         currentBalance += earnedPrevMonth;
+      }
+      
       const opening = currentBalance;
       const deps = depsByM[m] || (existing ? Number(existing.deposits) : 0);
       const wds = wdsByM[m] || (existing ? Number(existing.withdrawals) : 0);
@@ -88,6 +104,7 @@ export default async function handler(req, res) {
       const adjStart = opening + deps - wds;
       let gain = 0;
       let isManual = false;
+      let totalProfit = adjStart * (grossPct / 100);
 
       if (existing && existing.manual_gain_amount !== null && existing.manual_gain_amount !== undefined) {
         gain = Number(existing.manual_gain_amount);
@@ -95,6 +112,22 @@ export default async function handler(req, res) {
       } else {
         const effPct = grossPct * split;
         gain = adjStart * (effPct / 100);
+      }
+
+      // Process commission payouts if profit > 0
+      if (totalProfit > 0 && commRules && commRules.length > 0) {
+        for (const rule of commRules) {
+          const commAmount = totalProfit * (Number(rule.percent) / 100);
+          
+          // Upsert commission earnings
+          await supabase.from("commission_earnings").upsert({
+            recipient_id: rule.recipient_id,
+            source_investor_id: investorId,
+            year: targetYear,
+            month_number: m,
+            amount: commAmount
+          }, { onConflict: 'recipient_id,source_investor_id,year,month_number' }).select();
+        }
       }
 
       const ending = adjStart + gain - draw;

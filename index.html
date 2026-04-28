@@ -71,12 +71,17 @@
       display:grid;
       grid-template-columns:repeat(4,1fr);
       gap:14px;
+      align-items:stretch;
     }
     .metric{
       background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));
       border:1px solid var(--line);
       border-radius:18px;
       padding:16px;
+      display:flex;
+      flex-direction:column;
+      height:100%;
+      min-height:120px;
     }
     .metric .label{
       color:var(--muted);
@@ -87,7 +92,8 @@
     .metric .value{
       font-size:28px;
       font-weight:700;
-      margin-top:8px;
+      margin-top:auto;
+      padding-top:8px;
     }
     .metric .subvalue{
       font-size:14px;
@@ -323,6 +329,11 @@
         ["Investor Split", (investor.splitPct || investor.split_pct || 0) + "%"]
       ];
 
+      if (summary.commissionsEarnedMonth > 0 || summary.commissionsEarnedYear > 0) {
+        cards.push(["Commissions This Month", money(summary.commissionsEarnedMonth)]);
+        cards.push(["Commissions This Year", money(summary.commissionsEarnedYear)]);
+      }
+
       document.getElementById("summaryGrid").innerHTML = cards.map(([label, value]) => `
         <div class="metric">
           <div class="label">${label}</div>
@@ -349,7 +360,7 @@
         </div>
       `).join("");
 
-      document.getElementById("liveMeta").textContent = `Source: ${data.source || 'Unknown'} | Updated: ${new Date().toLocaleString()}`;
+      document.getElementById("liveMeta").textContent = `Updated: ${new Date().toLocaleString()}`;
       console.log("[Dashboard] Raw Data:", data);
     }
 
