@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const { data: inv, error: invErr } = await supabase
       .from("investors")
       .select("split_pct, recurring_monthly_draw")
-      .eq("id", investorId)
+      .ilike("id", investorId)
       .single();
     if (invErr) throw invErr;
 
@@ -36,11 +36,11 @@ export default async function handler(req, res) {
 
     // 3. Fetch all Deposits, Withdrawals, Fund Returns, Commission Rules, and Commission Earnings
     const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
-      supabase.from("deposits").select("*").eq("investor_id", investorId),
-      supabase.from("withdrawals").select("*").eq("investor_id", investorId).eq("status", "Approved"),
+      supabase.from("deposits").select("*").ilike("investor_id", investorId),
+      supabase.from("withdrawals").select("*").ilike("investor_id", investorId).eq("status", "Approved"),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
-      supabase.from("commission_rules").select("*").eq("investor_id", investorId),
-      supabase.from("commission_earnings").select("*").eq("recipient_id", investorId).eq("year", targetYear)
+      supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
+      supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
     ]);
 
     // Map data by month
