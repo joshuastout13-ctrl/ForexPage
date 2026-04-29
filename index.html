@@ -321,11 +321,10 @@
       const cards = [
         ["Starting Capital", money(summary.startingCapital ?? summary.starting_capital)],
         ["Current Balance", money(summary.currentBalance ?? summary.current_balance)],
-        ["Total Gain", money(summary.totalGain ?? summary.total_gain)],
+        ["Total Gain YTD", money(summary.totalGain ?? summary.total_gain)],
         ["Total Cash In", money(summary.totalCashIn)],
         ["Total Performance", `${pct(summary.totalPerformancePct)} (${money(summary.totalPerformanceDollar)})`],
         ["Total Draws/Withdrawals", money(summary.totalWithdrawals ?? summary.total_withdrawals)],
-        ["Net Change", money(summary.netChange ?? summary.net_change)],
         ["Investor Split", (investor.splitPct || investor.split_pct || 0) + "%"]
       ];
 
