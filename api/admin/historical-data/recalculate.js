@@ -116,17 +116,21 @@ export default async function handler(req, res) {
 
       // Process commission payouts if profit > 0
       if (totalProfit > 0 && commRules && commRules.length > 0) {
-        for (const rule of commRules) {
-          const commAmount = totalProfit * (Number(rule.percent) / 100);
-          
-          // Upsert commission earnings
-          await supabase.from("commission_earnings").upsert({
-            recipient_id: rule.recipient_id,
-            source_investor_id: investorId,
-            year: targetYear,
-            month_number: m,
-            amount: commAmount
-          }, { onConflict: 'recipient_id,source_investor_id,year,month_number' }).select();
+        try {
+          for (const rule of commRules) {
+            const commAmount = totalProfit * (Number(rule.percent) / 100);
+            
+            // Upsert commission earnings
+            await supabase.from("commission_earnings").upsert({
+              recipient_id: rule.recipient_id,
+              source_investor_id: investorId,
+              year: targetYear,
+              month_number: m,
+              amount: commAmount
+            }, { onConflict: 'recipient_id,source_investor_id,year,month_number' });
+          }
+        } catch (commErr) {
+          console.warn(`[Recalc] Commission calculation skipped for month ${m}:`, commErr.message);
         }
       }
 
