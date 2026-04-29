@@ -364,7 +364,20 @@
         }
       }
 
-      if(d.length === 0) bd.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>`;
+      if(d.length === 0 && state.tab !== 'history') bd.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>`;
+      else if(d.length === 0 && state.tab === 'history' && state.filterInvestor) {
+        bd.innerHTML += `<tr><td colspan="9" style="text-align:center;padding:40px">
+          <div class="muted" style="margin-bottom:16px">No history records found for this investor in ${state.filterYear}.</div>
+          <button id="initRecalcBtn">Generate/Recalculate ${state.filterYear} History</button>
+        </td></tr>`;
+        setTimeout(() => {
+          document.getElementById('initRecalcBtn').onclick = async () => {
+             if(!confirm('This will initialize the monthly rows for this year. Proceed?')) return;
+             try { await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); loadTab('history'); }
+             catch(e) { alert(e.message); }
+          };
+        }, 0);
+      }
     }
 
     document.getElementById('dataBody').onclick = function(e) {
