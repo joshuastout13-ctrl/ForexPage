@@ -76,6 +76,10 @@
 </head>
 <body>
   <div class="wrap">
+    <div id="loadingView" style="text-align:center; padding-top:20vh;">
+       <div class="kicker">Stone & Company</div>
+       <div class="muted">Verifying secure session...</div>
+    </div>
     <div id="loginView" class="card hidden" style="max-width:600px;margin:10vh auto;">
       <div class="kicker">Admin Portal</div>
       <h2>Secure Login</h2>
@@ -215,14 +219,18 @@
 
     async function init() {
       try {
-        const res = await api.me(); state.admin = res.admin; showDashboard();
+        const res = await api.me(); state.admin = res.admin; 
+        document.getElementById('loadingView').classList.add('hidden');
+        showDashboard();
       } catch(e) {
+        document.getElementById('loadingView').classList.add('hidden');
         document.getElementById('dashboardView').classList.add('hidden');
         document.getElementById('loginView').classList.remove('hidden');
       }
     }
 
     function showDashboard() {
+      document.getElementById('loadingView').classList.add('hidden');
       document.getElementById('loginView').classList.add('hidden');
       document.getElementById('dashboardView').classList.remove('hidden');
       document.getElementById('adminName').textContent = `Logged in as ${state.admin.name}`;
