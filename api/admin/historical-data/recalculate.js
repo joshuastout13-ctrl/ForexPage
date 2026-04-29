@@ -130,7 +130,8 @@ export default async function handler(req, res) {
         }
       }
 
-      const ending = adjStart + gain - draw;
+      const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? Number(existing.recurring_draw) : draw;
+      const ending = adjStart + gain - currentDraw;
       
       const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       
@@ -145,7 +146,7 @@ export default async function handler(req, res) {
         gross_return_pct: grossPct,
         manual_gain_amount: existing ? existing.manual_gain_amount : null,
         manual_return_pct: existing ? existing.manual_return_pct : null,
-        recurring_draw: draw,
+        recurring_draw: currentDraw,
         ending_balance: ending,
         is_manual: isManual,
         updated_at: new Date()
