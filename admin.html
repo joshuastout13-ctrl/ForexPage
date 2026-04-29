@@ -218,11 +218,21 @@
     };
 
     async function init() {
+      // Safety net: if it takes > 5s, show login
+      const timeout = setTimeout(() => {
+        if (document.getElementById('loadingView').classList.contains('hidden')) return;
+        console.warn('Init timeout hit, showing login');
+        document.getElementById('loadingView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+      }, 5000);
+
       try {
         const res = await api.me(); state.admin = res.admin; 
+        clearTimeout(timeout);
         document.getElementById('loadingView').classList.add('hidden');
         showDashboard();
       } catch(e) {
+        clearTimeout(timeout);
         document.getElementById('loadingView').classList.add('hidden');
         document.getElementById('dashboardView').classList.add('hidden');
         document.getElementById('loginView').classList.remove('hidden');
@@ -405,7 +415,6 @@
           <button type="button" id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate ${state.filterYear} Monthly Rows</button>
         </td></tr>`;
       }
-    }
     }
 
     document.getElementById('dataBody').onclick = function(e) {
