@@ -152,16 +152,24 @@ export default async function handler(req, res) {
         updated_at: new Date()
       };
 
+      console.log(`[Recalc] Month ${m}: Opening ${opening}, Ending ${ending}`);
+      
       const { data: up, error: upErr } = await supabase
         .from("investor_monthly_history")
         .upsert(rowPayload, { onConflict: 'investor_id,year,month_number' })
         .select()
         .single();
       
-      if (upErr) throw upErr;
+      if (upErr) {
+        console.error(`[Recalc] Failed month ${m}:`, upErr.message);
+        throw upErr;
+      }
+      
       updatedRows.push(up);
       currentBalance = ending;
     }
+    
+    console.log(`[Recalc] Successfully updated ${updatedRows.length} months for ${investorId}`);
 
     return res.status(200).json({ success: true, updatedCount: updatedRows.length });
   } catch (err) {
