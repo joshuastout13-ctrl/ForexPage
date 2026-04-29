@@ -7,12 +7,15 @@ import { getMyfxbookLive } from "../../lib/myfxbook.js";
 export default async function handler(req, res) {
   // 1. Verify Authorization (Vercel Cron security)
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    console.warn("[Cron] Unauthorized access attempt blocked");
+  const isVercelCron = req.headers['x-vercel-cron'] === '1';
+  const isAuthorized = isVercelCron || (authHeader && authHeader === `Bearer ${process.env.CRON_SECRET}`);
+
+  if (!isAuthorized) {
+    console.warn("[Cron] Unauthorized access attempt blocked. Header missing or secret mismatch.");
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  console.log("[Cron] Starting scheduled Myfxbook sync...");
+  console.log(`[Cron] Starting scheduled Myfxbook sync (Trigger: ${isVercelCron ? 'Vercel Scheduler' : 'Manual Header'})...`);
 
   try {
     // 2. Trigger the sync logic
