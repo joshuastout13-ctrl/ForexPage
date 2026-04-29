@@ -394,47 +394,51 @@
       else if(d.length === 0 && state.tab === 'history' && state.filterInvestor) {
         bd.innerHTML += `<tr><td colspan="9" style="text-align:center;padding:60px">
           <div class="muted" style="margin-bottom:20px; font-size:16px;">No history records found for this investor in ${state.filterYear}.</div>
-          <button id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate ${state.filterYear} Monthly Rows</button>
+          <button type="button" id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate ${state.filterYear} Monthly Rows</button>
         </td></tr>`;
-        setTimeout(() => {
-          const initBtn = document.getElementById('initRecalcBtn');
-          if (initBtn) {
-            initBtn.onclick = async () => {
-              if(!confirm(`This will initialize the ${state.filterYear} monthly rows for this investor. Proceed?`)) return;
-              
-              const originalText = initBtn.textContent;
-              initBtn.disabled = true; initBtn.textContent = 'Initializing...';
-              showToast('Generating history records...');
-              
-              try { 
-                await api.request('/api/admin/historical-data/recalculate', { 
-                  method:'POST', 
-                  body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) 
-                }); 
-                showToast('Success! History generated.');
-                loadTab('history'); 
-              }
-              catch(e) { 
-                showToast(e.message, true);
-                console.error(e);
-              } finally {
-                if(document.getElementById('initRecalcBtn')) {
-                  initBtn.disabled = false; initBtn.textContent = originalText;
-                }
-              }
-            };
-          }
-        }, 0);
       }
+    }
     }
 
     document.getElementById('dataBody').onclick = function(e) {
-      const btn = e.target.closest('.action-btn'); if(!btn) return;
+      const btn = e.target.closest('.action-btn, #initRecalcBtn'); if(!btn) return;
       const { action, id } = btn.dataset;
+      
+      if (btn.id === 'initRecalcBtn') {
+          handleInitHistory();
+          return;
+      }
+      
       if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
       else if(action==='delete_user') openConfirm(state.tab, action, id);
       else openConfirm(state.tab, action, id);
     };
+
+    async function handleInitHistory() {
+      if(!confirm(`This will initialize the ${state.filterYear} monthly rows for this investor. Proceed?`)) return;
+      
+      const btn = document.getElementById('initRecalcBtn');
+      const originalText = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Initializing...';
+      showToast('Generating history records. Please wait...');
+      
+      try { 
+        await api.request('/api/admin/historical-data/recalculate', { 
+          method:'POST', 
+          body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) 
+        }); 
+        showToast('Success! 2026 History has been generated.');
+        loadTab('history'); 
+      }
+      catch(e) { 
+        showToast(`Error: ${e.message}`, true);
+        console.error(e);
+      } finally {
+        if(document.getElementById('initRecalcBtn')) {
+          btn.disabled = false; btn.textContent = originalText;
+        }
+      }
+    }
 
     function openModal(tab, action, id) {
       document.getElementById('formAction').value = action; document.getElementById('formId').value = id || '';
