@@ -182,13 +182,16 @@
       const old = document.querySelector('.toast'); if(old) old.remove();
       const t = document.createElement('div');
       t.className = 'toast';
+      t.style.pointerEvents = 'auto';
       if(isError) t.style.borderColor = 'var(--danger)';
-      t.innerHTML = `<span>${isError ? '❌' : '✅'}</span> ${msg}`;
+      t.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px; width:100%;">
+          <span>${isError ? '❌' : '✅'}</span> 
+          <div style="flex:1; margin-right:20px;">${msg}</div>
+          <button onclick="this.closest('.toast').remove()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:18px; padding:0 5px;">✕</button>
+        </div>
+      `;
       document.body.appendChild(t);
-      setTimeout(() => {
-        t.style.opacity = '0'; t.style.transition = 'opacity 0.5s';
-        setTimeout(() => t.remove(), 500);
-      }, 10000);
     }
     const api = {
       async request(endpoint, options = {}) {
