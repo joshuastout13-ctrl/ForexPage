@@ -17,13 +17,13 @@ export default async function handler(req, res) {
     // 1. Get Investor split and draw
     const { data: inv, error: invErr } = await supabase
       .from("investors")
-      .select("split_pct, recurring_monthly_draw")
+      .select("split_pct, monthly_draw")
       .ilike("id", investorId)
       .single();
     if (invErr) throw invErr;
 
     const split = (inv.split_pct || 100) / 100;
-    const draw = inv.recurring_monthly_draw || 0;
+    const draw = inv.monthly_draw || 0;
 
     // 2. Fetch all historical records for this year to see what's already there
     const { data: history, error: histErr } = await supabase
