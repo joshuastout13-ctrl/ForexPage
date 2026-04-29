@@ -389,30 +389,38 @@
 
       if(d.length === 0 && state.tab !== 'history') bd.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>`;
       else if(d.length === 0 && state.tab === 'history' && state.filterInvestor) {
-        bd.innerHTML += `<tr><td colspan="9" style="text-align:center;padding:40px">
-          <div class="muted" style="margin-bottom:16px">No history records found for this investor in ${state.filterYear}.</div>
-          <button id="initRecalcBtn">Generate/Recalculate ${state.filterYear} History</button>
+        bd.innerHTML += `<tr><td colspan="9" style="text-align:center;padding:60px">
+          <div class="muted" style="margin-bottom:20px; font-size:16px;">No history records found for this investor in ${state.filterYear}.</div>
+          <button id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate ${state.filterYear} Monthly Rows</button>
         </td></tr>`;
         setTimeout(() => {
-          document.getElementById('initRecalcBtn').onclick = async () => {
-             if(!confirm('This will initialize the monthly rows for this year. Proceed?')) return;
-             const btn = document.getElementById('initRecalcBtn');
-             const originalText = btn.textContent;
-             btn.disabled = true; btn.textContent = 'Initializing...';
-             showToast('Starting history generation...');
-             
-             try { 
-               await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); 
-               showToast('History generated successfully!');
-               loadTab('history'); 
-             }
-             catch(e) { 
-               showToast(e.message, true);
-               console.error(e);
-             } finally {
-               btn.disabled = false; btn.textContent = originalText;
-             }
-          };
+          const initBtn = document.getElementById('initRecalcBtn');
+          if (initBtn) {
+            initBtn.onclick = async () => {
+              if(!confirm(`This will initialize the ${state.filterYear} monthly rows for this investor. Proceed?`)) return;
+              
+              const originalText = initBtn.textContent;
+              initBtn.disabled = true; initBtn.textContent = 'Initializing...';
+              showToast('Generating history records...');
+              
+              try { 
+                await api.request('/api/admin/historical-data/recalculate', { 
+                  method:'POST', 
+                  body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) 
+                }); 
+                showToast('Success! History generated.');
+                loadTab('history'); 
+              }
+              catch(e) { 
+                showToast(e.message, true);
+                console.error(e);
+              } finally {
+                if(document.getElementById('initRecalcBtn')) {
+                  initBtn.disabled = false; initBtn.textContent = originalText;
+                }
+              }
+            };
+          }
         }, 0);
       }
     }
