@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     try {
       const body = req.body || {};
       
-      const newId = body.id || `acc_${crypto.randomBytes(4).toString("hex")}`;
+      const newId = body.investorId;
       
       const payload = {
         id: newId,
