@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       let accData = null;
       if (body.startingCapital !== undefined && body.startingCapital !== "") {
         const accPayload = {
-          id: newId, 
+          id: body.portalUsername || newId, // To match dashboard logic conventions
           investor_id: newId,
           name: [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
           starting_capital: Number(body.startingCapital || 0),

@@ -13,6 +13,7 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const updates = {};
       
+      if (body.id !== undefined) updates.id = body.id;
       if (body.investorId !== undefined) updates.investor_id = body.investorId;
       if (body.name !== undefined) updates.name = body.name;
       if (body.startingCapital !== undefined) updates.starting_capital = Number(body.startingCapital);

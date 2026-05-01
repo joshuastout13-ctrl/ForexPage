@@ -17,9 +17,9 @@
     .muted{color:var(--muted);line-height:1.5}
     .kicker{ display:inline-block; padding:7px 12px; border-radius:999px; background:rgba(79,140,255,.12); color:var(--accent2); font-size:12px; text-transform:uppercase; letter-spacing:.08em; border:1px solid rgba(127,179,255,.2); margin-bottom:12px; }
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-    input, select, textarea{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.08); color:#ffffff; font-size:15px; outline:none; transition:border-color 0.2s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--accent); background:rgba(255,255,255,.12); }
-    option { background: var(--bg2); color: #ffffff; }
+    input, select, textarea{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s; }
+    select option { background: #1e293b; color: #fff; }
+    input:focus, select:focus, textarea:focus { border-color:var(--accent); }
     button{ padding:12px 16px; border:none; border-radius:12px; background:linear-gradient(135deg,var(--accent),#2f6df0); color:#fff; font-weight:700; cursor:pointer; transition:transform 0.1s, opacity 0.2s; }
     button:active{transform:scale(0.98)}
     button[disabled]{opacity:0.5;cursor:not-allowed}
@@ -181,15 +181,9 @@
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear()
     };
 
-    const money = (n) => Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"});
-    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     
-    function updateMonthNumber(select) {
-      const numInput = document.getElementById('f_monthNumber');
-      if (numInput && select.value) {
-        numInput.value = months.indexOf(select.value) + 1;
-      }
-    }
+    const money = (n) => Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"});
     
     function showToast(msg, isError = false) {
       const old = document.querySelector('.toast'); if(old) old.remove();
@@ -504,7 +498,8 @@
           ${action==='add' ? `<div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" /></div>` : ''}
           <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'accounts') {
-        html = `<div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
+        html = `<div class="form-group"><label>Account ID</label><input id="f_id" value="${record.id||''}" placeholder="Leave blank to auto-generate" /></div>
+          <div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
           <div class="form-group"><label>Account Name</label><input id="f_name" value="${record.name||''}" required /></div>
           <div class="grid2">
             <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="${record.starting_capital||0}" required /></div>
@@ -526,15 +521,15 @@
             </div>
           ` : `
             <div class="grid2">
-              <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="${record.request_date||''}" required /></div>
+            <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="${record.request_date||''}" required /></div>
               <div class="form-group"><label>Eff. Year</label><input id="f_year" type="number" value="${record.year||new Date().getFullYear()}" required /></div>
               <div class="form-group"><label>Month Name</label>
-                <select id="f_month" onchange="updateMonthNumber(this)" required>
+                <select id="f_month" required>
                   <option value="" disabled ${!record.month?'selected':''}>Select Month</option>
-                  ${months.map(m => `<option value="${m}" ${record.month===m?'selected':''}>${m}</option>`).join('')}
+                  ${MONTHS.map(m => `<option value="${m}" ${record.month===m?'selected':''}>${m}</option>`).join('')}
                 </select>
               </div>
-              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||new Date().getMonth()+1}" required readonly style="opacity:0.7; cursor:not-allowed;" /></div>
+              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
             </div>
             <div class="form-group"><label>Status</label><select id="f_status"><option ${record.status==='Pending'?'selected':''}>Pending</option><option ${record.status==='Approved'?'selected':''}>Approved</option><option ${record.status==='Completed'?'selected':''}>Completed</option><option ${record.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
           `}
@@ -543,12 +538,12 @@
         html = `<div class="grid2">
             <div class="form-group"><label>Year</label><input id="f_year" type="number" value="${record.year||new Date().getFullYear()}" required ${action==='edit_return'?'readonly':''} /></div>
             <div class="form-group"><label>Month Name</label>
-              <select id="f_month" onchange="updateMonthNumber(this)" required ${action==='edit_return'?'disabled':''}>
+              <select id="f_month" required ${action==='edit_return'?'disabled':''}>
                 <option value="" disabled ${!record.month?'selected':''}>Select Month</option>
-                ${months.map(m => `<option value="${m}" ${record.month===m?'selected':''}>${m}</option>`).join('')}
+                ${MONTHS.map(m => `<option value="${m}" ${record.month===m?'selected':''}>${m}</option>`).join('')}
               </select>
             </div>
-            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||''}" required readonly style="opacity:0.7; cursor:not-allowed;" /></div>
+            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
             <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="${record.gross_return_pct||0}" required /></div>
             <div class="form-group"><label>Source</label><select id="f_source"><option ${record.source==='Manual'?'selected':''}>Manual</option><option ${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
             <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" ${!record.locked?'selected':''}>No</option><option value="true" ${record.locked?'selected':''}>Yes</option></select></div>
@@ -625,6 +620,48 @@
         splitInput.oninput = updateStatus;
         updateStatus();
       }
+
+      // Sync Month Number when Month Name changes
+      const monthSel = document.getElementById('f_month');
+      const monthNumInp = document.getElementById('f_monthNumber');
+      if (monthSel && monthNumInp) {
+        monthSel.onchange = () => {
+          const idx = MONTHS.indexOf(monthSel.value);
+          if (idx !== -1) monthNumInp.value = idx + 1;
+        };
+        // Trigger once if adding
+        if (action === 'add' && !monthSel.value) {
+            const curMonth = new Date().getMonth();
+            monthSel.value = MONTHS[curMonth];
+            monthNumInp.value = curMonth + 1;
+        }
+      }
+
+      // Link Investor and Account
+      const invSel = document.getElementById('f_investorId');
+      const accSel = document.getElementById('f_accountId');
+      if (invSel && accSel) {
+        const updateAccounts = (investorId, selectedAccId) => {
+          const filtered = state.data.accounts.filter(a => a.investor_id === investorId);
+          accSel.innerHTML = `<option value="" disabled ${!selectedAccId?'selected':''}>Select Account</option>` + 
+            filtered.map(a => `<option value="${a.id}" ${selectedAccId===a.id?'selected':''}>${a.name} (${a.id})</option>`).join('');
+          
+          if (!selectedAccId && filtered.length > 0) {
+            accSel.value = filtered[0].id;
+          }
+        };
+
+        invSel.onchange = () => updateAccounts(invSel.value);
+        accSel.onchange = () => {
+          const acc = state.data.accounts.find(a => a.id === accSel.value);
+          if (acc && invSel.value !== acc.investor_id) {
+            invSel.value = acc.investor_id;
+          }
+        };
+
+        // Initialize if editing or if investor already selected
+        if (invSel.value) updateAccounts(invSel.value, record.account_id);
+      }
     }
 
     function openConfirm(tab, action, id) {
@@ -641,7 +678,7 @@
        const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
 
        try {
-         const fields = ['firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct'];
+         const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct'];
          fields.forEach(f => {
            const el = document.getElementById('f_'+f);
            if(el && el.value !== '') {
