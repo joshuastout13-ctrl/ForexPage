@@ -1,4 +1,4 @@
--- Stone and Company Forex Fund - Supabase Schema
+-- ForEx Investment Tracker - Supabase Schema
 
 -- 1. Investors
 CREATE TABLE IF NOT EXISTS investors (

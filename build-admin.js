@@ -141,7 +141,7 @@ const htmlBody = `
       <div class="right" style="margin-bottom:24px;">
         <div>
           <div class="kicker">Admin Portal</div>
-          <h1>Stone & Company Management</h1>
+          <h1>ForEx Investment Tracker Management</h1>
         </div>
         <div class="right">
           <div id="adminName" class="muted">Logged in as Admin</div>
@@ -687,7 +687,7 @@ const out = \`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Admin Dashboard - Stone and Company</title>
+  <title>Admin Dashboard - ForEx Investment Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>\${css}</style>
 </head>

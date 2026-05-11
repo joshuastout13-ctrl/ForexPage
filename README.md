@@ -1,4 +1,4 @@
-# Stone and Company Forex Fund Investor Portal
+# ForEx Investment Tracker Investor Portal
 
 A lightweight, serverless investor portal built with HTML, CSS, and Node.js. It integrates with Google Sheets to display real-time and historical performance data.
 
