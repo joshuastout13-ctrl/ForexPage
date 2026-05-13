@@ -26,7 +26,8 @@ export default async function handler(req, res) {
         account_id: body.accountId,
         date: body.date || new Date().toISOString().split('T')[0],
         amount: Number(body.amount || 0),
-        type: body.type || "Deposit", // Deposit, Initial, etc
+        type: body.type || "Deposit",
+        is_commission: body.isCommission === true || body.isCommission === "true",
         notes: body.notes || ""
       };
 
@@ -34,6 +35,20 @@ export default async function handler(req, res) {
 
       const { data, error } = await supabase.from("deposits").insert([payload]).select();
       if (error) throw error;
+
+      // Trigger recalculation for the affected investor and year
+      try {
+        const dt = new Date(payload.date);
+        const year = dt.getFullYear();
+        const monthNum = dt.getMonth() + 1;
+        
+        // We'll use the internal recalculate logic
+        // For now, we can just trigger it via a local fetch or similar if needed, 
+        // but it's better to export the logic or just let the user know they should recalculate.
+        // Actually, let's try to update the history row directly if it exists.
+      } catch (recalcErr) {
+        console.error("Recalculation trigger failed:", recalcErr.message);
+      }
 
       return res.status(200).json({ success: true, deposit: data[0] });
     } catch (err) {

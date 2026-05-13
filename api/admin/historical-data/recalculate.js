@@ -44,11 +44,17 @@ export default async function handler(req, res) {
     ]);
 
     // Map data by month
-    const depsByM = {}; allDeps?.forEach(d => {
+    const depsByM = {}; 
+    const commDepsByM = {};
+    allDeps?.forEach(d => {
       const dt = new Date(d.date); 
       if(dt.getFullYear() === targetYear) {
         const m = dt.getMonth() + 1;
-        depsByM[m] = (depsByM[m] || 0) + Number(d.amount);
+        const amt = Number(d.amount);
+        depsByM[m] = (depsByM[m] || 0) + amt;
+        if (d.is_commission) {
+          commDepsByM[m] = (commDepsByM[m] || 0) + amt;
+        }
       }
     });
     const wdsByM = {}; allWds?.forEach(w => {

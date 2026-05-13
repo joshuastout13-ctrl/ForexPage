@@ -321,24 +321,26 @@
             <td><button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button></td>
           </tr>`).join('');
       } else if (state.tab === 'deposits') {
-        hd.innerHTML = `<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Comm</th><th>Date</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => `<tr>
             <td><span class="badge ${i.type==='VOID'?'inactive':'active'}">${i.type}</span></td>
-            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td><td>${i.date}</td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
+            <td>${i.is_commission ? '✅' : ''}</td><td>${i.date}</td>
             <td>
               <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
               ${i.type!=='VOID'? `<button class="danger action-btn" data-action="void" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Void</button>` : ''}
             </td>
           </tr>`).join('');
       } else if (state.tab === 'withdrawals') {
-        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Comm</th><th>Effective</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
           return `<tr>
             <td><span class="badge ${cls}">${i.status}</span></td>
-            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td><td>${i.month} ${i.year}</td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
+            <td>${i.is_commission ? '✅' : ''}</td><td>${i.month} ${i.year}</td>
             <td>
               <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
               ${i.status!=='Cancelled'? `<button class="danger action-btn" data-action="cancel_wd" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Cancel</button>` : ''}
@@ -513,7 +515,10 @@
       } else if (tab === 'deposits' || tab === 'withdrawals') {
         html = `<div class="form-group"><label>Investor</label><select id="f_investorId" required>${getInvOpts()}</select></div>
           <div class="form-group"><label>Account</label><select id="f_accountId" required>${getAccOpts()}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="${record.amount||0}" required /></div>
+          <div class="grid2">
+            <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="${record.amount||0}" required /></div>
+            <div class="form-group"><label>Is Commission?</label><select id="f_isCommission"><option value="false" ${!record.is_commission?'selected':''}>No</option><option value="true" ${record.is_commission?'selected':''}>Yes</option></select></div>
+          </div>
           ${tab==='deposits' ? `
             <div class="grid2">
               <div class="form-group"><label>Date</label><input id="f_date" type="date" value="${record.date||''}" required /></div>
