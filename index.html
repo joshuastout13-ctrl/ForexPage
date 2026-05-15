@@ -157,7 +157,6 @@
     }
     table{
       width:100%;
-      min-width:720px;
       border-collapse:collapse;
       margin-top:10px;
     }
@@ -270,9 +269,7 @@
       <div class="card">
         <h2>Monthly Balance Breakdown</h2>
 
-        <div style="overflow-x:auto;">
-          <table id="breakdownTable"></table>
-        </div>
+        <table id="breakdownTable"></table>
       </div>
     </div>
   </div>
@@ -382,35 +379,37 @@
         <tr>
           <th>Month</th>
           <th>Starting Balance</th>
-          <th>Gross Return</th>
-          <th>Investor Return</th>
-          <th>Gain</th>
-          <th>Activity</th>
-          <th>Ending Balance</th>
+          <th style="text-align:right;">Monthly Details</th>
         </tr>
       `;
 
       const body = rows.map((r) => {
         let activityHtml = '';
-        if (r.deposits > 0) activityHtml += `<div class="green" style="font-size:11px;">+${money(r.deposits)} (Dep)</div>`;
-        if (r.commissionsEarned > 0) activityHtml += `<div class="green" style="font-size:11px;">+${money(r.commissionsEarned)} (Comm)</div>`;
-        if (r.recurringDraw > 0) activityHtml += `<div style="color:#ff8f8f; font-size:11px;">-${money(r.recurringDraw)} (Draw)</div>`;
-        if (r.oneTimeWithdrawal > 0) activityHtml += `<div style="color:#ff8f8f; font-size:11px;">-${money(r.oneTimeWithdrawal)} (Wd)</div>`;
-        
-        if (!activityHtml) activityHtml = '<span class="muted">—</span>';
+        if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} (Dep)</div>`;
+        if (r.commissionsEarned > 0) activityHtml += `<div class="green">+${money(r.commissionsEarned)} (Comm)</div>`;
+        if (r.recurringDraw > 0) activityHtml += `<div style="color:#ff8f8f;">-${money(r.recurringDraw)} (Draw)</div>`;
+        if (r.oneTimeWithdrawal > 0) activityHtml += `<div style="color:#ff8f8f;">-${money(r.oneTimeWithdrawal)} (Wd)</div>`;
 
         return `
           <tr class="${r.isProjection ? "projection-row" : ""}">
             <td>
-              ${r.month}
+              <div style="font-weight:600; font-size:14px; color:var(--text);">${r.month}</div>
               ${r.isProjection ? '<span class="projection-tag">Projection</span>' : ""}
             </td>
-            <td>${money(r.adjustedStartingBalance)}</td>
-            <td>${pct(r.grossReturnPct)}</td>
-            <td>${pct(r.effectiveReturnPct)}</td>
-            <td>${money(r.gain)}</td>
-            <td><div style="display:flex; flex-direction:column; gap:2px; align-items:flex-end;">${activityHtml}</div></td>
-            <td>${money(r.endingBalance)}</td>
+            <td style="vertical-align:top; font-weight:500;">${money(r.adjustedStartingBalance)}</td>
+            <td>
+              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:12px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <span class="muted">Return:</span>
+                  <span style="font-weight:600; color:var(--success);">${pct(r.grossReturnPct)}</span>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <span class="muted">Gain:</span>
+                  <span style="font-weight:600;">${money(r.gain)}</span>
+                </div>
+                ${activityHtml ? `<div style="margin-top:4px; border-top:1px solid var(--line); padding-top:4px; width:100%; text-align:right;">${activityHtml}</div>` : ''}
+              </div>
+            </td>
           </tr>
         `;
       }).join("");
