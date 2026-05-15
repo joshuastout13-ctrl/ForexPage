@@ -27,7 +27,6 @@ export default async function handler(req, res) {
         date: body.date || new Date().toISOString().split('T')[0],
         amount: Number(body.amount || 0),
         type: body.type || "Deposit",
-        is_commission: body.isCommission === true || body.isCommission === "true",
         notes: body.notes || ""
       };
 

@@ -30,7 +30,6 @@ export default async function handler(req, res) {
         month: body.month || "Unknown",
         amount: Number(body.amount || 0),
         status: body.status || "Pending", // Pending, Approved, Completed, Cancelled
-        is_commission: body.isCommission === true || body.isCommission === "true",
         notes: body.notes || ""
       };
 

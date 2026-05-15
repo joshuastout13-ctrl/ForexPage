@@ -333,7 +333,7 @@
         ["Investor Split", (investor.splitPct || investor.split_pct || 0) + "%"]
       ];
 
-      if (summary.commissionsEarnedMonth > 0 || summary.commissionsEarnedYear > 0) {
+      if (investor.hasCommissionAccount) {
         cards.push(["Commissions This Month", money(summary.commissionsEarnedMonth)]);
         cards.push(["Commissions This Year", money(summary.commissionsEarnedYear)]);
       }
@@ -377,7 +377,7 @@
       `).join("");
     }
 
-    function renderBreakdown(rows) {
+    function renderBreakdown(rows, hasCommissionAccount) {
       const head = `
         <tr>
           <th>Month</th>
@@ -385,6 +385,7 @@
           <th>Gross Return</th>
           <th>Investor Return</th>
           <th>Gain</th>
+          ${hasCommissionAccount ? '<th>Commissions</th>' : ''}
           <th>Deposits</th>
           <th>Recurring Draw</th>
           <th>One-Time Withdrawal</th>
@@ -402,6 +403,7 @@
           <td>${pct(r.grossReturnPct)}</td>
           <td>${pct(r.effectiveReturnPct)}</td>
           <td>${money(r.gain)}</td>
+          ${hasCommissionAccount ? `<td>${money(r.commissionsEarned)}</td>` : ''}
           <td>${money(r.deposits)}</td>
           <td>${money(r.recurringDraw)}</td>
           <td>${money(r.oneTimeWithdrawal)}</td>
@@ -438,7 +440,7 @@
       renderLive(data);
       renderMonths(data.monthlyHistory);
       renderChart(data);
-      renderBreakdown(data.breakdown);
+      renderBreakdown(data.breakdown, data.investor.hasCommissionAccount);
     }
     
     let perfChart = null;

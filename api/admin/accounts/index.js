@@ -8,9 +8,17 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
-      const { data, error } = await supabase.from("investor_accounts").select("*").order("created_at", { ascending: false });
+      const { data: accounts, error } = await supabase.from("investor_accounts").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return res.status(200).json({ accounts: data });
+      
+      const { data: rules, error: rulesError } = await supabase.from("commission_rules").select("*").not("account_id", "is", null);
+      if (!rulesError && rules) {
+        accounts.forEach(acc => {
+          acc.commissionRules = rules.filter(r => r.account_id === acc.id);
+        });
+      }
+
+      return res.status(200).json({ accounts });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -21,7 +29,9 @@ export default async function handler(req, res) {
       const body = req.body || {};
       
       const newId = body.id || `acc_${crypto.randomBytes(4).toString("hex")}`;
-      
+      const splitPct = Number(body.splitPct !== undefined ? body.splitPct : 100);
+      const commissionRules = Array.isArray(body.commissionRules) ? body.commissionRules : [];
+
       const payload = {
         id: newId,
         investor_id: body.investorId,
@@ -30,6 +40,8 @@ export default async function handler(req, res) {
         total_cash_in: Number(body.totalCashIn || 0),
         open_date: body.openDate || new Date().toISOString().split('T')[0],
         status: body.status || "Active",
+        is_commission: body.isCommission === true || body.isCommission === "true",
+        split_pct: splitPct,
         notes: body.notes || ""
       };
 
@@ -37,6 +49,17 @@ export default async function handler(req, res) {
 
       const { data, error } = await supabase.from("investor_accounts").insert([payload]).select();
       if (error) throw error;
+
+      // Save commission rules
+      if (commissionRules.length > 0) {
+        const rulesPayload = commissionRules.map(rule => ({
+          investor_id: body.investorId,
+          account_id: newId,
+          recipient_id: rule.recipientId,
+          percent: Number(rule.percent)
+        }));
+        await supabase.from("commission_rules").insert(rulesPayload);
+      }
 
       return res.status(200).json({ success: true, account: data[0] });
     } catch (err) {

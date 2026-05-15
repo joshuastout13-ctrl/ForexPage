@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS investor_accounts (
   total_cash_in NUMERIC(15, 2) DEFAULT 0.00,
   open_date DATE,
   status TEXT DEFAULT 'Active',
+  is_commission BOOLEAN DEFAULT FALSE,
+  split_pct NUMERIC(5, 2) DEFAULT 100.00,
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

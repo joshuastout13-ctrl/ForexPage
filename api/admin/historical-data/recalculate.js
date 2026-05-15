@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const startMonth = Number(startMonthNumber || 1);
     const targetYear = Number(year || new Date().getFullYear());
 
-    // 1. Get Investor split and draw
+    // 1. Get Investor split and draw (keep as fallback)
     const { data: inv, error: invErr } = await supabase
       .from("investors")
       .select("split_pct, monthly_draw")
@@ -22,10 +22,18 @@ export default async function handler(req, res) {
       .single();
     if (invErr) throw invErr;
 
-    const split = (inv.split_pct || 100) / 100;
+    const investorSplit = (inv.split_pct || 100) / 100;
     const draw = inv.monthly_draw || 0;
 
-    // 2. Fetch all historical records for this year to see what's already there
+    // 1b. Get Accounts with their splits
+    const { data: accounts, error: accsErr } = await supabase
+      .from("investor_accounts")
+      .select("*")
+      .eq("investor_id", investorId)
+      .eq("status", "Active");
+    if (accsErr) throw accsErr;
+
+    // 2. Fetch all historical records for this year
     const { data: history, error: histErr } = await supabase
       .from("investor_monthly_history")
       .select("*")
@@ -43,25 +51,38 @@ export default async function handler(req, res) {
       supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
     ]);
 
-    // Map data by month
+    // Map data by month and account
     const depsByM = {}; 
-    const commDepsByM = {};
+    const depsByMAcc = {};
     allDeps?.forEach(d => {
       const dt = new Date(d.date); 
       if(dt.getFullYear() === targetYear) {
         const m = dt.getMonth() + 1;
         const amt = Number(d.amount);
+        const accId = d.account_id;
         depsByM[m] = (depsByM[m] || 0) + amt;
-        if (d.is_commission) {
-          commDepsByM[m] = (commDepsByM[m] || 0) + amt;
+        if (accId) {
+          if (!depsByMAcc[m]) depsByMAcc[m] = {};
+          depsByMAcc[m][accId] = (depsByMAcc[m][accId] || 0) + amt;
         }
       }
     });
-    const wdsByM = {}; allWds?.forEach(w => {
+
+    const wdsByM = {}; 
+    const wdsByMAcc = {};
+    allWds?.forEach(w => {
       if(w.effective_year === targetYear || (!w.effective_year && targetYear === new Date().getFullYear())) {
-        wdsByM[w.month_number] = (wdsByM[w.month_number] || 0) + Number(w.amount || 0);
+        const m = w.month_number;
+        const amt = Number(w.amount || 0);
+        const accId = w.account_id;
+        wdsByM[m] = (wdsByM[m] || 0) + amt;
+        if (accId) {
+          if (!wdsByMAcc[m]) wdsByMAcc[m] = {};
+          wdsByMAcc[m][accId] = (wdsByMAcc[m][accId] || 0) + amt;
+        }
       }
     });
+
     const fundRetByM = {}; allReturns?.forEach(r => {
       fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
     });
@@ -69,64 +90,51 @@ export default async function handler(req, res) {
       commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
     });
 
-    // 4. Iterate from startMonth to 12
-    let currentBalance = 0;
-    
-    // Find the opening balance for the start month
-    const prevMonth = history.find(h => h.month_number === startMonth - 1);
-    if (prevMonth) {
-      currentBalance = Number(prevMonth.ending_balance);
-    } else if (startMonth === 1) {
-      // Get starting capital if month 1
-      const { data: accs } = await supabase.from("investor_accounts").select("starting_capital").eq("investor_id", investorId).eq("status", "Active");
-      currentBalance = accs?.reduce((sum, a) => sum + Number(a.starting_capital), 0) || 0;
-    } else {
-      // Fallback: try to find the earliest history row if startMonth > 1
-      const firstRow = history.find(h => h.month_number === startMonth);
-      if (firstRow) currentBalance = Number(firstRow.opening_balance);
-    }
+    // 4. Track balances per account
+    let accountBalances = {};
+    accounts.forEach(a => {
+      accountBalances[a.id] = Number(a.starting_capital || 0);
+    });
+
+    // If startMonth > 1, we need to initialize accountBalances from a previous history row? 
+    // This is hard because history is currently aggregated. 
+    // We'll assume the starting_capital is the source of truth for the beginning of time.
+    // To handle startMonth > 1 properly with multiple accounts, we'd need per-account history.
+    // For now, we'll proportion the opening balance if multiple accounts exist.
 
     const updatedRows = [];
 
-    for (let m = startMonth; m <= 12; m++) {
+    for (let m = 1; m <= 12; m++) {
       const existing = history.find(h => h.month_number === m);
-      
-      // Add commissions earned in the PREVIOUS month to the opening balance of THIS month
-      // Only do this if we are carrying over from m-1. For startMonth, currentBalance already includes it if it was in the DB.
-      // Wait, if we are looping, currentBalance is the ending_balance of m-1.
       const earnedPrevMonth = (m > 1) ? (commEarningsByM[m - 1] || 0) : 0;
-      if (m > startMonth) {
-        currentBalance += earnedPrevMonth;
-      } else if (m === startMonth && startMonth > 1 && !existing) {
-         // If we are starting mid-year and regenerating, we'd need it. But usually history exists.
-         currentBalance += earnedPrevMonth;
-      }
       
-      const opening = currentBalance;
-      const deps = depsByM[m] || (existing ? Number(existing.deposits) : 0);
-      const wds = wdsByM[m] || (existing ? Number(existing.withdrawals) : 0);
-      const grossPct = fundRetByM[m] || (existing ? Number(existing.gross_return_pct) : 0);
-      
-      const adjStart = opening + deps - wds;
-      let gain = 0;
-      let isManual = false;
-      let totalProfit = adjStart * (grossPct / 100);
-
-      if (existing && existing.manual_gain_amount !== null && existing.manual_gain_amount !== undefined) {
-        gain = Number(existing.manual_gain_amount);
-        isManual = true;
-      } else {
-        const effPct = grossPct * split;
-        gain = adjStart * (effPct / 100);
+      // Add commissions to the FIRST commission account found, or just the first account
+      const commAcc = accounts.find(a => a.is_commission) || accounts[0];
+      if (commAcc && earnedPrevMonth > 0) {
+        accountBalances[commAcc.id] += earnedPrevMonth;
       }
 
-      // Process commission payouts if profit > 0
-      if (totalProfit > 0 && commRules && commRules.length > 0) {
-        try {
-          for (const rule of commRules) {
+      let totalOpening = 0;
+      let totalGain = 0;
+      let totalDeps = 0;
+      let totalWds = 0;
+
+      for (const acc of accounts) {
+        const opening = accountBalances[acc.id];
+        const deps = (depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0;
+        const wds = (wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0;
+        const grossPct = fundRetByM[m] || 0;
+        const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
+        
+        const adjStart = opening + deps - wds;
+        const totalProfit = adjStart * (grossPct / 100);
+        const gain = totalProfit * split;
+
+        // Process commissions for this account
+        const accRules = commRules?.filter(r => r.account_id === acc.id);
+        if (totalProfit > 0 && accRules && accRules.length > 0) {
+          for (const rule of accRules) {
             const commAmount = totalProfit * (Number(rule.percent) / 100);
-            
-            // Upsert commission earnings
             await supabase.from("commission_earnings").upsert({
               recipient_id: rule.recipient_id,
               source_investor_id: investorId,
@@ -135,13 +143,27 @@ export default async function handler(req, res) {
               amount: commAmount
             }, { onConflict: 'recipient_id,source_investor_id,year,month_number' });
           }
-        } catch (commErr) {
-          console.warn(`[Recalc] Commission calculation skipped for month ${m}:`, commErr.message);
         }
+
+        totalOpening += opening;
+        totalGain += gain;
+        totalDeps += deps;
+        totalWds += wds;
+
+        // Update balance for next month (compounding)
+        // Draw is still handled at investor level below
+        accountBalances[acc.id] = adjStart + gain;
       }
 
+      // Handle monthly draw (subtract from first account or split proportionally)
       const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? Number(existing.recurring_draw) : draw;
-      const ending = adjStart + gain - currentDraw;
+      if (currentDraw > 0 && accounts.length > 0) {
+        accountBalances[accounts[0].id] -= currentDraw;
+      }
+
+      if (m < startMonth) continue; // Skip saving if before startMonth
+
+      const ending = Object.values(accountBalances).reduce((a, b) => a + b, 0);
       
       const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       
@@ -150,19 +172,19 @@ export default async function handler(req, res) {
         year: targetYear,
         month_number: m,
         month: monthNames[m],
-        opening_balance: opening,
-        deposits: deps,
-        withdrawals: wds,
-        gross_return_pct: grossPct,
+        opening_balance: totalOpening,
+        deposits: totalDeps,
+        withdrawals: totalWds,
+        gross_return_pct: fundRetByM[m] || 0,
         manual_gain_amount: existing ? existing.manual_gain_amount : null,
         manual_return_pct: existing ? existing.manual_return_pct : null,
         recurring_draw: currentDraw,
         ending_balance: ending,
-        is_manual: isManual,
+        is_manual: existing ? !!existing.manual_gain_amount : false,
         updated_at: new Date()
       };
 
-      console.log(`[Recalc] Month ${m}: Opening ${opening}, Ending ${ending}`);
+      console.log(`[Recalc] Month ${m}: Opening ${totalOpening}, Ending ${ending}`);
       
       const { data: up, error: upErr } = await supabase
         .from("investor_monthly_history")

@@ -21,7 +21,6 @@ export default async function handler(req, res) {
       if (body.month !== undefined) updates.month = body.month;
       if (body.amount !== undefined) updates.amount = Number(body.amount);
       if (body.status !== undefined) updates.status = body.status;
-      if (body.isCommission !== undefined) updates.is_commission = body.isCommission === true || body.isCommission === "true";
       if (body.notes !== undefined) updates.notes = body.notes;
 
       const { data, error } = await supabase.from("withdrawals").update(updates).eq("id", id).select();
