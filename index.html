@@ -157,7 +157,7 @@
     }
     table{
       width:100%;
-      min-width:920px;
+      min-width:720px;
       border-collapse:collapse;
       margin-top:10px;
     }
@@ -385,31 +385,35 @@
           <th>Gross Return</th>
           <th>Investor Return</th>
           <th>Gain</th>
-          ${hasCommissionAccount ? '<th>Commissions</th>' : ''}
-          <th>Deposits</th>
-          <th>Recurring Draw</th>
-          <th>One-Time Withdrawal</th>
+          <th>Activity</th>
           <th>Ending Balance</th>
         </tr>
       `;
 
-      const body = rows.map((r) => `
-        <tr class="${r.isProjection ? "projection-row" : ""}">
-          <td>
-            ${r.month}
-            ${r.isProjection ? '<span class="projection-tag">Projection</span>' : ""}
-          </td>
-          <td>${money(r.adjustedStartingBalance)}</td>
-          <td>${pct(r.grossReturnPct)}</td>
-          <td>${pct(r.effectiveReturnPct)}</td>
-          <td>${money(r.gain)}</td>
-          ${hasCommissionAccount ? `<td>${money(r.commissionsEarned)}</td>` : ''}
-          <td>${money(r.deposits)}</td>
-          <td>${money(r.recurringDraw)}</td>
-          <td>${money(r.oneTimeWithdrawal)}</td>
-          <td>${money(r.endingBalance)}</td>
-        </tr>
-      `).join("");
+      const body = rows.map((r) => {
+        let activityHtml = '';
+        if (r.deposits > 0) activityHtml += `<div class="green" style="font-size:11px;">+${money(r.deposits)} (Dep)</div>`;
+        if (r.commissionsEarned > 0) activityHtml += `<div class="green" style="font-size:11px;">+${money(r.commissionsEarned)} (Comm)</div>`;
+        if (r.recurringDraw > 0) activityHtml += `<div style="color:#ff8f8f; font-size:11px;">-${money(r.recurringDraw)} (Draw)</div>`;
+        if (r.oneTimeWithdrawal > 0) activityHtml += `<div style="color:#ff8f8f; font-size:11px;">-${money(r.oneTimeWithdrawal)} (Wd)</div>`;
+        
+        if (!activityHtml) activityHtml = '<span class="muted">—</span>';
+
+        return `
+          <tr class="${r.isProjection ? "projection-row" : ""}">
+            <td>
+              ${r.month}
+              ${r.isProjection ? '<span class="projection-tag">Projection</span>' : ""}
+            </td>
+            <td>${money(r.adjustedStartingBalance)}</td>
+            <td>${pct(r.grossReturnPct)}</td>
+            <td>${pct(r.effectiveReturnPct)}</td>
+            <td>${money(r.gain)}</td>
+            <td><div style="display:flex; flex-direction:column; gap:2px; align-items:flex-end;">${activityHtml}</div></td>
+            <td>${money(r.endingBalance)}</td>
+          </tr>
+        `;
+      }).join("");
 
       document.getElementById("breakdownTable").innerHTML = head + body;
     }
