@@ -4,277 +4,511 @@
   <meta charset="utf-8" />
   <title>ForEx Investment Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root{
-      --bg:#08101d;
-      --bg2:#0f172a;
-      --panel:rgba(17,26,46,.94);
-      --line:rgba(255,255,255,.08);
-      --text:#e7eefb;
-      --muted:#9fb0cc;
-      --accent:#4f8cff;
-      --accent2:#7fb3ff;
-      --success:#22c55e;
+    :root {
+      --bg: #030712;
+      --bg-surface: #0f172a;
+      --panel: rgba(30, 41, 59, 0.7);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.5);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.3);
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --glass: rgba(15, 23, 42, 0.6);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Arial,sans-serif;
-      background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-      color:var(--text);
+
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 48px}
-    .card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:22px;
-      box-shadow:0 12px 40px rgba(0,0,0,.22);
-      margin-bottom:18px;
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+      background-attachment: fixed;
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
     }
-    h1,h2,h3{margin:0 0 10px}
-    .muted{color:var(--muted);line-height:1.5}
-    .hero{
-      display:grid;
-      grid-template-columns:1.6fr .9fr;
-      gap:18px;
-      margin-bottom:18px;
+
+    h1, h2, h3, h4 {
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      font-weight: 700;
     }
-    .kicker{
-      display:inline-block;
-      padding:7px 12px;
-      border-radius:999px;
-      background:rgba(79,140,255,.12);
-      color:var(--accent2);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      border:1px solid rgba(127,179,255,.2);
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 40px 24px;
     }
-    .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-    .badge{
-      padding:8px 12px;
-      border-radius:999px;
-      background:rgba(255,255,255,.04);
-      border:1px solid var(--line);
-      color:var(--muted);
-      font-size:12px;
+
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .grid2{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:18px;
-      margin-bottom:18px;
+
+    .card:hover {
+      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
     }
-    .live-grid,.summary-grid{
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:14px;
-      align-items:stretch;
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      margin-bottom: 12px;
     }
-    .metric{
-      background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:16px;
-      display:flex;
-      flex-direction:column;
-      height:100%;
-      min-height:120px;
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
     }
-    .metric .label{
-      color:var(--muted);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.06em;
+
+    /* Layout Grids */
+    .hero-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      margin-bottom: 24px;
     }
-    .metric .value{
-      font-size:28px;
-      font-weight:700;
-      margin-top:12px;
-      padding-top:8px;
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
     }
-    .metric .subvalue{
-      font-size:12px;
-      color:var(--accent2);
-      font-weight:700;
-      margin-top:8px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
     }
-    .login-grid{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-      gap:12px;
-      align-items:end;
+
+    /* Metric Cards */
+    .metric {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
     }
-    input{
-      width:100%;
-      padding:12px 13px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      font-size:15px;
-      outline:none;
+
+    .metric::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.5;
     }
-    button{
-      padding:12px 16px;
-      border:none;
-      border-radius:12px;
-      background:linear-gradient(135deg,var(--accent),#2f6df0);
-      color:#fff;
-      font-weight:700;
-      cursor:pointer;
+
+    .metric.success::before { background: var(--success); }
+    .metric.warning::before { background: var(--warning); }
+
+    .metric .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
-    .secondary{
-      background:rgba(255,255,255,.06);
-      border:1px solid var(--line);
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
-    .month-grid{
-      display:grid;
-      grid-template-columns:repeat(6,1fr);
-      gap:12px;
+
+    .metric .icon {
+      width: 24px;
+      height: 24px;
+      color: var(--muted);
+      opacity: 0.6;
     }
-    .month-box{
-      background:rgba(255,255,255,.04);
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:14px;
+
+    .metric .value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
     }
-    .month-box .month{
-      color:var(--muted);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.06em;
+
+    .metric .subvalue {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
-    .month-box .pct{
-      font-size:22px;
-      font-weight:700;
-      margin-top:8px;
+
+    /* Sidebar Styles */
+    .performance-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      margin-top:10px;
+
+    .perf-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
     }
-    th,td{
-      padding:14px 12px;
-      border-bottom:1px solid var(--line);
-      text-align:right;
+
+    .perf-item .info .label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
     }
-    th:first-child,td:first-child{text-align:left}
-    th{
-      color:var(--muted);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.06em;
+
+    .perf-item .info .val {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
     }
-    .hidden{display:none}
-    .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .green{color:var(--success)}
-    .projection-row{opacity:0.65;font-style:italic}
-    .projection-tag{
-      font-size:10px;
-      background:rgba(255,255,255,0.1);
-      padding:2px 6px;
-      border-radius:4px;
-      margin-left:6px;
-      color:var(--muted);
-      font-weight:normal;
+
+    .perf-item .change {
+      text-align: right;
     }
-    @media(max-width:980px){
-      .hero,.grid2{grid-template-columns:1fr}
-      .live-grid,.summary-grid{grid-template-columns:repeat(2,1fr)}
-      .month-grid{grid-template-columns:repeat(3,1fr)}
+
+    .perf-item .pct {
+      font-size: 16px;
+      font-weight: 700;
     }
-    @media(max-width:640px){
-      .live-grid{grid-template-columns:1fr}
-      .summary-grid{grid-template-columns:1fr 1fr}
-      .month-grid{grid-template-columns:repeat(2,1fr)}
-      th,td{padding:10px 8px;font-size:13px}
-      .metric .value{font-size:22px}
+
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 8px;
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    td:first-child {
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px 0 0 12px;
+    }
+
+    td:last-child {
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0 12px 12px 0;
+    }
+
+    /* Inputs & Buttons */
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      background: rgba(15, 23, 42, 0.5);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    button {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      box-shadow: none;
+    }
+
+    button.secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: none;
+    }
+
+    /* Login Screen */
+    #loginCard {
+      max-width: 440px;
+      margin: 100px auto;
+      text-align: center;
+    }
+
+    .login-header {
+      margin-bottom: 32px;
+    }
+
+    .login-header h1 {
+      font-size: 32px;
+      margin-top: 12px;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      text-align: left;
+    }
+
+    /* Utilities */
+    .hidden { display: none !important; }
+    .green { color: var(--success); }
+    .red { color: var(--danger); }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    /* Month grid */
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .month-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .month-box .month {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .month-box .pct {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 4px;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-layout, .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+      .wrap { padding: 20px 16px; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <!-- Login Screen -->
     <div id="loginCard" class="card">
-      <div class="kicker" style="margin-bottom:12px;">Investor Portal</div>
-      <div class="muted" style="margin-bottom:20px;">Please enter your credentials to access the fund dashboard.</div>
-      <div class="login-grid">
-        <div>
-          <div class="muted" style="margin-bottom:6px;">Username</div>
-          <input id="username" placeholder="Investor username" />
-        </div>
-        <div>
-          <div class="muted" style="margin-bottom:6px;">Password</div>
-          <input id="password" type="password" placeholder="Password" />
-        </div>
-        <div>
-          <button id="loginBtn">Login</button>
-        </div>
+      <div class="login-header">
+        <div class="kicker">Investor Portal</div>
+        <h1>ForEx Tracker</h1>
+        <p class="muted">Access your investment dashboard and performance metrics.</p>
       </div>
-      <div id="loginError" class="muted" style="color:#ff8f8f;"></div>
+      <div class="login-form">
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Username</label>
+          <input id="username" placeholder="Enter your username" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Password</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+        <button id="loginBtn" style="width:100%; margin-top:12px;">Sign In</button>
+        <div id="loginError" style="color:var(--danger); font-size:14px; text-align:center; min-height:20px;"></div>
+      </div>
     </div>
 
+    <!-- Dashboard -->
     <div id="dashboard" class="hidden">
-      <div class="hero">
-        <div class="card">
-          <span class="kicker">Investor Portal</span>
-          <h1>ForEx Investment Tracker</h1>
-        </div>
-        <div id="statusCard" class="card">
-          <div class="muted">Connection Status</div>
-          <div id="status" class="value green" style="font-size:30px;font-weight:700;margin-top:8px;">Ready</div>
-          <div id="statusText" class="muted">Not logged in</div>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="card">
-          <div class="right">
-            <div>
-              <h2>Investor Account</h2>
-              <div id="investorName" class="muted"></div>
-            </div>
-            <button id="logoutBtn" class="secondary">Logout</button>
+      <!-- Header -->
+      <div class="hero-layout">
+        <div class="card flex-between" style="padding: 32px;">
+          <div>
+            <div class="kicker">Active Portfolio</div>
+            <h1 style="font-size:36px;">ForEx Investment Tracker</h1>
+            <p class="muted" style="margin-top:8px;">Real-time performance monitoring and historical analysis.</p>
           </div>
-          <div class="summary-grid" id="summaryGrid" style="margin-top:14px;"></div>
+          <div style="text-align:right;">
+             <button id="logoutBtn" class="secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Logout
+             </button>
+          </div>
         </div>
-
+        
         <div class="card">
-          <h2>Daily Fund Performance</h2>
-          <div class="live-grid" id="liveGrid"></div>
-          <div id="liveMeta" class="muted" style="margin-top:12px;"></div>
-          <div class="muted" style="margin-top:6px;font-size:12px;opacity:0.7;">Data refreshes daily at 4 PM PST</div>
+          <div class="muted" style="margin-bottom:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">System Status</div>
+          <div class="status-badge">
+            <div class="status-dot"></div>
+            <span id="status" style="font-weight:700; font-family:'Outfit'; font-size:18px;">Ready</span>
+          </div>
+          <div id="statusText" class="muted" style="margin-top:16px; font-weight:500;">Welcome back</div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>Historical Monthly Returns</h2>
+      <!-- Main Content -->
+      <div class="main-grid">
+        <!-- Left Column -->
+        <div class="content-col">
+          <div class="card">
+            <div class="flex-between" style="margin-bottom:24px;">
+              <h2>Investor Account</h2>
+              <div id="investorName" class="kicker" style="margin-bottom:0;"></div>
+            </div>
+            <div class="summary-grid" id="summaryGrid">
+              <!-- Summary Metrics injected here -->
+            </div>
+          </div>
 
-        <div class="month-grid" id="monthGrid" style="margin-top:14px;"></div>
-      </div>
+          <div class="card">
+            <h2 style="margin-bottom:20px;">Historical Monthly Returns</h2>
+            <div class="month-grid" id="monthGrid"></div>
+          </div>
 
-      <div class="card">
-        <h2>Monthly Performance Growth</h2>
-        <div style="height:350px; position:relative;">
-          <canvas id="performanceChart"></canvas>
+          <div class="card">
+            <h2 style="margin-bottom:24px;">Monthly Performance Growth</h2>
+            <div style="height:350px; position:relative;">
+              <canvas id="performanceChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 style="margin-bottom:24px;">Monthly Balance Breakdown</h2>
+            <div class="table-container">
+              <table id="breakdownTable"></table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>Monthly Balance Breakdown</h2>
-
-        <table id="breakdownTable"></table>
+        <!-- Right Column (Sidebar) -->
+        <div class="sidebar-col">
+          <div class="card">
+            <h2 style="margin-bottom:20px;">Fund Performance</h2>
+            <div class="performance-list" id="liveGrid">
+              <!-- Live metrics injected here -->
+            </div>
+            <div id="liveMeta" class="muted" style="margin-top:24px; font-size:12px; text-align:center;"></div>
+            <div class="muted" style="margin-top:8px; font-size:11px; opacity:0.6; text-align:center;">
+              Data refreshes daily at 4:00 PM PST
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
+    const ICONS = {
+      capital: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
+      balance: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`,
+      gain: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+      cashin: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M5 15l7 7 7-7"/></svg>`,
+      performance: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+      withdrawal: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V2M5 9l7-7 7 7"/></svg>`,
+      split: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>`,
+      commission: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
+    };
+
     function money(n) {
       return Number(n || 0).toLocaleString(undefined, {
         style: "currency",
@@ -292,7 +526,8 @@
     async function login() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
-      document.getElementById("loginError").textContent = "";
+      const errorEl = document.getElementById("loginError");
+      errorEl.textContent = "";
 
       const res = await fetch("/api/login", {
         method: "POST",
@@ -302,8 +537,7 @@
 
       const data = await res.json();
       if (!res.ok) {
-        document.getElementById("loginError").textContent =
-          data.error || "Login failed";
+        errorEl.textContent = data.error || "Login failed. Please check credentials.";
         return;
       }
 
@@ -314,31 +548,41 @@
       await fetch("/api/logout", { method: "POST" });
       document.getElementById("dashboard").classList.add("hidden");
       document.getElementById("loginCard").classList.remove("hidden");
-      document.getElementById("statusText").textContent = "Not logged in";
+      document.getElementById("statusText").textContent = "Signed out";
     }
 
     function renderSummary(data) {
       const summary = data.summary || {};
       const investor = data.investor || {};
-      const cards = [
-        ["Starting Capital", money(summary.startingCapital ?? summary.starting_capital)],
-        ["Current Balance", money(summary.currentBalance ?? summary.current_balance)],
-        ["Total Gain YTD", money(summary.totalGain ?? summary.total_gain)],
-        ["Total Cash In", money(summary.totalCashIn)],
-        ["Total Performance", `${pct(summary.totalPerformancePct)} (${money(summary.totalPerformanceDollar)})`],
-        ["Total Draws/Withdrawals", money(summary.totalWithdrawals ?? summary.total_withdrawals)],
-        ["Investor Split", (investor.splitPct || investor.split_pct || 0) + "%"]
+      const metrics = [
+        { label: "Starting Capital", value: money(summary.startingCapital ?? summary.starting_capital), icon: ICONS.capital },
+        { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
+        { label: "Total Gain YTD", value: money(summary.totalGain ?? summary.total_gain), icon: ICONS.gain, class: 'success' },
+        { label: "Total Cash In", value: money(summary.totalCashIn), icon: ICONS.cashin },
+        { 
+          label: "Total Performance", 
+          value: pct(summary.totalPerformancePct), 
+          subvalue: money(summary.totalPerformanceDollar),
+          icon: ICONS.performance,
+          class: 'success'
+        },
+        { label: "Withdrawals", value: money(summary.totalWithdrawals ?? summary.total_withdrawals), icon: ICONS.withdrawal, class: 'warning' },
+        { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
       ];
 
       if (investor.hasCommissionAccount) {
-        cards.push(["Commissions This Month", money(summary.commissionsEarnedMonth)]);
-        cards.push(["Commissions This Year", money(summary.commissionsEarnedYear)]);
+        metrics.push({ label: "Comm. This Month", value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success' });
+        metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success' });
       }
 
-      document.getElementById("summaryGrid").innerHTML = cards.map(([label, value]) => `
-        <div class="metric">
-          <div class="label">${label}</div>
-          <div class="value">${value}</div>
+      document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
+        <div class="metric ${m.class || ''}">
+          <div class="label-row">
+            <div class="label">${m.label}</div>
+            ${m.icon}
+          </div>
+          <div class="value">${m.value}</div>
+          ${m.subvalue ? `<div class="subvalue">${m.subvalue}</div>` : ''}
         </div>
       `).join("");
     }
@@ -347,74 +591,81 @@
       const live = data.live || {};
       const liveDollarGains = data.liveDollarGains || {};
       const items = [
-        ["Today", live.today, liveDollarGains.today],
-        ["This Week", live.week, liveDollarGains.week],
-        ["This Month", live.month, liveDollarGains.month],
-        ["This Year", live.year, liveDollarGains.year]
+        { label: "Today", pct: live.today, dollar: liveDollarGains.today },
+        { label: "This Week", pct: live.week, dollar: liveDollarGains.week },
+        { label: "This Month", pct: live.month, dollar: liveDollarGains.month },
+        { label: "This Year", pct: live.year, dollar: liveDollarGains.year }
       ];
 
-      document.getElementById("liveGrid").innerHTML = items.map(([label, value, dollars]) => `
-        <div class="metric">
-          <div class="label">${label}</div>
-          <div class="value">${value}</div>
-          <div class="subvalue">${money(dollars)} gain</div>
+      document.getElementById("liveGrid").innerHTML = items.map(item => `
+        <div class="perf-item">
+          <div class="info">
+            <div class="label">${item.label}</div>
+            <div class="val">${money(item.dollar)}</div>
+          </div>
+          <div class="change">
+            <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>
+          </div>
         </div>
       `).join("");
 
-      document.getElementById("liveMeta").textContent = `Updated: ${new Date().toLocaleString()}`;
-      console.log("[Dashboard] Raw Data:", data);
+      document.getElementById("liveMeta").textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
     }
 
     function renderMonths(monthlyHistory) {
       document.getElementById("monthGrid").innerHTML = monthlyHistory.map((m) => `
         <div class="month-box">
           <div class="month">${m.month}</div>
-          <div class="pct">${pct(m.grossReturnPct)}</div>
+          <div class="pct ${parseFloat(m.grossReturnPct) >= 0 ? 'green' : 'red'}">${pct(m.grossReturnPct)}</div>
         </div>
       `).join("");
     }
 
-    function renderBreakdown(rows, hasCommissionAccount) {
+    function renderBreakdown(rows) {
       const head = `
-        <tr>
-          <th>Month</th>
-          <th>Starting Balance</th>
-          <th style="text-align:right;">Monthly Details</th>
-        </tr>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Starting Balance</th>
+            <th style="text-align:right;">Performance & Activity</th>
+          </tr>
+        </thead>
       `;
 
       const body = rows.map((r) => {
         let activityHtml = '';
-        if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} (Dep)</div>`;
-        if (r.commissionsEarned > 0) activityHtml += `<div class="green">+${money(r.commissionsEarned)} (Comm)</div>`;
-        if (r.recurringDraw > 0) activityHtml += `<div style="color:#ff8f8f;">-${money(r.recurringDraw)} (Draw)</div>`;
-        if (r.oneTimeWithdrawal > 0) activityHtml += `<div style="color:#ff8f8f;">-${money(r.oneTimeWithdrawal)} (Wd)</div>`;
+        if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
+        if (r.commissionsEarned > 0) activityHtml += `<div class="green">+${money(r.commissionsEarned)} Commission</div>`;
+        if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
+        if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal</div>`;
 
         return `
-          <tr class="${r.isProjection ? "projection-row" : ""}">
+          <tr class="${r.isProjection ? "muted" : ""}" style="${r.isProjection ? "opacity:0.6; font-style:italic;" : ""}">
             <td>
-              <div style="font-weight:600; font-size:14px; color:var(--text);">${r.month}</div>
-              ${r.isProjection ? '<span class="projection-tag">Projection</span>' : ""}
+              <div style="font-weight:700; color:var(--text);">${r.month}</div>
+              ${r.isProjection ? '<span style="font-size:10px; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; margin-top:4px; display:inline-block;">Projection</span>' : ""}
             </td>
-            <td style="vertical-align:top; font-weight:500;">${money(r.adjustedStartingBalance)}</td>
             <td>
-              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:12px;">
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <span class="muted">Return:</span>
-                  <span style="font-weight:600; color:var(--success);">${pct(r.grossReturnPct)}</span>
+               <div style="font-family:'Outfit'; font-weight:600;">${money(r.adjustedStartingBalance)}</div>
+            </td>
+            <td>
+              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <span class="muted" style="font-size:12px;">Return:</span>
+                  <span style="font-weight:700; font-family:'Outfit';" class="${parseFloat(r.grossReturnPct) >= 0 ? 'green' : 'red'}">${pct(r.grossReturnPct)}</span>
                 </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <span class="muted">Gain:</span>
-                  <span style="font-weight:600;">${money(r.gain)}</span>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <span class="muted" style="font-size:12px;">Gain:</span>
+                  <span style="font-weight:700; font-family:'Outfit';">${money(r.gain)}</span>
                 </div>
-                ${activityHtml ? `<div style="margin-top:4px; border-top:1px solid var(--line); padding-top:4px; width:100%; text-align:right;">${activityHtml}</div>` : ''}
+                ${activityHtml ? `<div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; width:100%; text-align:right; font-size:11px; font-weight:600;">${activityHtml}</div>` : ''}
               </div>
             </td>
           </tr>
         `;
       }).join("");
 
-      document.getElementById("breakdownTable").innerHTML = head + body;
+      document.getElementById("breakdownTable").innerHTML = head + `<tbody>${body}</tbody>`;
     }
 
     async function loadDashboard() {
@@ -424,8 +675,6 @@
       if (!res.ok) {
         document.getElementById("loginCard").classList.remove("hidden");
         document.getElementById("dashboard").classList.add("hidden");
-        document.getElementById("statusText").textContent =
-          data.error || "Please log in";
         return;
       }
 
@@ -433,17 +682,14 @@
       document.getElementById("dashboard").classList.remove("hidden");
       
       const firstName = (data.investor.name || "").split(' ')[0];
-      document.getElementById("statusText").textContent = `Welcome, ${firstName}`;
-      
-      document.getElementById("investorName").textContent =
-        `Started ${data.investor.startDate || "N/A"}`;
-      document.getElementById("status").textContent = "Ready";
+      document.getElementById("statusText").textContent = `Welcome back, ${firstName}`;
+      document.getElementById("investorName").textContent = `Active since ${data.investor.startDate || "N/A"}`;
 
       renderSummary(data);
       renderLive(data);
       renderMonths(data.monthlyHistory);
       renderChart(data);
-      renderBreakdown(data.breakdown, data.investor.hasCommissionAccount);
+      renderBreakdown(data.breakdown);
     }
     
     let perfChart = null;
@@ -451,16 +697,14 @@
       const ctx = document.getElementById('performanceChart').getContext('2d');
       if (perfChart) perfChart.destroy();
 
-      // Use all months from breakdown to ensure Jan-Dec are always visible
       const fullBreakdown = data.breakdown;
       const labels = fullBreakdown.map(r => r.month);
       const pctData = fullBreakdown.map(r => r.isProjection ? null : r.effectiveReturnPct);
       const dollarGains = fullBreakdown.map(r => r.gain);
 
-      // Create a premium gradient for the bars
       const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-      gradient.addColorStop(0, 'rgba(79, 140, 255, 0.8)');
-      gradient.addColorStop(1, 'rgba(79, 140, 255, 0.1)');
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
 
       perfChart = new Chart(ctx, {
         type: 'bar',
@@ -470,11 +714,11 @@
             label: 'Monthly Return %',
             data: pctData,
             backgroundColor: gradient,
-            borderColor: '#4f8cff',
-            borderWidth: 1,
-            borderRadius: 6,
-            hoverBackgroundColor: 'rgba(79, 140, 255, 1)',
-            barPercentage: 0.5, // Make bars thinner
+            borderColor: '#3b82f6',
+            borderWidth: 2,
+            borderRadius: 8,
+            hoverBackgroundColor: '#60a5fa',
+            barPercentage: 0.6,
             categoryPercentage: 0.8
           }]
         },
@@ -484,17 +728,10 @@
           plugins: {
             legend: { display: false },
             tooltip: {
-              enabled: true,
-              filter: function(tooltipItem) {
-                // Only show tooltip if there's actual data
-                return tooltipItem.raw !== null;
-              },
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              titleColor: '#e7eefb',
-              bodyColor: '#e7eefb',
-              borderColor: 'rgba(255, 255, 255, 0.1)',
-              borderWidth: 1,
-              padding: 12,
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              titleFont: { family: 'Outfit', size: 14, weight: 'bold' },
+              bodyFont: { family: 'Inter', size: 13 },
+              padding: 16,
               displayColors: false,
               callbacks: {
                 label: function(context) {
@@ -510,20 +747,12 @@
           },
           scales: {
             y: {
-              beginAtZero: true,
-              suggestedMax: 5, // Keep scale consistent
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { 
-                color: '#9fb0cc',
-                callback: value => value.toFixed(1) + '%'
-              }
+              grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+              ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, callback: v => v + '%' }
             },
             x: {
               grid: { display: false },
-              ticks: { 
-                color: '#9fb0cc',
-                font: { size: 10 }
-              }
+              ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
             }
           }
         }
@@ -532,7 +761,10 @@
 
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    
+    // Auto-login check
     loadDashboard().catch(() => {});
   </script>
 </body>
 </html>
+
