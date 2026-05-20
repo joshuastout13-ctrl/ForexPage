@@ -18,6 +18,44 @@ export default async function handler(req, res) {
         });
       }
 
+      try {
+        const { buildInvestorDashboard } = await import("../../../lib/dashboard.js");
+        const { getMyfxbookLive } = await import("../../../lib/myfxbook.js");
+        
+        const [rawInvestors, returnsSheet, depositsSheet, withdrawalsSheet, historyTable, commissionEarningsTable, live] = await Promise.all([
+          supabase.from("investors").select("*"),
+          supabase.from("monthly_returns").select("*"),
+          supabase.from("deposits").select("*"),
+          supabase.from("withdrawals").select("*"),
+          supabase.from("investor_monthly_history").select("*"),
+          supabase.from("commission_earnings").select("*"),
+          getMyfxbookLive()
+        ]);
+        
+        const preloadedData = {
+          rawInvestors: rawInvestors.data || [],
+          accounts: accounts, // already fetched
+          returnsSheet: returnsSheet.data || [],
+          depositsSheet: depositsSheet.data || [],
+          withdrawalsSheet: withdrawalsSheet.data || [],
+          historyTable: historyTable.data || [],
+          commissionEarningsTable: commissionEarningsTable.data || [],
+          live
+        };
+
+        // Calculate balances using preloaded data
+        for (let acc of accounts) {
+          try {
+            const res = await buildInvestorDashboard(acc.investor_id, preloadedData);
+            acc.current_balance = res.summary.currentBalance;
+          } catch(e) {
+            acc.current_balance = acc.starting_capital;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to calculate account balances:", err);
+      }
+
       return res.status(200).json({ accounts });
     } catch (err) {
       return res.status(500).json({ error: err.message });

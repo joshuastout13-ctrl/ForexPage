@@ -5,7 +5,7 @@
   <title>Admin Dashboard - ForEx Investment Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
+:root{
       --bg:#08101d; --bg2:#0f172a; --panel:rgba(17,26,46,.94); --line:rgba(255,255,255,.08); --text:#e7eefb;
       --muted:#9fb0cc; --accent:#4f8cff; --accent2:#7fb3ff; --success:#22c55e; --danger:#ef4444; --warning:#eab308;
     }
@@ -73,10 +73,11 @@
       animation: toastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @keyframes toastIn { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-  </style>
+</style>
 </head>
 <body>
-  <div class="wrap">
+  
+<div class="wrap">
     <div id="loadingView" style="text-align:center; padding-top:20vh;">
        <div class="kicker">ForEx Investment Tracker</div>
        <div class="muted">Verifying secure session...</div>
@@ -98,14 +99,13 @@
       </div>
       <div class="dashboard-layout">
         <div class="sidebar card" style="padding:16px;">
-          <button class="nav-btn active" data-tab="investors">1. Investors</button>
-          <button class="nav-btn" data-tab="accounts">2. Accounts</button>
-          <button class="nav-btn" data-tab="deposits">3. Deposits</button>
-          <button class="nav-btn" data-tab="withdrawals">4. Withdrawals</button>
-          <button class="nav-btn" data-tab="returns">5. Monthly Returns</button>
-          <button class="nav-btn" data-tab="performance">6. Live Performance</button>
-          <button class="nav-btn" data-tab="snapshots">7. Snapshots</button>
-          <button class="nav-btn" data-tab="history">8. Historical Data</button>
+          <button class="nav-btn active" data-tab="investors">1. Investors & Accounts</button>
+          <button class="nav-btn" data-tab="deposits">2. Deposits</button>
+          <button class="nav-btn" data-tab="withdrawals">3. Withdrawals</button>
+          <button class="nav-btn" data-tab="returns">4. Monthly Returns</button>
+          <button class="nav-btn" data-tab="performance">5. Live Performance</button>
+          <button class="nav-btn" data-tab="snapshots">6. Snapshots</button>
+          <button class="nav-btn" data-tab="history">7. Historical Data</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -175,7 +175,7 @@
   </div>
 
   <script>
-    let state = {
+let state = {
       admin: null, tab: 'investors',
       data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [] },
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear()
@@ -256,14 +256,14 @@
         e.currentTarget.classList.add('active');
         state.tab = e.currentTarget.dataset.tab;
         
-        const titles = { investors: 'Investors Directory', accounts: 'Investor Accounts', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
+        const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
         document.getElementById('viewTitle').textContent = titles[state.tab];
         document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
         document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         loadTab(state.tab);
       });
     });
-
+ 
     async function loadTab(tab) {
       document.getElementById('loadingIndicator').classList.remove('hidden');
       document.getElementById('dataHead').innerHTML = ''; document.getElementById('dataBody').innerHTML = '';
@@ -279,7 +279,14 @@
           history: `/api/admin/historical-data?investorId=${state.filterInvestor}&year=${state.filterYear}`
         };
         
-        if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
+        if (tab === 'investors') {
+          const [invRes, accRes] = await Promise.all([
+            api.request('/api/admin/investors'),
+            api.request('/api/admin/accounts')
+          ]);
+          state.data.investors = invRes.investors || [];
+          state.data.accounts = accRes.accounts || [];
+        } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
           const res = await api.request(endpoints[tab]);
           state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
         }
@@ -294,30 +301,45 @@
       } catch(e) { alert('Failed to load data: ' + e.message); } 
       finally { document.getElementById('loadingIndicator').classList.add('hidden'); }
     }
-
+ 
     function renderTable() {
       const hd = document.getElementById('dataHead'), bd = document.getElementById('dataBody');
       const s = state.search.toLowerCase();
       let d = state.data[state.tab];
-
+ 
       if (state.tab === 'investors') {
-        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Split</th><th>Draw</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.first_name} ${i.last_name} ${i.email}`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => `<tr>
-            <td><span class="badge ${i.active?'active':'inactive'}">${i.active?'Active':'Inactive'}</span></td>
-            <td>${i.id}</td><td>${i.first_name} ${i.last_name}</td><td>${i.portal_username}</td><td>${i.split_pct}%</td><td>${money(i.monthly_draw)}</td>
+        bd.innerHTML = d.map(i => {
+          const stClass = i.active ? 'active' : 'inactive';
+          const primaryAcc = state.data.accounts.find(a => a.investor_id === i.id) || {};
+          const startCap = primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A';
+          const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A');
+          const split = primaryAcc.split_pct !== undefined ? `${primaryAcc.split_pct}%` : `${i.split_pct}%`;
+          
+          return `<tr>
+            <td><span class="badge ${stClass}">${i.active?'Active':'Inactive'}</span></td>
+            <td>${i.id}</td><td>${i.first_name} ${i.last_name}</td><td>${i.portal_username}</td>
+            <td>${startCap}</td><td><div style="font-weight:600">${currBal}</div></td>
+            <td>${split}</td><td>${money(i.monthly_draw)}</td>
             <td>
               <button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
               <button class="action-btn" style="padding:6px 10px;font-size:12px;background:${i.active?'var(--danger)':'var(--success)'}" data-action="${i.active?'deactivate':'reactivate'}" data-id="${i.id}">${i.active?'Deactivate':'Reactivate'}</button>
               <button class="danger action-btn" data-action="delete_user" data-id="${i.id}" style="padding:6px 10px;font-size:12px;margin-left:4px">Delete</button>
             </td>
-          </tr>`).join('');
+          </tr>`;
+        }).join('');
       } else if (state.tab === 'accounts') {
         hd.innerHTML = `<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Comm</th><th>Date</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.name}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => `<tr>
             <td><span class="badge ${i.status==='Active'?'active':'inactive'}">${i.status}</span></td>
-            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.name}</td><td>${money(i.starting_capital)}</td><td>${i.is_commission ? '✅' : ''}</td><td>${i.open_date}</td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.name}</td>
+            <td>
+              <div style="font-weight:600">${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
+              <div class="muted" style="font-size:11px">Start: ${money(i.starting_capital)}</div>
+            </td>
+            <td>${i.is_commission ? '✅' : ''}</td><td>${i.open_date}</td>
             <td><button class="secondary action-btn" data-action="edit" data-id="${i.id}" style="padding:6px 10px;font-size:12px">Edit</button></td>
           </tr>`).join('');
       } else if (state.tab === 'deposits') {
@@ -478,17 +500,38 @@
       const getAccOpts = () => state.data.accounts.map(a => `<option value="${a.id}" ${record.account_id===a.id?'selected':''}>${a.name} - Inv ${a.investor_id}</option>`).join('');
 
       if(tab === 'investors') {
+        const primaryAcc = action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {};
+        const rules = primaryAcc.commissionRules || [];
         html = `<div class="grid2">
             <div class="form-group"><label>First Name</label><input id="f_firstName" value="${record.first_name||''}" required /></div>
             <div class="form-group"><label>Last Name</label><input id="f_lastName" value="${record.last_name||''}" required /></div>
             <div class="form-group"><label>Email</label><input id="f_email" type="email" value="${record.email||''}" /></div>
             <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="${record.portal_username||''}" required /></div>
-            <div class="form-group"><label>Role</label><select id="f_role"><option ${record.role==='Admin'?'selected':''}>Investor</option><option ${record.role==='Admin'?'selected':''}>Admin</option></select></div>
+            <div class="form-group"><label>Role</label><select id="f_role"><option ${record.role==='Investor'?'selected':''}>Investor</option><option ${record.role==='Admin'?'selected':''}>Admin</option></select></div>
             <div class="form-group"><label>Temp Password</label><input id="f_tempPassword" placeholder="Leave blank to keep" /></div>
             <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="${record.monthly_draw||0}" required /></div>
             <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="${record.start_date||''}" required /></div>
           </div>
-          ${action==='add' ? `<div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" /></div>` : ''}
+          
+          <h3 style="margin-top:20px;border-bottom:1px solid var(--line);padding-bottom:8px;font-size:15px;color:var(--text);">Linked Account Details</h3>
+          <div class="grid2">
+            <div class="form-group"><label>Account ID</label><input id="f_accountId" value="${primaryAcc.id||''}" placeholder="Auto-generated if blank" ${action==='edit'?'readonly':''} /></div>
+            <div class="form-group"><label>Account Name</label><input id="f_name" value="${primaryAcc.name||''}" required /></div>
+            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="${primaryAcc.starting_capital||0}" required /></div>
+            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="${primaryAcc.total_cash_in||primaryAcc.starting_capital||0}" required /></div>
+          </div>
+          <div class="grid2">
+            <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;"><input type="checkbox" id="f_isCommission" style="width:auto; transform:scale(1.2);" ${primaryAcc.is_commission ? 'checked' : ''} /><label style="margin:0; font-size:15px; color:var(--text);">Is Commission Account?</label></div>
+            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="${primaryAcc.split_pct !== undefined ? primaryAcc.split_pct : 100}" required /></div>
+          </div>
+          <div id="commissionDistributionContainer" style="margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h4 style="margin:0;">Commission Distribution</h4>
+              <div id="commissionStatus" class="badge pending">Calculating...</div>
+            </div>
+            <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
+          </div>
           <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>`;
       } else if (tab === 'accounts') {
         html = `<div class="form-group"><label>Account ID</label><input id="f_id" value="${record.id||''}" placeholder="Leave blank to auto-generate" /></div>
@@ -579,8 +622,9 @@
       document.getElementById('dynamicFormFields').innerHTML = html;
       document.getElementById('entityModal').classList.remove('hidden');
 
-      if (tab === 'accounts') {
-        const rules = record.commissionRules || [];
+      if (tab === 'investors' || tab === 'accounts') {
+        const primaryAcc = tab === 'investors' ? (action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {}) : record;
+        const rules = primaryAcc.commissionRules || [];
         const rowsContainer = document.getElementById('commissionRows');
         const addBtn = document.getElementById('addCommissionBtn');
         const splitInput = document.getElementById('f_splitPct');
@@ -624,6 +668,35 @@
         addBtn.onclick = () => addRow();
         splitInput.oninput = updateStatus;
         updateStatus();
+
+        if (tab === 'investors' && action === 'add') {
+          const fName = document.getElementById('f_firstName');
+          const lName = document.getElementById('f_lastName');
+          const usernameInp = document.getElementById('f_portalUsername');
+          const accNameInp = document.getElementById('f_name');
+          const startCapInp = document.getElementById('f_startingCapital');
+          const cashInInp = document.getElementById('f_totalCashIn');
+          
+          const updateDefaults = () => {
+            const first = fName.value.trim();
+            const last = lName.value.trim();
+            
+            if (first || last) {
+              accNameInp.value = [first, last].filter(Boolean).join(' ') + ' Main Account';
+              if (first) {
+                usernameInp.value = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+              }
+            }
+          };
+
+          const updateCashIn = () => {
+            cashInInp.value = startCapInp.value;
+          };
+          
+          fName.addEventListener('input', updateDefaults);
+          lName.addEventListener('input', updateDefaults);
+          startCapInp.addEventListener('input', updateCashIn);
+        }
       }
 
       // Sync Month Number when Month Name changes
@@ -694,7 +767,7 @@
            }
          });
          
-         if (tab === 'accounts') {
+         if (tab === 'investors' || tab === 'accounts') {
             payload.commissionRules = [];
             document.querySelectorAll('.comm-row').forEach(row => {
                const rec = row.querySelector('.comm-row-user').value;
@@ -782,6 +855,6 @@
     });
 
     init();
-  </script>
+</script>
 </body>
 </html>

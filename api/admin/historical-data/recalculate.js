@@ -14,16 +14,24 @@ export default async function handler(req, res) {
     const startMonth = Number(startMonthNumber || 1);
     const targetYear = Number(year || new Date().getFullYear());
 
-    // 1. Get Investor split and draw (keep as fallback)
+    // 1. Get Investor split, draw, and start date
     const { data: inv, error: invErr } = await supabase
       .from("investors")
-      .select("split_pct, monthly_draw")
+      .select("split_pct, monthly_draw, start_date")
       .ilike("id", investorId)
       .single();
     if (invErr) throw invErr;
 
     const investorSplit = (inv.split_pct || 100) / 100;
     const draw = inv.monthly_draw || 0;
+    
+    let startDate = null;
+    if (inv.start_date) {
+      const d = new Date(inv.start_date);
+      if (!isNaN(d.getTime())) {
+        startDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+      }
+    }
 
     // 1b. Get Accounts with their splits
     const { data: accounts, error: accsErr } = await supabase
@@ -105,6 +113,9 @@ export default async function handler(req, res) {
     const updatedRows = [];
 
     for (let m = 1; m <= 12; m++) {
+      const isStarted = !startDate || (targetYear > startDate.getUTCFullYear()) || 
+                        (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
+
       const existing = history.find(h => h.month_number === m);
       const earnedPrevMonth = (m > 1) ? (commEarningsByM[m - 1] || 0) : 0;
       
@@ -123,7 +134,9 @@ export default async function handler(req, res) {
         const opening = accountBalances[acc.id];
         const deps = (depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0;
         const wds = (wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0;
-        const grossPct = fundRetByM[m] || 0;
+        
+        // If the investor hasn't started yet, grossPct is 0
+        const grossPct = isStarted ? (fundRetByM[m] || 0) : 0;
         const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
         
         const adjStart = opening + deps - wds;

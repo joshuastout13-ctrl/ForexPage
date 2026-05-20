@@ -45,7 +45,7 @@ async function testInvestorLogin() {
        headers: { 'Cookie': invCookie }
     });
     const dashData = await dashRes.json();
-    if (dashData.investor && dashData.accounts) {
+    if (dashData.investor && dashData.breakdown) {
        console.log("Investor Dashboard Data: PASS");
     } else {
        console.log("Investor Dashboard Data: FAIL (" + JSON.stringify(dashData) + ")");

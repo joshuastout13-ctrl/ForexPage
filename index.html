@@ -637,7 +637,8 @@
         if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
         if (r.commissionsEarned > 0) activityHtml += `<div class="green">+${money(r.commissionsEarned)} Commission</div>`;
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
-        if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal</div>`;
+        if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
+        if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal Completed</div>`;
 
         return `
           <tr class="${r.isProjection ? "muted" : ""}" style="${r.isProjection ? "opacity:0.6; font-style:italic;" : ""}">

@@ -29,13 +29,16 @@ export default async function handler(req, res) {
       const body = req.body || {};
       
       const newId = body.id || `inv_${crypto.randomBytes(4).toString("hex")}`;
-      const splitPct = Number(body.splitPct || 0);
+      const splitPct = Number(body.splitPct !== undefined ? body.splitPct : 100);
       const commissionRules = Array.isArray(body.commissionRules) ? body.commissionRules : [];
+      const isCommission = body.isCommission === true || body.isCommission === "true";
       
       // Validate split
-      const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
-      if (Math.abs(splitPct + totalCommissions - 100) > 0.01 && splitPct !== 100) {
-        throw new Error(`Split (${splitPct}%) and Commissions (${totalCommissions}%) must equal 100%`);
+      if (isCommission) {
+        const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
+        if (Math.abs(splitPct + totalCommissions - 100) > 0.01) {
+          throw new Error(`Split (${splitPct}%) and Commissions (${totalCommissions}%) must equal 100% for commission accounts`);
+        }
       }
       
       const investorPayload = {
@@ -58,14 +61,18 @@ export default async function handler(req, res) {
 
       // Optionally create an account row if starting data is provided
       let accData = null;
+      const accId = body.accountId || body.portalUsername || newId;
       if (body.startingCapital !== undefined && body.startingCapital !== "") {
         const accPayload = {
-          id: body.portalUsername || newId, // To match dashboard logic conventions
+          id: accId,
           investor_id: newId,
-          name: [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
+          name: body.name || [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
           starting_capital: Number(body.startingCapital || 0),
+          total_cash_in: Number(body.totalCashIn !== undefined ? body.totalCashIn : (body.startingCapital || 0)),
           open_date: investorPayload.start_date,
           status: "Active",
+          is_commission: body.isCommission === true || body.isCommission === "true",
+          split_pct: splitPct,
           notes: "Created via Admin Dashboard"
         };
         const { data: aData, error: aError } = await supabase.from("investor_accounts").insert([accPayload]).select();
@@ -80,6 +87,7 @@ export default async function handler(req, res) {
       if (commissionRules.length > 0) {
         const rulesPayload = commissionRules.map(rule => ({
           investor_id: newId,
+          account_id: accId,
           recipient_id: rule.recipientId,
           percent: Number(rule.percent)
         }));

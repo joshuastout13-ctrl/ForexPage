@@ -1,188 +1,125 @@
-const fs = require('fs');
+import fs from 'fs';
 
 const css = `
-    :root{
-      --bg:#08101d;
-      --bg2:#0f172a;
-      --panel:rgba(17,26,46,.94);
-      --line:rgba(255,255,255,.08);
-      --text:#e7eefb;
-      --muted:#9fb0cc;
-      --accent:#4f8cff;
-      --accent2:#7fb3ff;
-      --success:#22c55e;
-      --danger:#ef4444;
-      --warning:#eab308;
+:root{
+      --bg:#08101d; --bg2:#0f172a; --panel:rgba(17,26,46,.94); --line:rgba(255,255,255,.08); --text:#e7eefb;
+      --muted:#9fb0cc; --accent:#4f8cff; --accent2:#7fb3ff; --success:#22c55e; --danger:#ef4444; --warning:#eab308;
     }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Arial,sans-serif;
-      background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-      background-attachment:fixed;
-      color:var(--text);
-      min-height:100vh;
-    }
+    body{ margin:0; font-family:Arial,sans-serif; background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%); background-attachment:fixed; color:var(--text); min-height:100vh; }
     .wrap{max-width:1440px;margin:0 auto;padding:24px 20px 48px}
-    .card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:22px;
-      box-shadow:0 12px 40px rgba(0,0,0,.22);
-      margin-bottom:18px;
-    }
+    .card{ background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 12px 40px rgba(0,0,0,.22); margin-bottom:18px; }
     h1,h2,h3{margin:0 0 10px}
     .muted{color:var(--muted);line-height:1.5}
-    .kicker{
-      display:inline-block;
-      padding:7px 12px;
-      border-radius:999px;
-      background:rgba(79,140,255,.12);
-      color:var(--accent2);
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      border:1px solid rgba(127,179,255,.2);
-      margin-bottom:12px;
-    }
+    .kicker{ display:inline-block; padding:7px 12px; border-radius:999px; background:rgba(79,140,255,.12); color:var(--accent2); font-size:12px; text-transform:uppercase; letter-spacing:.08em; border:1px solid rgba(127,179,255,.2); margin-bottom:12px; }
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-    input, select, textarea{
-      width:100%; padding:12px 13px; border-radius:12px;
-      border:1px solid var(--line); background:rgba(255,255,255,.04);
-      color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s;
-    }
+    input, select, textarea{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s; }
+    select option { background: #1e293b; color: #fff; }
     input:focus, select:focus, textarea:focus { border-color:var(--accent); }
-    button{
-      padding:12px 16px; border:none; border-radius:12px;
-      background:linear-gradient(135deg,var(--accent),#2f6df0);
-      color:#fff; font-weight:700; cursor:pointer;
-      transition:transform 0.1s, opacity 0.2s;
-    }
+    button{ padding:12px 16px; border:none; border-radius:12px; background:linear-gradient(135deg,var(--accent),#2f6df0); color:#fff; font-weight:700; cursor:pointer; transition:transform 0.1s, opacity 0.2s; }
     button:active{transform:scale(0.98)}
     button[disabled]{opacity:0.5;cursor:not-allowed}
     .secondary{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);}
     .danger{background:linear-gradient(135deg,var(--danger),#c53030);}
-    .warning{background:linear-gradient(135deg,var(--warning),#b45309);}
-    
     table{width:100%;min-width:1000px;border-collapse:collapse;}
     th,td{padding:14px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;}
     th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
     tr:last-child td{border-bottom:none}
-    
     .hidden{display:none !important}
     .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .green{color:var(--success)}
-    .red{color:var(--danger)}
-    
     .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:bold;text-transform:uppercase;}
     .badge.active{background:rgba(34,197,94,0.15);color:var(--success)}
     .badge.inactive{background:rgba(239,68,68,0.15);color:var(--danger)}
     .badge.pending{background:rgba(234,179,8,0.15);color:var(--warning)}
 
-    /* Modal styling */
-    .modal-overlay{
-      position:fixed; top:0; left:0; right:0; bottom:0;
-      background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
-      display:flex; justify-content:center; align-items:flex-start;
-      padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh;
-    }
-    .modal{
-      background:var(--panel); border:1px solid var(--line);
-      border-radius:22px; padding:24px; width:100%; max-width:600px;
-      box-shadow:0 20px 40px rgba(0,0,0,.4);
-    }
+    .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); display:flex; justify-content:center; align-items:flex-start; padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh; }
+    .modal{ background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; width:100%; max-width:600px; box-shadow:0 20px 40px rgba(0,0,0,.4); }
     .form-group{margin-bottom:16px;}
     .form-group label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;}
     
-    /* Layout */
     .dashboard-layout { display:flex; gap:24px; min-height:calc(100vh - 120px); align-items:flex-start; }
     .sidebar { flex:0 0 240px; position:sticky; top:24px; }
     .main-content { flex:1; min-width:0; }
-    
-    .nav-btn {
-      display:block; width:100%; text-align:left; padding:12px 16px;
-      background:transparent; border:1px solid transparent; color:var(--muted);
-      border-radius:12px; margin-bottom:8px; font-weight:600;
-      transition:0.2s;
-    }
+    .nav-btn { display:block; width:100%; text-align:left; padding:12px 16px; background:transparent; border:1px solid transparent; color:var(--muted); border-radius:12px; margin-bottom:8px; font-weight:600; transition:0.2s; white-space:nowrap; }
     .nav-btn:hover { background:rgba(255,255,255,.03); }
     .nav-btn.active { background:rgba(79,140,255,.1); color:var(--text); border-color:rgba(127,179,255,.2); }
 
-    /* Toggles */
-    .toggle-switch{position:relative;width:44px;height:24px;background:rgba(255,255,255,0.1);border-radius:12px;cursor:pointer;transition:0.3s;}
-    .toggle-switch.on{background:var(--success)}
-    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;}
-    .toggle-switch.on .toggle-knob{transform:translateX(20px);}
+    @media (max-width: 980px) {
+      .wrap { padding:12px 10px 48px; }
+      .right.header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .dashboard-layout { flex-direction: column; gap: 16px; }
+      .sidebar { 
+        position: relative; top: 0; flex: none; width: 100%; 
+        display: flex; overflow-x: auto; padding: 8px !important; gap: 8px;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      .sidebar::-webkit-scrollbar { display: none; }
+      .sidebar .nav-btn { margin-bottom: 0; padding: 10px 14px; font-size: 13px; flex: 0 0 auto; width: auto; }
+      .grid2 { grid-template-columns: 1fr; }
+      .modal { padding: 16px; border-radius: 16px; }
+      h1 { font-size: 1.5rem; }
+    }
+    
+    .toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid var(--accent); color: white;
+      padding: 14px 24px; border-radius: 12px; z-index: 9999;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 12px;
+      font-weight: 600; font-size: 14px; pointer-events: none;
+      animation: toastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes toastIn { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 `;
 
 const htmlBody = `
-  <div class="wrap">
-    
-    <!-- LOGIN VIEW -->
-    <div id="loginView" class="card" style="max-width:600px;margin:10vh auto;">
+<div class="wrap">
+    <div id="loadingView" style="text-align:center; padding-top:20vh;">
+       <div class="kicker">ForEx Investment Tracker</div>
+       <div class="muted">Verifying secure session...</div>
+    </div>
+    <div id="loginView" class="card hidden" style="max-width:600px;margin:10vh auto;">
       <div class="kicker">Admin Portal</div>
       <h2>Secure Login</h2>
       <div class="muted" style="margin-bottom:20px;">Enter your admin credentials.</div>
-      <div class="form-group">
-        <label>Username</label>
-        <input id="loginUser" placeholder="admin" autofocus />
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input id="loginPass" type="password" placeholder="••••••••" />
-      </div>
+      <div class="form-group"><label>Username</label><input id="loginUser" placeholder="admin" autofocus /></div>
+      <div class="form-group"><label>Password</label><input id="loginPass" type="password" placeholder="••••••••" /></div>
       <div id="loginError" class="muted" style="color:var(--danger);margin-bottom:16px;"></div>
       <button id="loginBtn" style="width:100%">Authenticate</button>
     </div>
 
-    <!-- MAIN DASHBOARD -->
     <div id="dashboardView" class="hidden">
       <div class="right" style="margin-bottom:24px;">
-        <div>
-          <div class="kicker">Admin Portal</div>
-          <h1>ForEx Investment Tracker Management</h1>
-        </div>
-        <div class="right">
-          <div id="adminName" class="muted">Logged in as Admin</div>
-          <button id="logoutBtn" class="secondary">Logout</button>
-        </div>
+        <div><div class="kicker">Admin Portal</div><h1>ForEx Investment Tracker Management</h1></div>
+        <div class="right"><div id="adminName" class="muted">Logged in as Admin</div><button id="logoutBtn" class="secondary">Logout</button></div>
       </div>
-
       <div class="dashboard-layout">
-        <!-- SIDEBAR -->
         <div class="sidebar card" style="padding:16px;">
-          <button class="nav-btn active" data-tab="investors">1. Investors</button>
-          <button class="nav-btn" data-tab="accounts">2. Accounts</button>
-          <button class="nav-btn" data-tab="deposits">3. Deposits</button>
-          <button class="nav-btn" data-tab="withdrawals">4. Withdrawals</button>
-          <button class="nav-btn" data-tab="returns">5. Monthly Returns</button>
-          <button class="nav-btn" data-tab="performance">6. Live Performance</button>
-          <button class="nav-btn" data-tab="snapshots">7. Snapshots</button>
+          <button class="nav-btn active" data-tab="investors">1. Investors & Accounts</button>
+          <button class="nav-btn" data-tab="deposits">2. Deposits</button>
+          <button class="nav-btn" data-tab="withdrawals">3. Withdrawals</button>
+          <button class="nav-btn" data-tab="returns">4. Monthly Returns</button>
+          <button class="nav-btn" data-tab="performance">5. Live Performance</button>
+          <button class="nav-btn" data-tab="snapshots">6. Snapshots</button>
+          <button class="nav-btn" data-tab="history">7. Historical Data</button>
         </div>
-
-        <!-- MAIN TABLE -->
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
             <h2 id="viewTitle" style="margin:0">Investors Directory</h2>
-            <div class="right">
+            <div id="viewActions" class="right">
               <input id="searchBar" placeholder="Search..." style="max-width:200px" />
               <button id="addEntityBtn">+ Add New</button>
+              <button id="importBtn" class="secondary hidden">Bulk Import</button>
             </div>
           </div>
           <div id="loadingIndicator" class="muted hidden" style="padding:20px;text-align:center;">Loading data...</div>
           <div style="overflow-x:auto;">
-            <table id="dataTable">
-              <thead id="dataHead"></thead>
-              <tbody id="dataBody"></tbody>
-            </table>
+            <table id="dataTable"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- GENERIC ENTITY MODAL -->
   <div id="entityModal" class="modal-overlay hidden">
     <div class="modal">
       <div class="right" style="margin-bottom:20px;">
@@ -192,10 +129,8 @@ const htmlBody = `
       <form id="entityForm">
         <input type="hidden" id="formAction" />
         <input type="hidden" id="formId" />
-        
         <div id="dynamicFormFields"></div>
         <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;margin-top:16px;"></div>
-        
         <div style="margin-top:24px;text-align:right;">
           <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
           <button type="submit" id="saveEntityBtn">Save Changes</button>
@@ -204,7 +139,25 @@ const htmlBody = `
     </div>
   </div>
 
-  <!-- STATUS/DELETE CONFIRM MODAL -->
+  <div id="importModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 style="margin:0">Bulk Import History</h2>
+        <button class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
+      </div>
+      <div class="muted" style="margin-bottom:20px;">Upload a CSV file with columns: month_number, year, opening_balance, deposits, withdrawals, gross_return_pct, manual_gain_amount, notes.</div>
+      <div class="form-group">
+        <label>Select CSV File</label>
+        <input type="file" id="csvFileInput" accept=".csv" />
+      </div>
+      <div id="importPreview" class="muted" style="margin-top:16px;max-height:200px;overflow:auto;font-size:12px;"></div>
+      <div style="margin-top:24px;text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="processImportBtn">Start Import</button>
+      </div>
+    </div>
+  </div>
+
   <div id="statusModal" class="modal-overlay hidden">
     <div class="modal" style="max-width:400px;text-align:center">
       <h2 id="statusModalTitle">Confirm Action</h2>
@@ -217,37 +170,45 @@ const htmlBody = `
   </div>
 `;
 
-const jsBody = \`
-    // App State
-    let state = {
-      admin: null,
-      tab: 'investors',
-      data: {
-        investors: [],
-        accounts: [],
-        deposits: [],
-        withdrawals: [],
-        returns: [],
-        performance: [],
-        snapshots: []
-      },
-      search: '',
-      targetId: null,      // For deletes/voids
-      targetAction: null,  // Type of confirmation
-      targetContext: null  // Which tab it triggered on
+const jsBody = `
+let state = {
+      admin: null, tab: 'investors',
+      data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [] },
+      search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear()
     };
 
-    function money(n) { return Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"}); }
-    function query(q) { return document.querySelector(q); }
-
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    const money = (n) => Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"});
+    
+    function showToast(msg, isError = false) {
+      const old = document.querySelector('.toast'); if(old) old.remove();
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.style.pointerEvents = 'auto';
+      if(isError) t.style.borderColor = 'var(--danger)';
+      t.innerHTML = \`
+        <div style="display:flex; align-items:center; gap:12px; width:100%;">
+          <span>\${isError ? '❌' : '✅'}</span> 
+          <div style="flex:1; margin-right:20px;">\${msg}</div>
+          <button onclick="this.closest('.toast').remove()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:18px; padding:0 5px;">✕</button>
+        </div>
+      \`;
+      document.body.appendChild(t);
+    }
     const api = {
       async request(endpoint, options = {}) {
-        const res = await fetch(endpoint, {
-          ...options,
-          headers: { 'Content-Type': 'application/json', ...(options.headers||{}) }
-        });
-        const d = await res.json().catch(()=>({}));
-        if(!res.ok) throw new Error(d.error || 'API Error');
+        const res = await fetch(endpoint, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers||{}) } });
+        let d = {};
+        const text = await res.text();
+        try { d = JSON.parse(text); } catch(e) { d = { error: 'Server returned non-JSON response', raw: text }; }
+        if(!res.ok) {
+           const msg = d.error || \`HTTP \${res.status}\`;
+           console.error('API Error:', msg, d);
+           // Show first 100 chars of raw response if it's a server error
+           const debugInfo = d.raw ? \`\\n\\nContent: \${d.raw.slice(0, 150)}...\` : '';
+           throw new Error(\`\${msg}\${debugInfo}\`);
+        }
         return d;
       },
       login: (u,p) => api.request('/api/admin/login', { method:'POST', body: JSON.stringify({username:u,password:p})}),
@@ -256,446 +217,655 @@ const jsBody = \`
     };
 
     async function init() {
+      // Safety net: if it takes > 5s, show login
+      const timeout = setTimeout(() => {
+        if (document.getElementById('loadingView').classList.contains('hidden')) return;
+        console.warn('Init timeout hit, showing login');
+        document.getElementById('loadingView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+      }, 5000);
+
       try {
-        const res = await api.me();
-        state.admin = res.admin;
+        const res = await api.me(); state.admin = res.admin; 
+        clearTimeout(timeout);
+        document.getElementById('loadingView').classList.add('hidden');
         showDashboard();
       } catch(e) {
+        clearTimeout(timeout);
+        document.getElementById('loadingView').classList.add('hidden');
         document.getElementById('dashboardView').classList.add('hidden');
         document.getElementById('loginView').classList.remove('hidden');
       }
     }
 
     function showDashboard() {
+      document.getElementById('loadingView').classList.add('hidden');
       document.getElementById('loginView').classList.add('hidden');
       document.getElementById('dashboardView').classList.remove('hidden');
       document.getElementById('adminName').textContent = \`Logged in as \${state.admin.name}\`;
       loadTab(state.tab);
     }
 
-    // --- Tab Manager ---
     document.querySelectorAll('.nav-btn').forEach(b => {
       b.addEventListener('click', (e) => {
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
         e.currentTarget.classList.add('active');
         state.tab = e.currentTarget.dataset.tab;
         
-        const titles = {
-          investors: 'Investors Directory',
-          accounts: 'Investor Accounts',
-          deposits: 'Deposits ledger',
-          withdrawals: 'Withdrawals ledger',
-          returns: 'Monthly Returns',
-          performance: 'Live Performance Overrides',
-          snapshots: 'Historical Snapshots (Read Only)'
-        };
+        const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
         document.getElementById('viewTitle').textContent = titles[state.tab];
-        
-        // Hide add button for snapshots
-        document.getElementById('addEntityBtn').style.display = (state.tab === 'snapshots' || state.tab === 'performance') ? 'none' : 'inline-block';
-        
+        document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
+        document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         loadTab(state.tab);
       });
     });
-
+ 
     async function loadTab(tab) {
       document.getElementById('loadingIndicator').classList.remove('hidden');
-      document.getElementById('dataHead').innerHTML = '';
-      document.getElementById('dataBody').innerHTML = '';
+      document.getElementById('dataHead').innerHTML = ''; document.getElementById('dataBody').innerHTML = '';
       try {
-        let endpoint = '';
-        if(tab==='investors') endpoint = '/api/admin/investors';
-        else if(tab==='accounts') endpoint = '/api/admin/accounts';
-        else if(tab==='deposits') endpoint = '/api/admin/deposits';
-        else if(tab==='withdrawals') endpoint = '/api/admin/withdrawals';
-        else if(tab==='returns') endpoint = '/api/admin/monthly-returns';
-        else if(tab==='performance') endpoint = '/api/admin/live-performance';
-        else if(tab==='snapshots') endpoint = '/api/admin/snapshots';
-
-        if(endpoint) {
-          const res = await api.request(endpoint);
-          state.data[tab] = res[tab==='returns'?'monthlyReturns':(tab==='performance'?'livePerformance':tab)] || [];
+        const endpoints = { 
+          investors: '/api/admin/investors', 
+          accounts: '/api/admin/accounts', 
+          deposits: '/api/admin/deposits', 
+          withdrawals: '/api/admin/withdrawals', 
+          returns: '/api/admin/monthly-returns', 
+          performance: '/api/admin/live-performance', 
+          snapshots: '/api/admin/snapshots',
+          history: \`/api/admin/historical-data?investorId=\${state.filterInvestor}&year=\${state.filterYear}\`
+        };
+        
+        if (tab === 'investors') {
+          const [invRes, accRes] = await Promise.all([
+            api.request('/api/admin/investors'),
+            api.request('/api/admin/accounts')
+          ]);
+          state.data.investors = invRes.investors || [];
+          state.data.accounts = accRes.accounts || [];
+        } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
+          const res = await api.request(endpoints[tab]);
+          state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
         }
         
-        // Ensure investors are loaded if we are on accounts, deposits or withdrawals for dropdowns
-        if (['accounts', 'deposits', 'withdrawals'].includes(tab) && state.data.investors.length===0) {
-           const invRes = await api.request('/api/admin/investors');
-           state.data.investors = invRes.investors || [];
+        if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
+           const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
         }
         if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
-           const accRes = await api.request('/api/admin/accounts');
-           state.data.accounts = accRes.accounts || [];
+           const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
         }
-
         renderTable();
-      } catch(e) {
-        alert('Failed to load data: ' + e.message);
-      } finally {
-        document.getElementById('loadingIndicator').classList.add('hidden');
-      }
+      } catch(e) { alert('Failed to load data: ' + e.message); } 
+      finally { document.getElementById('loadingIndicator').classList.add('hidden'); }
     }
-
+ 
     function renderTable() {
-      const hd = document.getElementById('dataHead');
-      const bd = document.getElementById('dataBody');
+      const hd = document.getElementById('dataHead'), bd = document.getElementById('dataBody');
       const s = state.search.toLowerCase();
       let d = state.data[state.tab];
-
+ 
       if (state.tab === 'investors') {
-        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Split</th><th>Draw</th><th>Actions</th></tr>\`;
+        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           const stClass = i.active ? 'active' : 'inactive';
+          const primaryAcc = state.data.accounts.find(a => a.investor_id === i.id) || {};
+          const startCap = primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A';
+          const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A');
+          const split = primaryAcc.split_pct !== undefined ? \`\${primaryAcc.split_pct}%\` : \`\${i.split_pct}%\`;
+          
           return \`<tr>
             <td><span class="badge \${stClass}">\${i.active?'Active':'Inactive'}</span></td>
             <td>\${i.id}</td><td>\${i.first_name} \${i.last_name}</td><td>\${i.portal_username}</td>
-            <td>\${i.split_pct}%</td><td>\${money(i.monthly_draw)}</td>
+            <td>\${startCap}</td><td><div style="font-weight:600">\${currBal}</div></td>
+            <td>\${split}</td><td>\${money(i.monthly_draw)}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
-              <button class="action-btn" style="background:\${i.active?'var(--danger)':'var(--success)'}" data-action="\${i.active?'deactivate':'reactivate'}" data-id="\${i.id}">\${i.active?'Deactivate':'Reactivate'}</button>
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              <button class="action-btn" style="padding:6px 10px;font-size:12px;background:\${i.active?'var(--danger)':'var(--success)'}" data-action="\${i.active?'deactivate':'reactivate'}" data-id="\${i.id}">\${i.active?'Deactivate':'Reactivate'}</button>
+              <button class="danger action-btn" data-action="delete_user" data-id="\${i.id}" style="padding:6px 10px;font-size:12px;margin-left:4px">Delete</button>
             </td>
           </tr>\`;
         }).join('');
-      }
-      else if (state.tab === 'accounts') {
-        hd.innerHTML = \`<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Date</th><th>Actions</th></tr>\`;
+      } else if (state.tab === 'accounts') {
+        hd.innerHTML = \`<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Comm</th><th>Date</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.name}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
             <td><span class="badge \${i.status==='Active'?'active':'inactive'}">\${i.status}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.name}</td><td>\${money(i.starting_capital)}</td><td>\${i.open_date}</td>
-            <td><button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button></td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.name}</td>
+            <td>
+              <div style="font-weight:600">\${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
+              <div class="muted" style="font-size:11px">Start: \${money(i.starting_capital)}</div>
+            </td>
+            <td>\${i.is_commission ? '✅' : ''}</td><td>\${i.open_date}</td>
+            <td><button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button></td>
           </tr>\`).join('');
-      }
-      else if (state.tab === 'deposits') {
+      } else if (state.tab === 'deposits') {
         hd.innerHTML = \`<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => {
-          const cls = i.type==='VOID'?'inactive':'active';
-          return \`<tr>
-            <td><span class="badge \${cls}">\${i.type}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.date}</td>
+        bd.innerHTML = d.map(i => \`<tr>
+            <td><span class="badge \${i.type==='VOID'?'inactive':'active'}">\${i.type}</span></td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td>
+            <td>\${i.date}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
-              \${i.type!=='VOID'? \`<button class="danger action-btn" data-action="void" data-id="\${i.id}">Void</button>\` : ''}
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              \${i.type!=='VOID'? \`<button class="danger action-btn" data-action="void" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Void</button>\` : ''}
             </td>
-          </tr>\`;
-        }).join('');
-      }
-      else if (state.tab === 'withdrawals') {
+          </tr>\`).join('');
+      } else if (state.tab === 'withdrawals') {
         hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
-          let cls = 'pending';
-          if(i.status==='Approved' || i.status==='Completed') cls='active';
-          if(i.status==='Cancelled') cls='inactive';
+          let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
           return \`<tr>
             <td><span class="badge \${cls}">\${i.status}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td><td>\${i.month} \${i.year}</td>
+            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td>
+            <td>\${i.month} \${i.year}</td>
             <td>
-              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
-              \${i.status!=='Cancelled'? \`<button class="danger action-btn" data-action="cancel_wd" data-id="\${i.id}">Cancel</button>\` : ''}
+              <button class="secondary action-btn" data-action="edit" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Edit</button>
+              \${i.status!=='Cancelled'? \`<button class="danger action-btn" data-action="cancel_wd" data-id="\${i.id}" style="padding:6px 10px;font-size:12px">Cancel</button>\` : ''}
             </td>
           </tr>\`;
         }).join('');
-      }
-      else if (state.tab === 'returns') {
-        hd.innerHTML = \`<tr><th>Year/Month</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>\`;
+      } else if (state.tab === 'returns') {
+        hd.innerHTML = \`<tr><th>Date</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.year} \${i.month}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
             <td>\${i.month} \${i.year}</td><td>\${i.gross_return_pct}%</td><td>\${i.source}</td><td>\${i.locked?'Yes':'No'}</td><td>\${new Date(i.last_updated).toLocaleDateString()}</td>
-            <td><button class="secondary action-btn" data-action="edit_return" data-id="\${i.year}_\${i.month_number}">Edit</button></td>
+            <td><button class="secondary action-btn" data-action="edit_return" data-id="\${i.year}_\${i.month_number}" style="padding:6px 10px;font-size:12px">Edit</button></td>
           </tr>\`).join('');
-      }
-      else if (state.tab === 'performance') {
+      } else if (state.tab === 'performance') {
         hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Override</th><th>Updated</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.metric}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
             <td>\${i.metric}</td><td>\${i.value_pct}%</td><td>\${i.source}</td><td>\${i.is_override?'Yes':'No'}</td><td>\${new Date(i.updated_at).toLocaleDateString()}</td>
-            <td><button class="secondary action-btn" data-action="edit_perf" data-id="\${i.metric}">Edit</button></td>
+            <td><button class="secondary action-btn" data-action="edit_perf" data-id="\${i.metric}" style="padding:6px 10px;font-size:12px">Edit</button></td>
           </tr>\`).join('');
-      }
-      else if (state.tab === 'snapshots') {
+      } else if (state.tab === 'snapshots') {
         hd.innerHTML = \`<tr><th>Date</th><th>Investor</th><th>Account</th><th>Open Bal</th><th>Return %</th><th>Gain</th><th>Close Bal</th></tr>\`;
         d = d.filter(i => !s || \`\${i.investor_id} \${i.account_id} \${i.month} \${i.year}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
             <td>\${i.month} \${i.year}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td>
             <td>\${money(i.opening_balance)}</td><td>\${i.effective_return_pct}%</td><td>\${money(i.gain_amount)}</td><td>\${money(i.ending_balance)}</td>
           </tr>\`).join('');
+      } else if (state.tab === 'history') {
+        hd.innerHTML = \`<tr><th>Month</th><th>Opening</th><th>Deps/Wds</th><th>Gross %</th><th>Manual Gain</th><th>Total Gain</th><th>Draw</th><th>Ending</th><th>Action</th></tr>\`;
+        if(!state.filterInvestor) {
+          bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px">
+            <div class="muted" style="margin-bottom:12px">Select an investor and year to manage history:</div>
+            <div style="display:flex;justify-content:center;gap:10px;">
+              <select id="histInvSel" style="max-width:200px">\${state.data.investors.map(i => \`<option value="\${i.id}">\${i.first_name} \${i.last_name}</option>\`).join('')}</select>
+              <input id="histYearSel" type="number" value="\${state.filterYear}" style="width:100px" />
+              <button onclick="state.filterInvestor=document.getElementById('histInvSel').value; state.filterYear=document.getElementById('histYearSel').value; loadTab('history')">Load History</button>
+            </div>
+          </td></tr>\`;
+        } else {
+          bd.innerHTML = \`<tr><td colspan="9" style="background:rgba(255,255,255,.02);padding:12px;">
+             <div class="right">
+               <span class="muted">Investor ID: \${state.filterInvestor} | Year: \${state.filterYear}</span>
+               <div class="right">
+                 <button class="secondary" onclick="state.filterInvestor=''; loadTab('history')">Change Investor</button>
+                 <button id="recalcBtn" class="secondary" style="background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.2)">Recalculate Remaining Year</button>
+               </div>
+             </div>
+          </td></tr>\`;
+          bd.innerHTML += d.map(i => \`<tr>
+              <td style="font-weight:600">\${i.month}</td>
+              <td>\${money(i.opening_balance)}</td>
+              <td>+\${money(i.deposits)} / -\${money(i.withdrawals)}</td>
+              <td>\${i.gross_return_pct}%</td>
+              <td>\${i.is_manual ? \`<span style="color:var(--success)">\${money(i.manual_gain_amount)}</span>\` : '<span class="muted">Auto</span>'}</td>
+              <td>\${money(i.ending_balance - (i.opening_balance + i.deposits - i.withdrawals) + i.recurring_draw)}</td>
+              <td>\${money(i.recurring_draw)}</td>
+              <td style="font-weight:600">\${money(i.ending_balance)}</td>
+              <td><button class="secondary action-btn" data-action="edit_history" data-id="\${i.month_number}" style="padding:4px 8px;font-size:11px">Edit</button></td>
+            </tr>\`).join('');
+          
+          setTimeout(() => {
+            if(document.getElementById('recalcBtn')) {
+              document.getElementById('recalcBtn').onclick = async () => {
+                 if(!confirm('Recalculate balances from this point forward? Manual entries will be preserved but balances will be cascaded. Ensure you have entered correct Gross Returns for the fund first.')) return;
+                 try { await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); loadTab('history'); }
+                 catch(e) { alert(e.message); }
+              };
+            }
+          }, 0);
+        }
       }
 
-      if(d.length === 0) {
-        bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>\`;
+      if(d.length === 0 && state.tab !== 'history') bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>\`;
+      else if(d.length === 0 && state.tab === 'history' && state.filterInvestor) {
+        bd.innerHTML += \`<tr><td colspan="9" style="text-align:center;padding:60px">
+          <div class="muted" style="margin-bottom:20px; font-size:16px;">No history records found for this investor in \${state.filterYear}.</div>
+          <button type="button" id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate \${state.filterYear} Monthly Rows</button>
+        </td></tr>\`;
       }
     }
 
     document.getElementById('dataBody').onclick = function(e) {
-      const btn = e.target.closest('.action-btn');
-      if(!btn) return;
+      const btn = e.target.closest('.action-btn, #initRecalcBtn'); if(!btn) return;
       const { action, id } = btn.dataset;
       
-      if(action === 'edit' || action === 'edit_return' || action === 'edit_perf') {
-        openModal(state.tab, 'edit', id);
-      } else {
-        openConfirm(state.tab, action, id);
+      if (btn.id === 'initRecalcBtn') {
+          handleInitHistory();
+          return;
       }
+      
+      if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
+      else if(action==='delete_user') openConfirm(state.tab, action, id);
+      else openConfirm(state.tab, action, id);
     };
 
-    // --- Dynamic Modal System ---
+    async function handleInitHistory() {
+      if(!confirm(\`This will initialize the \${state.filterYear} monthly rows for this investor. Proceed?\`)) return;
+      
+      const btn = document.getElementById('initRecalcBtn');
+      const originalText = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Initializing...';
+      showToast('Generating history records. Please wait...');
+      
+      try { 
+        await api.request('/api/admin/historical-data/recalculate', { 
+          method:'POST', 
+          body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) 
+        }); 
+        showToast('Success! 2026 History has been generated.');
+        loadTab('history'); 
+      }
+      catch(e) { 
+        showToast(\`Error: \${e.message}\`, true);
+        console.error(e);
+      } finally {
+        if(document.getElementById('initRecalcBtn')) {
+          btn.disabled = false; btn.textContent = originalText;
+        }
+      }
+    }
+
     function openModal(tab, action, id) {
-      const title = document.getElementById('modalTitle');
-      const wrap = document.getElementById('dynamicFormFields');
-      document.getElementById('formAction').value = action;
-      document.getElementById('formId').value = id || '';
+      document.getElementById('formAction').value = action; document.getElementById('formId').value = id || '';
       document.getElementById('modalError').textContent = '';
       
-      let html = '';
-      let record = {};
-      
-      if(action === 'edit' || action === 'edit_return' || action === 'edit_perf') {
-        title.textContent = \`Edit \${tab.slice(0,-1)}\`;
-        if(tab === 'returns') {
-           const [y, m] = id.split('_');
-           record = state.data[tab].find(r => r.year == y && r.month_number == m) || {};
-        } else if (tab === 'performance') {
-           record = state.data[tab].find(r => r.metric == id) || {};
-        } else {
-           record = state.data[tab].find(r => r.id === id) || {};
-        }
-      } else {
-        title.textContent = \`Add \${tab.slice(0,-1)}\`;
-      }
+      let html = '', record = {};
+      if(action.startsWith('edit')) {
+        document.getElementById('modalTitle').textContent = \`Edit Item\`;
+        if(tab === 'returns') { const [y, m] = id.split('_'); record = state.data[tab].find(r => r.year==y && r.month_number==m) || {}; }
+        else if(tab === 'performance') record = state.data[tab].find(r => r.metric == id) || {};
+        else record = state.data[tab].find(r => r.id === id) || {};
+      } else document.getElementById('modalTitle').textContent = \`Add Item\`;
 
-      function getInvOpts() {
-         return state.data.investors.map(i => \`<option value="\${i.id}" \${record.investor_id===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('');
-      }
-      function getAccOpts() {
-         return state.data.accounts.map(a => \`<option value="\${a.id}" \${record.account_id===a.id?'selected':''}>\${a.name} (\${a.id}) - Inv \${a.investor_id}</option>\`).join('');
-      }
+      const getInvOpts = () => state.data.investors.map(i => \`<option value="\${i.id}" \${record.investor_id===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('');
+      const getAccOpts = () => state.data.accounts.map(a => \`<option value="\${a.id}" \${record.account_id===a.id?'selected':''}>\${a.name} - Inv \${a.investor_id}</option>\`).join('');
 
-      if (tab === 'investors') {
-        html = \`
-          <div class="grid2">
-            <div class="form-group"><label>First Name</label><input id="f_first_name" value="\${record.first_name||''}" required /></div>
-            <div class="form-group"><label>Last Name</label><input id="f_last_name" value="\${record.last_name||''}" required /></div>
+      if(tab === 'investors') {
+        const primaryAcc = action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {};
+        const rules = primaryAcc.commissionRules || [];
+        html = \`<div class="grid2">
+            <div class="form-group"><label>First Name</label><input id="f_firstName" value="\${record.first_name||''}" required /></div>
+            <div class="form-group"><label>Last Name</label><input id="f_lastName" value="\${record.last_name||''}" required /></div>
             <div class="form-group"><label>Email</label><input id="f_email" type="email" value="\${record.email||''}" /></div>
-            <div class="form-group"><label>Portal Username</label><input id="f_portal_username" value="\${record.portal_username||''}" required /></div>
-            <div class="form-group"><label>Role</label><select id="f_role"><option \${record.role==='Admin'?'selected':''}>Investor</option><option \${record.role==='Admin'?'selected':''}>Admin</option></select></div>
-            <div class="form-group"><label>Temp Password</label><input id="f_temp_password" placeholder="Leave blank to keep current" /></div>
-            <div class="form-group"><label>Split %</label><input id="f_split_pct" type="number" step="0.1" value="\${record.split_pct||50}" required /></div>
-            <div class="form-group"><label>Monthly Draw ($)</label><input id="f_monthly_draw" type="number" step="1" value="\${record.monthly_draw||0}" required /></div>
-            <div class="form-group"><label>Start Date</label><input id="f_start_date" type="date" value="\${record.start_date||''}" required /></div>
+            <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="\${record.portal_username||''}" required /></div>
+            <div class="form-group"><label>Role</label><select id="f_role"><option \${record.role==='Investor'?'selected':''}>Investor</option><option \${record.role==='Admin'?'selected':''}>Admin</option></select></div>
+            <div class="form-group"><label>Temp Password</label><input id="f_tempPassword" placeholder="Leave blank to keep" /></div>
+            <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="\${record.monthly_draw||0}" required /></div>
+            <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="\${record.start_date||''}" required /></div>
           </div>
-          \${action==='add' ? \`<div class="form-group"><label>Starting Capital ($) [Auto-creates linked account]</label><input id="f_starting_capital" type="number" step="0.01" /></div>\` : ''}
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
-      } 
-      else if (tab === 'accounts') {
-        html = \`
-          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account Name</label><input id="f_name" value="\${record.name||''}" required /></div>
-          \${action==='add' ? \`<div class="form-group"><label>Starting Capital ($)</label><input id="f_starting_capital" type="number" value="0" required /></div>\` : ''}
-          \${action==='edit' ? \`<div class="form-group"><label>Override Capital ($)</label><input id="f_starting_capital" type="number" value="\${record.starting_capital||0}" required /></div>\` : ''}
+          
+          <h3 style="margin-top:20px;border-bottom:1px solid var(--line);padding-bottom:8px;font-size:15px;color:var(--text);">Linked Account Details</h3>
           <div class="grid2">
-            <div class="form-group"><label>Open Date</label><input id="f_open_date" type="date" value="\${record.open_date||''}" required /></div>
+            <div class="form-group"><label>Account ID</label><input id="f_accountId" value="\${primaryAcc.id||''}" placeholder="Auto-generated if blank" \${action==='edit'?'readonly':''} /></div>
+            <div class="form-group"><label>Account Name</label><input id="f_name" value="\${primaryAcc.name||''}" required /></div>
+            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="\${primaryAcc.starting_capital||0}" required /></div>
+            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="\${primaryAcc.total_cash_in||primaryAcc.starting_capital||0}" required /></div>
+          </div>
+          <div class="grid2">
+            <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;"><input type="checkbox" id="f_isCommission" style="width:auto; transform:scale(1.2);" \${primaryAcc.is_commission ? 'checked' : ''} /><label style="margin:0; font-size:15px; color:var(--text);">Is Commission Account?</label></div>
+            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="\${primaryAcc.split_pct !== undefined ? primaryAcc.split_pct : 100}" required /></div>
+          </div>
+          <div id="commissionDistributionContainer" style="margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h4 style="margin:0;">Commission Distribution</h4>
+              <div id="commissionStatus" class="badge pending">Calculating...</div>
+            </div>
+            <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+      } else if (tab === 'accounts') {
+        html = \`<div class="form-group"><label>Account ID</label><input id="f_id" value="\${record.id||''}" placeholder="Leave blank to auto-generate" /></div>
+          <div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account Name</label><input id="f_name" value="\${record.name||''}" required /></div>
+          <div class="grid2">
+            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="\${record.starting_capital||0}" required /></div>
+            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="\${record.total_cash_in||record.totalcashin||0}" required /></div>
+          </div>
+          <div class="grid2">
+            <div class="form-group"><label>Open Date</label><input id="f_openDate" type="date" value="\${record.open_date||''}" required /></div>
             <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Active'?'selected':''}>Active</option><option \${record.status==='Closed'?'selected':''}>Closed</option></select></div>
           </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
-      }
-      else if (tab === 'deposits') {
-        html = \`
-          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account</label><select id="f_account_id" required>\${getAccOpts()}</select></div>
           <div class="grid2">
-            <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
-            <div class="form-group"><label>Date</label><input id="f_date" type="date" value="\${record.date||''}" required /></div>
-            <div class="form-group"><label>Type</label><select id="f_type"><option \${record.type==='Deposit'?'selected':''}>Deposit</option><option \${record.type==='Initial'?'selected':''}>Initial</option><option \${record.type==='VOID'?'selected':''}>VOID</option></select></div>
+            <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;"><input type="checkbox" id="f_isCommission" style="width:auto; transform:scale(1.2);" \${record.is_commission ? 'checked' : ''} /><label style="margin:0; font-size:15px; color:var(--text);">Is Commission Account?</label></div>
+            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="\${record.split_pct !== undefined ? record.split_pct : 100}" required /></div>
           </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
-      }
-      else if (tab === 'withdrawals') {
-        html = \`
-          <div class="form-group"><label>Investor</label><select id="f_investor_id" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account</label><select id="f_account_id" required>\${getAccOpts()}</select></div>
-          <div class="grid2">
-            <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
-            <div class="form-group"><label>Request Date</label><input id="f_request_date" type="date" value="\${record.request_date||''}" required /></div>
-            <div class="form-group"><label>Effective Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required /></div>
-            <div class="form-group"><label>Effective Month Number (1-12)</label><input id="f_month_number" type="number" min="1" max="12" value="\${record.month_number||new Date().getMonth()+1}" required /></div>
-            <div class="form-group"><label>Effective Month Name</label><input id="f_month" value="\${record.month||''}" required /></div>
-            <div class="form-group"><label>Status</label><select id="f_status">
-              <option \${record.status==='Pending'?'selected':''}>Pending</option>
-              <option \${record.status==='Approved'?'selected':''}>Approved</option>
-              <option \${record.status==='Completed'?'selected':''}>Completed</option>
-              <option \${record.status==='Cancelled'?'selected':''}>Cancelled</option>
-            </select></div>
+          <div id="commissionDistributionContainer" style="margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h4 style="margin:0;">Commission Distribution</h4>
+              <div id="commissionStatus" class="badge pending">Calculating...</div>
+            </div>
+            <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
           </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
-      }
-      else if (tab === 'returns') {
-        html = \`
-          <div class="grid2">
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+      } else if (tab === 'deposits' || tab === 'withdrawals') {
+        html = \`<div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
+          <div class="form-group"><label>Account</label><select id="f_accountId" required>\${getAccOpts()}</select></div>
+          <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
+          \${tab==='deposits' ? \`
+            <div class="grid2">
+              <div class="form-group"><label>Date</label><input id="f_date" type="date" value="\${record.date||''}" required /></div>
+              <div class="form-group"><label>Type</label><select id="f_type"><option \${record.type==='Deposit'?'selected':''}>Deposit</option><option \${record.type==='Initial'?'selected':''}>Initial</option><option \${record.type==='VOID'?'selected':''}>VOID</option></select></div>
+            </div>
+          \` : \`
+            <div class="grid2">
+            <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="\${record.request_date||''}" required /></div>
+              <div class="form-group"><label>Eff. Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required /></div>
+              <div class="form-group"><label>Month Name</label>
+                <select id="f_month" required>
+                  <option value="" disabled \${!record.month?'selected':''}>Select Month</option>
+                  \${MONTHS.map(m => \`<option value="\${m}" \${record.month===m?'selected':''}>\${m}</option>\`).join('')}
+                </select>
+              </div>
+              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
+            </div>
+            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Pending'?'selected':''}>Pending</option><option \${record.status==='Approved'?'selected':''}>Approved</option><option \${record.status==='Completed'?'selected':''}>Completed</option><option \${record.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
+          \`}
+          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+      } else if (tab === 'returns') {
+        html = \`<div class="grid2">
             <div class="form-group"><label>Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Month Number</label><input id="f_month_number" type="number" min="1" max="12" value="\${record.month_number||''}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Month Name</label><input id="f_month" value="\${record.month||''}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Gross Return PCT (%)</label><input id="f_gross_return_pct" type="number" step="0.001" value="\${record.gross_return_pct||0}" required /></div>
+            <div class="form-group"><label>Month Name</label>
+              <select id="f_month" required \${action==='edit_return'?'disabled':''}>
+                <option value="" disabled \${!record.month?'selected':''}>Select Month</option>
+                \${MONTHS.map(m => \`<option value="\${m}" \${record.month===m?'selected':''}>\${m}</option>\`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
+            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="\${record.gross_return_pct||0}" required /></div>
             <div class="form-group"><label>Source</label><select id="f_source"><option \${record.source==='Manual'?'selected':''}>Manual</option><option \${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
             <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" \${!record.locked?'selected':''}>No</option><option value="true" \${record.locked?'selected':''}>Yes</option></select></div>
-          </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
-      }
-      else if (tab === 'performance') {
-        html = \`
-          <div class="form-group"><label>Metric</label><input id="f_metric" value="\${record.metric}" readonly /></div>
-          <div class="form-group"><label>Value %</label><input id="f_value_pct" type="number" step="0.01" value="\${record.value_pct}" required /></div>
+          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+      } else if (tab === 'performance') {
+        html = \`<div class="form-group"><label>Metric</label><input id="f_metric" value="\${record.metric}" readonly /></div>
+          <div class="form-group"><label>Value %</label><input id="f_valuePct" type="number" step="0.01" value="\${record.value_pct}" required /></div>
           <div class="grid2">
              <div class="form-group"><label>Source</label><input id="f_source" value="\${record.source||''}" /></div>
-             <div class="form-group"><label>Is Override</label><select id="f_is_override"><option value="true" \${record.is_override?'selected':''}>Yes</option><option value="false" \${!record.is_override?'selected':''}>No</option></select></div>
+             <div class="form-group"><label>Is Override</label><select id="f_isOverride"><option value="true" \${record.is_override?'selected':''}>Yes</option><option value="false" \${!record.is_override?'selected':''}>No</option></select></div>
+          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
+      } else if (tab === 'history') {
+        record = state.data[tab].find(r => r.month_number == id) || {};
+        html = \`<div class="grid2">
+            <div class="form-group"><label>Month</label><input value="\${record.month}" readonly /></div>
+            <div class="form-group"><label>Opening Balance ($)</label><input id="f_openingBalance" type="number" step="0.01" value="\${record.opening_balance}" required /></div>
+            <div class="form-group"><label>Deposits ($)</label><input id="f_deposits" type="number" step="0.01" value="\${record.deposits}" /></div>
+            <div class="form-group"><label>Withdrawals ($)</label><input id="f_withdrawals" type="number" step="0.01" value="\${record.withdrawals}" /></div>
+            <div class="form-group"><label>Recurring Draw ($)</label><input id="f_recurringDraw" type="number" step="0.01" value="\${record.recurring_draw}" /></div>
+            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="\${record.gross_return_pct}" /></div>
+            <div class="form-group"><label>Manual Gain ($ Override)</label><input id="f_manualGainAmount" type="number" step="0.01" value="\${record.manual_gain_amount||''}" placeholder="Leave blank for auto" /></div>
+            <div class="form-group"><label>Manual Return % Override</label><input id="f_manualReturnPct" type="number" step="0.001" value="\${record.manual_return_pct||''}" placeholder="Leave blank for auto" /></div>
           </div>
           <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-        \`;
+          <div class="muted" style="margin-top:10px;font-size:12px">Note: Saving will mark this month as manual and update the ending balance. Use "Recalculate Forward" afterward to cascade balances.</div>\`;
       }
 
-      wrap.innerHTML = html;
+      document.getElementById('dynamicFormFields').innerHTML = html;
       document.getElementById('entityModal').classList.remove('hidden');
+
+      if (tab === 'investors' || tab === 'accounts') {
+        const primaryAcc = tab === 'investors' ? (action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {}) : record;
+        const rules = primaryAcc.commissionRules || [];
+        const rowsContainer = document.getElementById('commissionRows');
+        const addBtn = document.getElementById('addCommissionBtn');
+        const splitInput = document.getElementById('f_splitPct');
+        const statusEl = document.getElementById('commissionStatus');
+        
+        const updateStatus = () => {
+          let split = parseFloat(splitInput.value) || 0;
+          let sumCommissions = 0;
+          document.querySelectorAll('.comm-row-pct').forEach(inp => sumCommissions += (parseFloat(inp.value)||0));
+          let total = split + sumCommissions;
+          
+          if (Math.abs(total - 100) < 0.01) {
+             statusEl.className = 'badge active'; statusEl.textContent = '100% Allocated';
+             document.getElementById('saveEntityBtn').disabled = false;
+          } else {
+             statusEl.className = 'badge inactive'; statusEl.textContent = \`Total: \${total.toFixed(1)}% (Needs 100%)\`;
+             document.getElementById('saveEntityBtn').disabled = true;
+          }
+          const rowCount = document.querySelectorAll('.comm-row').length;
+          addBtn.style.display = rowCount >= 4 ? 'none' : 'inline-block';
+        };
+
+        const addRow = (recipientId = '', pct = '') => {
+          if (document.querySelectorAll('.comm-row').length >= 4) return;
+          const div = document.createElement('div'); div.className = 'comm-row right';
+          div.innerHTML = \`
+            <select class="comm-row-user" required style="flex:1; padding:8px; font-size:13px;">
+              <option value="" disabled \${!recipientId?'selected':''}>Select User</option>
+              \${state.data.investors.map(i => \`<option value="\${i.id}" \${recipientId===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('')}
+            </select>
+            <input class="comm-row-pct" type="number" step="0.1" placeholder="%" value="\${pct}" required style="width:80px; padding:8px; font-size:13px;" />
+            <button type="button" class="danger remove-comm-btn" style="padding:8px 12px; font-size:13px;">✕</button>
+          \`;
+          rowsContainer.appendChild(div);
+          div.querySelector('.remove-comm-btn').onclick = () => { div.remove(); updateStatus(); };
+          div.querySelector('.comm-row-pct').oninput = updateStatus;
+          updateStatus();
+        };
+
+        rules.forEach(r => addRow(r.recipient_id, r.percent));
+        addBtn.onclick = () => addRow();
+        splitInput.oninput = updateStatus;
+        updateStatus();
+
+        if (tab === 'investors' && action === 'add') {
+          const fName = document.getElementById('f_firstName');
+          const lName = document.getElementById('f_lastName');
+          const usernameInp = document.getElementById('f_portalUsername');
+          const accNameInp = document.getElementById('f_name');
+          const startCapInp = document.getElementById('f_startingCapital');
+          const cashInInp = document.getElementById('f_totalCashIn');
+          
+          const updateDefaults = () => {
+            const first = fName.value.trim();
+            const last = lName.value.trim();
+            
+            if (first || last) {
+              accNameInp.value = [first, last].filter(Boolean).join(' ') + ' Main Account';
+              if (first) {
+                usernameInp.value = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+              }
+            }
+          };
+
+          const updateCashIn = () => {
+            cashInInp.value = startCapInp.value;
+          };
+          
+          fName.addEventListener('input', updateDefaults);
+          lName.addEventListener('input', updateDefaults);
+          startCapInp.addEventListener('input', updateCashIn);
+        }
+      }
+
+      // Sync Month Number when Month Name changes
+      const monthSel = document.getElementById('f_month');
+      const monthNumInp = document.getElementById('f_monthNumber');
+      if (monthSel && monthNumInp) {
+        monthSel.onchange = () => {
+          const idx = MONTHS.indexOf(monthSel.value);
+          if (idx !== -1) monthNumInp.value = idx + 1;
+        };
+        // Trigger once if adding
+        if (action === 'add' && !monthSel.value) {
+            const curMonth = new Date().getMonth();
+            monthSel.value = MONTHS[curMonth];
+            monthNumInp.value = curMonth + 1;
+        }
+      }
+
+      // Link Investor and Account
+      const invSel = document.getElementById('f_investorId');
+      const accSel = document.getElementById('f_accountId');
+      if (invSel && accSel) {
+        const updateAccounts = (investorId, selectedAccId) => {
+          const filtered = state.data.accounts.filter(a => a.investor_id === investorId);
+          accSel.innerHTML = \`<option value="" disabled \${!selectedAccId?'selected':''}>Select Account</option>\` + 
+            filtered.map(a => \`<option value="\${a.id}" \${selectedAccId===a.id?'selected':''}>\${a.name} (\${a.id})</option>\`).join('');
+          
+          if (!selectedAccId && filtered.length > 0) {
+            accSel.value = filtered[0].id;
+          }
+        };
+
+        invSel.onchange = () => updateAccounts(invSel.value);
+        accSel.onchange = () => {
+          const acc = state.data.accounts.find(a => a.id === accSel.value);
+          if (acc && invSel.value !== acc.investor_id) {
+            invSel.value = acc.investor_id;
+          }
+        };
+
+        // Initialize if editing or if investor already selected
+        if (invSel.value) updateAccounts(invSel.value, record.account_id);
+      }
     }
 
     function openConfirm(tab, action, id) {
-      state.targetContext = tab;
-      state.targetAction = action;
-      state.targetId = id;
+      state.targetContext = tab; state.targetAction = action; state.targetId = id;
       document.getElementById('statusModalTitle').textContent = 'Confirm Action';
-      document.getElementById('statusModalText').textContent = \`Are you sure you want to \${action} this record (\${id})?\`;
+      document.getElementById('statusModalText').textContent = \`Are you sure you want to \${action.replace('_',' ')} record \${id}?\`;
       document.getElementById('statusModal').classList.remove('hidden');
     }
 
-    // --- Submissions ---
     document.getElementById('entityForm').addEventListener('submit', async (e) => {
        e.preventDefault();
-       const btn = document.getElementById('saveEntityBtn');
-       const err = document.getElementById('modalError');
-       const action = document.getElementById('formAction').value;
-       const id = document.getElementById('formId').value;
-       const tab = state.tab;
-       
-       let payload = {};
-       err.textContent = '';
-       btn.disabled = true;
-       btn.textContent = 'Saving...';
+       const btn = document.getElementById('saveEntityBtn'), err = document.getElementById('modalError');
+       const action = document.getElementById('formAction').value, id = document.getElementById('formId').value;
+       const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
 
        try {
-         // Gather generic form values
-         const fields = ['first_name', 'last_name', 'email', 'portal_username', 'role', 'temp_password', 'split_pct', 'monthly_draw', 'start_date', 'starting_capital', 'notes', 'investor_id', 'name', 'open_date', 'status', 'account_id', 'amount', 'date', 'type', 'request_date', 'year', 'month_number', 'month', 'gross_return_pct', 'source', 'locked', 'value_pct', 'is_override'];
-         
+         const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct', 'isCommission'];
          fields.forEach(f => {
            const el = document.getElementById('f_'+f);
-           if(el && el.value !== '') {
-              let v = el.value;
-              if (el.tagName === 'SELECT') {
-                if (v==='true') v = true;
-                else if (v==='false') v = false;
-              }
-              // Map snake_case DOM id to camelCase Payload or snake_case payload depending on backend
-              // actually the API routes were built mostly expecting camelCase for main fields, 
-              // BUT my backend accepts both correctly via req.body destruct for many.
-              // Let's explicitly format the payload logic here:
-              payload[f.replace(/_([a-z])/g, g => g[1].toUpperCase())] = v; // camelCase
-              payload[f] = v; // snake_case also sent
+           if(el) {
+              let v = el.type === 'checkbox' ? el.checked : el.value;
+              if (el.type !== 'checkbox' && v === '') return;
+              if (el.tagName === 'SELECT' && (v==='true'||v==='false')) v = (v==='true');
+              payload[f] = v;
            }
          });
-
-         let endpoint = '';
-         let method = action.startsWith('edit') ? 'PATCH' : 'POST';
          
+         if (tab === 'investors' || tab === 'accounts') {
+            payload.commissionRules = [];
+            document.querySelectorAll('.comm-row').forEach(row => {
+               const rec = row.querySelector('.comm-row-user').value;
+               const pct = parseFloat(row.querySelector('.comm-row-pct').value);
+               if (rec && !isNaN(pct)) payload.commissionRules.push({ recipientId: rec, percent: pct });
+            });
+         }
+
+         let endpoint = '', method = action.startsWith('edit') ? 'PATCH' : 'POST';
          if(tab==='investors') endpoint = \`/api/admin/investors\${method==='PATCH'?'/'+id:''}\`;
          else if(tab==='accounts') endpoint = \`/api/admin/accounts\${method==='PATCH'?'/'+id:''}\`;
          else if(tab==='deposits') endpoint = \`/api/admin/deposits\${method==='PATCH'?'/'+id:''}\`;
          else if(tab==='withdrawals') endpoint = \`/api/admin/withdrawals\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='returns') {
-           endpoint = \`/api/admin/monthly-returns\`; 
-           if(method==='PATCH') payload.year = id.split('_')[0];
-           if(method==='PATCH') payload.monthNumber = id.split('_')[1];
-         }
-         else if(tab==='performance') {
-           endpoint = \`/api/admin/live-performance\`;
-           payload.metric = id;
+         else if(tab==='returns') { endpoint = \`/api/admin/monthly-returns\`; }
+         else if(tab==='performance') { endpoint = \`/api/admin/live-performance\`; payload.metric = id; }
+         else if(tab==='history') { 
+           endpoint = \`/api/admin/historical-data\`; 
+           payload.investorId = state.filterInvestor; payload.year = state.filterYear; payload.monthNumber = id;
+           payload.isManual = true;
          }
 
          await api.request(endpoint, { method, body: JSON.stringify(payload) });
-         
          document.getElementById('entityModal').classList.add('hidden');
          loadTab(tab); 
-       } catch(ex) {
-         err.textContent = ex.message;
-       } finally {
-         btn.disabled = false;
-         btn.textContent = 'Save Changes';
-       }
+       } catch(ex) { 
+         err.textContent = ex.message; 
+         alert('Save Failed: ' + ex.message);
+       } 
+       finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
     });
 
     document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
-       const btn = e.target;
-       btn.disabled = true;
-       btn.textContent = 'Processing...';
+       const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
        try {
          const { targetContext: tab, targetAction: action, targetId: id } = state;
-         let endpoint = '';
-         
+         let endpoint = '', method = 'POST';
          if (action === 'deactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
          else if (action === 'reactivate') endpoint = \`/api/admin/investors/\${id}/status\`;
+         else if (action === 'delete_user') { endpoint = \`/api/admin/investors/\${id}\`; method = 'DELETE'; }
          else if (action === 'void') endpoint = \`/api/admin/deposits/\${id}/void\`;
          else if (action === 'cancel_wd') endpoint = \`/api/admin/withdrawals/\${id}/cancel\`;
 
-         await api.request(endpoint, { method: 'POST', body: JSON.stringify({ action }) }); // Action ignored in void/cancel but sent just in case
+         await api.request(endpoint, { method, body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
          loadTab(tab);
-       } catch(ex) {
-         alert(ex.message);
-       } finally {
-         btn.disabled = false;
-         btn.textContent = 'Confirm';
-       }
+       } catch(ex) { alert('Action Failed: ' + ex.message); } 
+       finally { btn.disabled = false; btn.textContent = 'Confirm'; }
     });
 
     document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
+    document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
+    document.getElementById('loginBtn').addEventListener('click', async () => { try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); } catch(e) { document.getElementById('loginError').textContent = e.message; } });
+    document.getElementById('logoutBtn').addEventListener('click', async() => { await api.logout(); window.location.reload(); });
+    document.getElementById('statusModal').querySelector('.closeModalBtn').addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
+    document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
 
-    // Listeners
-    document.getElementById('loginBtn').addEventListener('click', async () => {
-      const u = document.getElementById('loginUser').value;
-      const p = document.getElementById('loginPass').value;
-      try { await api.login(u,p); init(); } 
-      catch(e) { document.getElementById('loginError').textContent = e.message; }
-    });
-    document.getElementById('logoutBtn').addEventListener('click', async() => {
-      await api.logout(); window.location.reload();
-    });
-    document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => {
-      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
-    }));
-    document.getElementById('searchBar').addEventListener('input', (e) => {
-      state.search = e.target.value; renderTable();
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('importPreview').innerHTML = '';
+      document.getElementById('csvFileInput').value = '';
+      document.getElementById('importModal').classList.remove('hidden');
     });
 
-    // Boot
+    document.getElementById('processImportBtn').addEventListener('click', async () => {
+      const file = document.getElementById('csvFileInput').files[0];
+      if(!file) return alert('Select a file');
+      const btn = document.getElementById('processImportBtn');
+      btn.disabled = true; btn.textContent = 'Importing...';
+
+      try {
+        const text = await file.text();
+        const lines = text.split('\\n').map(l => l.split(',').map(c => c.trim()));
+        const header = lines[0];
+        const rows = lines.slice(1).filter(l => l.length > 1).map(l => {
+          let r = { investor_id: state.filterInvestor };
+          header.forEach((h, i) => { if(l[i]) r[h.trim()] = l[i]; });
+          return r;
+        });
+
+        const res = await api.request('/api/admin/historical-data/import', { method:'POST', body: JSON.stringify({ rows }) });
+        alert(\`Successfully imported \${res.importedCount} records.\`);
+        document.getElementById('importModal').classList.add('hidden');
+        loadTab('history');
+      } catch(e) { alert('Import failed: ' + e.message); }
+      finally { btn.disabled = false; btn.textContent = 'Start Import'; }
+    });
+
     init();
-\`;
+`;
 
-const out = \`<!DOCTYPE html>
+const out = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Admin Dashboard - ForEx Investment Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>\${css}</style>
+  <style>${css}</style>
 </head>
 <body>
-  \${htmlBody}
-  <script>\${jsBody}</script>
+  ${htmlBody}
+  <script>${jsBody}</script>
 </body>
-</html>\`;
+</html>`;
 
 fs.writeFileSync('admin.html', out);
 console.log('Successfully wrote dynamic admin.html');
