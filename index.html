@@ -624,7 +624,7 @@
       `).join("");
     }
 
-    function renderBreakdown(rows) {
+    function renderBreakdown(rows, splitPct = 100) {
       const head = `
         <thead>
           <tr>
@@ -643,6 +643,9 @@
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
         if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal Completed</div>`;
 
+        const netReturnPct = (parseFloat(r.grossReturnPct) || 0) * (splitPct / 100);
+        const netGain = (parseFloat(r.gain) || 0) * (splitPct / 100);
+
         return `
           <tr class="${r.isProjection ? "muted" : ""}" style="${r.isProjection ? "opacity:0.6; font-style:italic;" : ""}">
             <td>
@@ -655,12 +658,12 @@
             <td>
               <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
                 <div style="display:flex; gap:12px; align-items:center;">
-                  <span class="muted" style="font-size:12px;">Return:</span>
-                  <span style="font-weight:700; font-family:'Outfit';" class="${parseFloat(r.grossReturnPct) >= 0 ? 'green' : 'red'}">${pct(r.grossReturnPct)}</span>
+                  <span class="muted" style="font-size:12px;">Net Return:</span>
+                  <span style="font-weight:700; font-family:'Outfit';" class="${netReturnPct >= 0 ? 'green' : 'red'}">${pct(netReturnPct)}</span>
                 </div>
                 <div style="display:flex; gap:12px; align-items:center;">
-                  <span class="muted" style="font-size:12px;">Gain:</span>
-                  <span style="font-weight:700; font-family:'Outfit';">${money(r.gain)}</span>
+                  <span class="muted" style="font-size:12px;">Net Gain:</span>
+                  <span style="font-weight:700; font-family:'Outfit';">${money(netGain)}</span>
                 </div>
                 ${activityHtml ? `<div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; width:100%; text-align:right; font-size:11px; font-weight:600;">${activityHtml}</div>` : ''}
               </div>
@@ -693,7 +696,9 @@
       renderLive(data);
       renderMonths(data.monthlyHistory);
       renderChart(data);
-      renderBreakdown(data.breakdown);
+      
+      const splitPct = data.investor.splitPct || data.investor.split_pct || 100;
+      renderBreakdown(data.breakdown, splitPct);
     }
     
     let perfChart = null;
