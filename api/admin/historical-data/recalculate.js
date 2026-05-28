@@ -13,6 +13,7 @@ export default async function handler(req, res) {
 
     const startMonth = Number(startMonthNumber || 1);
     const targetYear = Number(year || new Date().getFullYear());
+    let currentBalance = 0;
 
     // 1. Get Investor split, draw, and start date
     const { data: inv, error: invErr } = await supabase
@@ -144,17 +145,29 @@ export default async function handler(req, res) {
         const gain = totalProfit * split;
 
         // Process commissions for this account
-        const accRules = commRules?.filter(r => r.account_id === acc.id);
+        const accRules = commRules?.filter(r => !r.account_id || r.account_id === acc.id);
         if (totalProfit > 0 && accRules && accRules.length > 0) {
           for (const rule of accRules) {
             const commAmount = totalProfit * (Number(rule.percent) / 100);
-            await supabase.from("commission_earnings").upsert({
+            // Delete existing to mimic upsert without requiring unique constraint
+            await supabase.from("commission_earnings")
+              .delete()
+              .eq("recipient_id", rule.recipient_id)
+              .eq("source_investor_id", investorId)
+              .eq("year", targetYear)
+              .eq("month_number", m);
+
+            const { error: commErr } = await supabase.from("commission_earnings").insert({
               recipient_id: rule.recipient_id,
               source_investor_id: investorId,
               year: targetYear,
               month_number: m,
               amount: commAmount
-            }, { onConflict: 'recipient_id,source_investor_id,year,month_number' });
+            });
+            if (commErr) {
+              console.error("[Recalc ERROR] Failed to insert commission:", commErr.message, commErr);
+              throw commErr;
+            }
           }
         }
 
