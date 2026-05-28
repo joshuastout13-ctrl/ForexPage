@@ -362,8 +362,9 @@ let state = {
       let d = state.data[state.tab];
  
       if (state.tab === 'investors') {
-        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Name</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
+        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
+        d.sort((a, b) => (a.portal_username || '').localeCompare(b.portal_username || ''));
         bd.innerHTML = d.map(i => {
           const stClass = i.active ? 'active' : 'inactive';
           const primaryAcc = state.data.accounts.find(a => a.investor_id === i.id) || {};
@@ -373,7 +374,7 @@ let state = {
           
           return \`<tr>
             <td><span class="badge \${stClass}">\${i.active?'Active':'Inactive'}</span></td>
-            <td>\${i.id}</td><td>\${i.first_name} \${i.last_name}</td><td>\${i.portal_username}</td>
+            <td>\${i.id}</td><td>\${i.portal_username}</td>
             <td>\${startCap}</td><td><div style="font-weight:600">\${currBal}</div></td>
             <td>\${split}</td><td>\${money(i.monthly_draw)}</td>
             <td>
