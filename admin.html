@@ -131,6 +131,22 @@
       color: #fff;
       border-color: var(--danger);
     }
+    
+    /* Click-blocking transition guards */
+    body.loading-active .sidebar,
+    body.loading-active #viewActions,
+    body.loading-active table,
+    body.loading-active #logoutBtn,
+    body.loading-active .nav-btn {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .modal-overlay.saving-active {
+      pointer-events: none;
+    }
+    .modal-overlay.saving-active .modal {
+      opacity: 0.7;
+    }
 </style>
 </head>
 <body>
@@ -323,6 +339,7 @@ let state = {
     });
  
     async function loadTab(tab) {
+      document.body.classList.add('loading-active');
       document.getElementById('loadingIndicator').classList.remove('hidden');
       document.getElementById('dataHead').innerHTML = ''; document.getElementById('dataBody').innerHTML = '';
       try {
@@ -357,7 +374,10 @@ let state = {
         }
         renderTable();
       } catch(e) { alert('Failed to load data: ' + e.message); } 
-      finally { document.getElementById('loadingIndicator').classList.add('hidden'); }
+      finally { 
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.body.classList.remove('loading-active');
+      }
     }
  
     function renderTable() {
@@ -508,8 +528,12 @@ let state = {
             if(document.getElementById('recalcBtn')) {
               document.getElementById('recalcBtn').onclick = async () => {
                  if(!confirm('Recalculate balances from this point forward? Manual entries will be preserved but balances will be cascaded. Ensure you have entered correct Gross Returns for the fund first.')) return;
+                 const rb = document.getElementById('recalcBtn');
+                 rb.disabled = true; rb.textContent = 'Recalculating...';
+                 document.body.classList.add('loading-active');
                  try { await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); loadTab('history'); }
                  catch(e) { alert(e.message); }
+                 finally { document.body.classList.remove('loading-active'); if(document.getElementById('recalcBtn')){ rb.disabled=false; rb.textContent='Recalculate Remaining Year'; } }
               };
             }
           }, 0);
@@ -835,6 +859,7 @@ let state = {
        const btn = document.getElementById('saveEntityBtn'), err = document.getElementById('modalError');
        const action = document.getElementById('formAction').value, id = document.getElementById('formId').value;
        const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
+       document.getElementById('entityModal').classList.add('saving-active');
 
        try {
          const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct', 'isCommission'];
@@ -877,11 +902,12 @@ let state = {
          err.textContent = ex.message; 
          alert('Save Failed: ' + ex.message);
        } 
-       finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
+       finally { btn.disabled = false; btn.textContent = 'Save Changes'; document.getElementById('entityModal').classList.remove('saving-active'); }
     });
 
     document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
        const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
+       document.getElementById('statusModal').classList.add('saving-active');
        try {
          const { targetContext: tab, targetAction: action, targetId: id } = state;
          let endpoint = '', method = 'POST';
@@ -895,13 +921,25 @@ let state = {
          document.getElementById('statusModal').classList.add('hidden');
          loadTab(tab);
        } catch(ex) { alert('Action Failed: ' + ex.message); } 
-       finally { btn.disabled = false; btn.textContent = 'Confirm'; }
+       finally { btn.disabled = false; btn.textContent = 'Confirm'; document.getElementById('statusModal').classList.remove('saving-active'); }
     });
+
 
     document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
     document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
-    document.getElementById('loginBtn').addEventListener('click', async () => { try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); } catch(e) { document.getElementById('loginError').textContent = e.message; } });
-    document.getElementById('logoutBtn').addEventListener('click', async() => { await api.logout(); window.location.reload(); });
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const lb = document.getElementById('loginBtn');
+      lb.disabled = true; lb.textContent = 'Authenticating...';
+      try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); }
+      catch(e) { document.getElementById('loginError').textContent = e.message; }
+      finally { lb.disabled = false; lb.textContent = 'Authenticate'; }
+    });
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      const lb = document.getElementById('logoutBtn');
+      lb.disabled = true; lb.textContent = 'Logging out...';
+      try { await api.logout(); window.location.reload(); }
+      catch(e) { lb.disabled = false; lb.textContent = 'Logout'; }
+    });
     document.getElementById('statusModal').querySelector('.closeModalBtn').addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
     document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
 
@@ -916,6 +954,7 @@ let state = {
       if(!file) return alert('Select a file');
       const btn = document.getElementById('processImportBtn');
       btn.disabled = true; btn.textContent = 'Importing...';
+      document.getElementById('importModal').classList.add('saving-active');
 
       try {
         const text = await file.text();
@@ -932,7 +971,7 @@ let state = {
         document.getElementById('importModal').classList.add('hidden');
         loadTab('history');
       } catch(e) { alert('Import failed: ' + e.message); }
-      finally { btn.disabled = false; btn.textContent = 'Start Import'; }
+      finally { btn.disabled = false; btn.textContent = 'Start Import'; document.getElementById('importModal').classList.remove('saving-active'); }
     });
 
     init();
