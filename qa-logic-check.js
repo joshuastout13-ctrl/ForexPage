@@ -34,7 +34,8 @@ async function runQa() {
     if (firstMonth) {
       console.log(`- Verifying Month: ${firstMonth.month}`);
       const expectedAdjusted = firstMonth.startingBalance + firstMonth.deposits - firstMonth.oneTimeWithdrawal;
-      const expectedGain = expectedAdjusted * (firstMonth.effectiveReturnPct / 100);
+      const expectedGainBasis = firstMonth.startingBalance + firstMonth.deposits;
+      const expectedGain = expectedGainBasis * (firstMonth.effectiveReturnPct / 100);
       const expectedEnd = expectedAdjusted + expectedGain - firstMonth.recurringDraw;
       
       const passAdjusted = Math.abs(firstMonth.adjustedStartingBalance - expectedAdjusted) < 0.01;

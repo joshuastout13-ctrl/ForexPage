@@ -406,6 +406,7 @@ let state = {
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
                 <button class="btn-action ${i.active?'btn-action-deactivate':'btn-action-reactivate'} action-btn" data-action="${i.active?'deactivate':'reactivate'}" data-id="${i.id}">${i.active?'Deactivate':'Reactivate'}</button>
                 <button class="btn-action btn-action-delete action-btn" data-action="delete_user" data-id="${i.id}">Delete</button>
+                <button class="btn-action action-btn" style="background:rgba(79,140,255,.12); color:#4f8cff; border-color:rgba(79,140,255,.2)" data-action="recalc_user" data-id="${i.id}">Recalculate</button>
               </div>
             </td>
           </tr>`;
@@ -560,8 +561,28 @@ let state = {
       
       if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
       else if(action==='delete_user') openConfirm(state.tab, action, id);
+      else if(action==='recalc_user') handleRecalcUser(id);
       else openConfirm(state.tab, action, id);
     };
+
+    async function handleRecalcUser(id) {
+       if(!confirm('Recalculate balances for this investor? This will apply the fund performance to their deposits/withdrawals for the current year.')) return;
+       document.body.classList.add('loading-active');
+       showToast('Recalculating investor balances...');
+       try { 
+         await api.request('/api/admin/historical-data/recalculate', { 
+           method:'POST', 
+           body: JSON.stringify({ investorId: id, year: state.filterYear, startMonthNumber: 1 }) 
+         }); 
+         showToast('Success! Investor balances have been recalculated.');
+         loadTab(state.tab); 
+       }
+       catch(e) { 
+         showToast(`Error: ${e.message}`, true);
+         console.error(e);
+       }
+       finally { document.body.classList.remove('loading-active'); }
+    }
 
     async function handleInitHistory() {
       if(!confirm(`This will initialize the ${state.filterYear} monthly rows for this investor. Proceed?`)) return;

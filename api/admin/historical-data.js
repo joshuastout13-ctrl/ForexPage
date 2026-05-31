@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       } = payload;
 
       // Calculation logic
-      const adjStart = (openingBalance || 0) + (deposits || 0) - (withdrawals || 0);
+      const gainBasis = (openingBalance || 0) + (deposits || 0);
       let gain = 0;
       
       if (manualGainAmount !== undefined && manualGainAmount !== null) {
@@ -45,9 +45,10 @@ export default async function handler(req, res) {
         // For now, assume gain is provided or calculated elsewhere.
         // If manualReturnPct is provided, use that.
         const pct = (manualReturnPct !== undefined && manualReturnPct !== null) ? manualReturnPct : grossReturnPct;
-        gain = adjStart * (pct / 100);
+        gain = gainBasis * (pct / 100);
       }
 
+      const adjStart = gainBasis - (withdrawals || 0);
       const endingBalance = adjStart + gain - (recurringDraw || 0);
 
       const { data, error } = await supabase
