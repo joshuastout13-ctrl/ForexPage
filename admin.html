@@ -187,6 +187,7 @@
             <div id="viewActions" class="right">
               <input id="searchBar" placeholder="Search..." style="max-width:200px" />
               <button id="addEntityBtn">+ Add New</button>
+              <button id="recalcAllBtn" class="secondary" style="background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.2)">Recalculate ALL Investors</button>
               <button id="importBtn" class="secondary hidden">Bulk Import</button>
             </div>
           </div>
@@ -331,9 +332,14 @@ let state = {
         state.tab = e.currentTarget.dataset.tab;
         
         const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
-        document.getElementById('viewTitle').textContent = titles[state.tab];
+        document.getElementById('viewTitle').textContent = titles[state.tab] || '';
         document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
+        document.getElementById('searchBar').style.display = (state.tab === 'history') ? 'none' : 'inline-block';
         document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
+        document.getElementById('recalcAllBtn').style.display = (state.tab === 'investors') ? 'inline-block' : 'none';
+        const tbody = document.getElementById('dataBody');
+        tbody.innerHTML = '';
+        document.getElementById('dataHead').innerHTML = '';
         loadTab(state.tab);
       });
     });
@@ -965,9 +971,32 @@ let state = {
     document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
 
     document.getElementById('importBtn').addEventListener('click', () => {
-      document.getElementById('importPreview').innerHTML = '';
       document.getElementById('csvFileInput').value = '';
+      document.getElementById('importPreview').innerHTML = '';
       document.getElementById('importModal').classList.remove('hidden');
+    });
+
+    document.getElementById('recalcAllBtn').addEventListener('click', async () => {
+      if(!confirm('Recalculate balances for ALL investors? This will apply the fund performance to their deposits/withdrawals for the current year. Depending on the number of investors, this may take a few seconds.')) return;
+      
+      const btn = document.getElementById('recalcAllBtn');
+      btn.disabled = true; btn.textContent = 'Recalculating...';
+      document.body.classList.add('loading-active');
+      showToast('Recalculating all investor balances...');
+      
+      try {
+        const res = await api.request('/api/admin/historical-data/recalculate-all', { 
+          method: 'POST', 
+          body: JSON.stringify({ year: state.filterYear }) 
+        });
+        showToast(`Success! ${res.updatedCount} history records have been recalculated.`);
+        await loadTab('investors');
+      } catch(err) {
+        showToast('Error recalculating all: ' + err.message, true);
+      } finally {
+        document.body.classList.remove('loading-active');
+        btn.disabled = false; btn.textContent = 'Recalculate ALL Investors';
+      }
     });
 
     document.getElementById('processImportBtn').addEventListener('click', async () => {
