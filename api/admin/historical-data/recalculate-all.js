@@ -19,21 +19,23 @@ export default async function handler(req, res) {
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings}, {data: allAccounts} ] = await Promise.all([
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings}, {data: allAccounts}, {data: allHistory} ] = await Promise.all([
       supabase.from("deposits").select("*"),
       supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_rules").select("*"),
       supabase.from("commission_earnings").select("*").eq("year", targetYear),
-      supabase.from("investor_accounts").select("*").eq("status", "Active")
+      supabase.from("investor_accounts").select("*").eq("status", "Active"),
+      supabase.from("investor_monthly_history").select("*").eq("year", targetYear)
     ]);
 
     // Group returns by month
     const fundRetByM = {};
     allReturns?.forEach(r => { fundRetByM[r.month_number] = Number(r.gross_return_pct || 0); });
 
-    let totalUpdated = 0;
-    
+    let historyToUpsert = [];
+    let commissionsToInsert = [];
+
     // We process each investor
     for (const inv of investors) {
       const investorId = inv.id;
@@ -47,7 +49,7 @@ export default async function handler(req, res) {
         }
       }
 
-      const accounts = allAccounts.filter(a => a.investor_id === investorId);
+      const accounts = allAccounts.filter(a => a.investor_id?.toLowerCase() === investorId.toLowerCase());
       
       const invDeps = allDeps.filter(d => d.investor_id?.toLowerCase() === investorId.toLowerCase());
       const invWds = allWds.filter(w => w.investor_id?.toLowerCase() === investorId.toLowerCase());
@@ -84,12 +86,8 @@ export default async function handler(req, res) {
         commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
       });
 
-      // Fetch history to see if it's manual
-      const { data: history } = await supabase
-        .from("investor_monthly_history")
-        .select("*")
-        .eq("investor_id", investorId)
-        .eq("year", targetYear);
+      // Find this investor's history
+      const history = allHistory.filter(h => h.investor_id?.toLowerCase() === investorId.toLowerCase());
 
       let accountBalances = {};
       accounts.forEach(a => { accountBalances[a.id] = Number(a.starting_capital || 0); });
@@ -127,15 +125,7 @@ export default async function handler(req, res) {
           if (totalProfit > 0 && accRules.length > 0) {
             for (const rule of accRules) {
               const commAmount = totalProfit * (Number(rule.percent) / 100);
-              
-              await supabase.from("commission_earnings")
-                .delete()
-                .eq("recipient_id", rule.recipient_id)
-                .eq("source_investor_id", investorId)
-                .eq("year", targetYear)
-                .eq("month_number", m);
-
-              await supabase.from("commission_earnings").insert({
+              commissionsToInsert.push({
                 recipient_id: rule.recipient_id,
                 source_investor_id: investorId,
                 year: targetYear,
@@ -162,30 +152,44 @@ export default async function handler(req, res) {
         
         const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         
-        await supabase
-          .from("investor_monthly_history")
-          .upsert({
-            investor_id: investorId,
-            year: targetYear,
-            month_number: m,
-            month: monthNames[m],
-            opening_balance: totalOpening,
-            deposits: totalDeps,
-            withdrawals: totalWds,
-            gross_return_pct: fundRetByM[m] || 0,
-            manual_gain_amount: existing ? existing.manual_gain_amount : null,
-            manual_return_pct: existing ? existing.manual_return_pct : null,
-            recurring_draw: currentDraw,
-            ending_balance: ending,
-            is_manual: existing ? !!existing.manual_gain_amount : false,
-            updated_at: new Date()
-          }, { onConflict: 'investor_id,year,month_number' });
-          
-        totalUpdated++;
+        historyToUpsert.push({
+          investor_id: investorId,
+          year: targetYear,
+          month_number: m,
+          month: monthNames[m],
+          opening_balance: totalOpening,
+          deposits: totalDeps,
+          withdrawals: totalWds,
+          gross_return_pct: fundRetByM[m] || 0,
+          manual_gain_amount: existing ? existing.manual_gain_amount : null,
+          manual_return_pct: existing ? existing.manual_return_pct : null,
+          recurring_draw: currentDraw,
+          ending_balance: ending,
+          is_manual: existing ? !!existing.manual_gain_amount : false,
+          updated_at: new Date()
+        });
       }
     }
 
-    return res.status(200).json({ success: true, updatedCount: totalUpdated });
+    // Perform batched DB operations
+    // 1. Delete all commissions for targetYear
+    await supabase.from("commission_earnings").delete().eq("year", targetYear);
+    
+    // 2. Insert new commissions (chunked if > 1000, though unlikely here)
+    if (commissionsToInsert.length > 0) {
+      await supabase.from("commission_earnings").insert(commissionsToInsert);
+    }
+    
+    // 3. Upsert history
+    if (historyToUpsert.length > 0) {
+      // Chunking by 500 records to avoid size limits
+      for (let i = 0; i < historyToUpsert.length; i += 500) {
+        const chunk = historyToUpsert.slice(i, i + 500);
+        await supabase.from("investor_monthly_history").upsert(chunk, { onConflict: 'investor_id,year,month_number' });
+      }
+    }
+
+    return res.status(200).json({ success: true, updatedCount: historyToUpsert.length, commsCount: commissionsToInsert.length });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
