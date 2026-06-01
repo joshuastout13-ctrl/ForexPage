@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     // 3. Fetch all Deposits, Withdrawals, Fund Returns, Commission Rules, and Commission Earnings
     const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
       supabase.from("deposits").select("*").ilike("investor_id", investorId),
-      supabase.from("withdrawals").select("*").ilike("investor_id", investorId).eq("status", "Approved"),
+      supabase.from("withdrawals").select("*").ilike("investor_id", investorId).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
       supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
