@@ -11,11 +11,10 @@ export default async function handler(req, res) {
     const { year } = req.body;
     const targetYear = Number(year || new Date().getFullYear());
 
-    // 1. Fetch all active investors
+    // 1. Fetch all investors
     const { data: investors, error: invErr } = await supabase
       .from("investors")
-      .select("id, split_pct, monthly_draw, start_date")
-      .eq("status", "Active");
+      .select("id, split_pct, monthly_draw, start_date");
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
