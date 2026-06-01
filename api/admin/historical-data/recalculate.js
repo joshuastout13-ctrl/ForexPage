@@ -140,11 +140,9 @@ export default async function handler(req, res) {
         const grossPct = isStarted ? (fundRetByM[m] || 0) : 0;
         const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
         
-        const gainBasis = opening + deps;
-        const totalProfit = gainBasis * (grossPct / 100);
-        const gain = totalProfit * split;
-        
         const adjStart = opening + deps - wds;
+        const totalProfit = adjStart * (grossPct / 100);
+        const gain = totalProfit * split;
 
         // Process commissions for this account
         const accRules = commRules?.filter(r => !r.account_id || r.account_id === acc.id);
