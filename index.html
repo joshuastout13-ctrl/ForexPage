@@ -328,6 +328,73 @@
       text-align: left;
     }
 
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(3, 7, 18, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .modal-content {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      transform: translateY(20px);
+      transition: transform 0.2s ease;
+    }
+    
+    .modal-overlay.active .modal-content {
+      transform: translateY(0);
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px;
+      margin: -8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+    
+    .cursor-pointer { cursor: pointer; }
+
     /* Utilities */
     .hidden { display: none !important; }
     .green { color: var(--success); }
@@ -500,6 +567,23 @@
     </div>
   </div>
 
+  <!-- Commission Modal -->
+  <div id="commissionModal" class="modal-overlay" onclick="if(event.target === this) this.classList.remove('active')">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0; font-size: 24px;">Commission Breakdown</h2>
+        <button class="modal-close" onclick="document.getElementById('commissionModal').classList.remove('active')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="table-container">
+        <table id="commissionTable">
+          <!-- Populated via JS -->
+        </table>
+      </div>
+    </div>
+  </div>
+
   <script>
     const ICONS = {
       capital: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
@@ -555,6 +639,8 @@
     }
 
     function renderSummary(data) {
+      window.currentCommissionBreakdown = data.commissionBreakdown || [];
+
       const summary = data.summary || {};
       const investor = data.investor || {};
       const metrics = [
@@ -574,12 +660,12 @@
       ];
 
       if (investor.hasCommissionAccount || (summary.commissionsEarnedYear || 0) > 0 || (summary.commissionsEarnedMonth || 0) > 0) {
-        metrics.push({ label: "Comm. This Month", value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success' });
-        metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success' });
+        metrics.push({ label: "Comm. This Month", value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
+        metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
       }
 
       document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
-        <div class="metric ${m.class || ''}">
+        <div class="metric ${m.class || ''}" ${m.action ? `data-action="${m.action}"` : ''}>
           <div class="label-row">
             <div class="label">${m.label}</div>
             ${m.icon}
@@ -588,6 +674,46 @@
           ${m.subvalue ? `<div class="subvalue">${m.subvalue}</div>` : ''}
         </div>
       `).join("");
+    }
+
+    function showCommissionModal() {
+      const breakdown = window.currentCommissionBreakdown || [];
+      const table = document.getElementById("commissionTable");
+      
+      const head = `
+        <thead>
+          <tr>
+            <th>Source Investor</th>
+            <th>Comm %</th>
+            <th style="text-align:right;">This Month</th>
+            <th style="text-align:right;">This Year</th>
+          </tr>
+        </thead>
+      `;
+
+      if (breakdown.length === 0) {
+        table.innerHTML = head + `<tbody><tr><td colspan="4" style="text-align:center;" class="muted">No commissions generated yet.</td></tr></tbody>`;
+      } else {
+        const body = breakdown.map(r => `
+          <tr>
+            <td>
+              <div style="font-weight:700; color:var(--text);">${r.sourceName}</div>
+            </td>
+            <td>
+              <div style="font-family:'Outfit'; font-weight:600;">${r.percent}%</div>
+            </td>
+            <td>
+              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.monthAmount)}</div>
+            </td>
+            <td>
+              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.yearAmount)}</div>
+            </td>
+          </tr>
+        `).join("");
+        table.innerHTML = head + `<tbody>${body}</tbody>`;
+      }
+      
+      document.getElementById("commissionModal").classList.add("active");
     }
 
     function renderLive(data) {
@@ -779,6 +905,13 @@
 
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    
+    document.getElementById("summaryGrid").addEventListener("click", (e) => {
+      const metricBox = e.target.closest('.metric');
+      if (metricBox && metricBox.dataset.action === 'showCommissionModal') {
+        showCommissionModal();
+      }
+    });
     
     // Auto-login check
     loadDashboard().catch(() => {});

@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
     // 3. Fetch all Deposits, Withdrawals, Fund Returns, Commission Rules, and Commission Earnings
     const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
-      supabase.from("deposits").select("*").ilike("investor_id", investorId),
+      supabase.from("deposits").select("*").ilike("investor_id", investorId).not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").ilike("investor_id", investorId).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       if(dt.getFullYear() === targetYear) {
         const m = dt.getMonth() + 1;
         const amt = Number(d.amount);
-        const accId = d.account_id;
+        const accId = d.account_id || accounts[0]?.id;
         depsByM[m] = (depsByM[m] || 0) + amt;
         if (accId) {
           if (!depsByMAcc[m]) depsByMAcc[m] = {};
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       if(w.effective_year === targetYear || (!w.effective_year && targetYear === new Date().getFullYear())) {
         const m = w.month_number;
         const amt = Number(w.amount || 0);
-        const accId = w.account_id;
+        const accId = w.account_id || accounts[0]?.id;
         wdsByM[m] = (wdsByM[m] || 0) + amt;
         if (accId) {
           if (!wdsByMAcc[m]) wdsByMAcc[m] = {};
@@ -141,7 +141,7 @@ export default async function handler(req, res) {
         const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
         
         const adjStart = opening + deps - wds;
-        const totalProfit = adjStart * (grossPct / 100);
+        const totalProfit = opening * (grossPct / 100);
         const gain = totalProfit * split;
 
         // Process commissions for this account
