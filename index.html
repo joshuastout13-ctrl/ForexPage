@@ -764,15 +764,14 @@
       const body = rows.map((r, idx) => {
         let activityHtml = '';
         if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
-
-        // Show commissions earned in the previous month as "Commission Added" in this month (when they carry over to starting balance)
+        
+        // Show commissions earned in the previous month as "Commission Added" in this month
         const prevRow = idx > 0 ? rows[idx - 1] : null;
         const commAdded = prevRow ? (parseFloat(prevRow.commissionsEarned) || 0) : 0;
         if (commAdded > 0) {
           activityHtml += `<div class="green">+${money(commAdded)} Commission Added</div>`;
         }
-
-        if (r.commissionsEarned > 0) activityHtml += `<div class="green">+${money(r.commissionsEarned)} Commission Earned</div>`;
+        
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
         if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal Completed</div>`;
