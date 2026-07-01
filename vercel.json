@@ -5,6 +5,14 @@
     { "source": "/admin/", "destination": "/admin.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=0, no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/sync-myfxbook",
