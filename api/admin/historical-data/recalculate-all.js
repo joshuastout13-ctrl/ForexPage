@@ -121,7 +121,16 @@ export default async function handler(req, res) {
           const totalProfit = opening * (grossPct / 100);
           const gain = totalProfit * split;
 
-          const accRules = invCommRules.filter(r => !r.account_id || r.account_id === acc.id);
+          const rulesByRecipient = {};
+          invCommRules.forEach(r => {
+            if (r.account_id === acc.id) {
+              rulesByRecipient[r.recipient_id] = r;
+            } else if (!r.account_id && !rulesByRecipient[r.recipient_id]) {
+              rulesByRecipient[r.recipient_id] = r;
+            }
+          });
+          const accRules = Object.values(rulesByRecipient);
+          
           if (totalProfit > 0 && accRules.length > 0) {
             for (const rule of accRules) {
               const commAmount = totalProfit * (Number(rule.percent) / 100);

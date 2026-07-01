@@ -145,19 +145,20 @@ export default async function handler(req, res) {
         const gain = totalProfit * split;
 
         // Process commissions for this account
-        const accRules = commRules?.filter(r => !r.account_id || r.account_id === acc.id);
-        if (totalProfit > 0 && accRules && accRules.length > 0) {
+        const rulesByRecipient = {};
+        commRules.forEach(r => {
+          if (r.account_id === acc.id) {
+            rulesByRecipient[r.recipient_id] = r;
+          } else if (!r.account_id && !rulesByRecipient[r.recipient_id]) {
+            rulesByRecipient[r.recipient_id] = r;
+          }
+        });
+        const accRules = Object.values(rulesByRecipient);
+
+        if (totalProfit > 0 && accRules.length > 0) {
           for (const rule of accRules) {
             const commAmount = totalProfit * (Number(rule.percent) / 100);
-            // Delete existing to mimic upsert without requiring unique constraint
-            await supabase.from("commission_earnings")
-              .delete()
-              .eq("recipient_id", rule.recipient_id)
-              .eq("source_investor_id", investorId)
-              .eq("year", targetYear)
-              .eq("month_number", m);
-
-            const { error: commErr } = await supabase.from("commission_earnings").insert({
+            commissionsToInsert.push({
               recipient_id: rule.recipient_id,
               source_investor_id: investorId,
               year: targetYear,

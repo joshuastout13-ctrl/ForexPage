@@ -660,7 +660,7 @@
       ];
 
       if (investor.hasCommissionAccount || (summary.commissionsEarnedYear || 0) > 0 || (summary.commissionsEarnedMonth || 0) > 0) {
-        metrics.push({ label: "Comm. This Month", value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
+        metrics.push({ label: `Comm. ${summary.commMonthName || 'This Month'}`, value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
         metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
       }
 
@@ -723,6 +723,7 @@
         { label: "Today", pct: live.today, dollar: liveDollarGains.today },
         { label: "This Week", pct: live.week, dollar: liveDollarGains.week },
         { label: "This Month", pct: live.month, dollar: liveDollarGains.month },
+        { label: "Last Month", pct: live.lastMonth, dollar: liveDollarGains.lastMonth },
         { label: "This Year", pct: live.year, dollar: liveDollarGains.year }
       ];
 
