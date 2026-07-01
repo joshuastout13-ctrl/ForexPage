@@ -720,11 +720,11 @@
       const live = data.live || {};
       const liveDollarGains = data.liveDollarGains || {};
       const items = [
-        { label: "Today", pct: live.today, dollar: liveDollarGains.today },
-        { label: "This Week", pct: live.week, dollar: liveDollarGains.week },
-        { label: "This Month", pct: live.month, dollar: liveDollarGains.month },
-        { label: "Last Month", pct: live.lastMonth, dollar: liveDollarGains.lastMonth },
-        { label: "This Year", pct: live.year, dollar: liveDollarGains.year }
+        { label: "Today", pct: live.today || "0.00%", dollar: liveDollarGains.today || 0 },
+        { label: "This Week", pct: live.week || "0.00%", dollar: liveDollarGains.week || 0 },
+        { label: "This Month", pct: live.month || "0.00%", dollar: liveDollarGains.month || 0 },
+        { label: "Last Month", pct: live.lastMonth || "0.00%", dollar: liveDollarGains.lastMonth || 0 },
+        { label: "This Year", pct: live.year || "0.00%", dollar: liveDollarGains.year || 0 }
       ];
 
       document.getElementById("liveGrid").innerHTML = items.map(item => `
