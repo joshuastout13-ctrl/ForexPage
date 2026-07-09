@@ -375,7 +375,10 @@ let state = {
         document.getElementById('recalcAllBtn').style.display = (state.tab === 'investors') ? 'inline-block' : 'none';
         
         const pullBtn = document.getElementById('pullMyfxbookBtn');
-        if (pullBtn) pullBtn.style.display = (state.tab === 'performance') ? 'inline-block' : 'none';
+        if (pullBtn) {
+          pullBtn.classList.toggle('hidden', state.tab !== 'performance');
+          pullBtn.style.display = (state.tab === 'performance') ? 'inline-block' : 'none';
+        }
 
         const tbody = document.getElementById('dataBody');
         tbody.innerHTML = '';
