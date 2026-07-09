@@ -1121,15 +1121,15 @@ let state = {
 
         metrics.forEach(m => {
           const curr = (res.current[m.dbKey] && res.current[m.dbKey].value_pct) 
-            ? \`\${res.current[m.dbKey].value_pct}%\` : '0.00%';
+            ? `${res.current[m.dbKey].value_pct}%` : '0.00%';
           const next = res.preview[m.key] || '0.00%';
           const hasChanged = curr.replace('+','') !== next.replace('+','');
           
-          b.innerHTML += \`<tr>
-            <td style="font-weight:bold;">\${m.label}</td>
-            <td>\${curr}</td>
-            <td style="color:\${hasChanged ? 'var(--accent2)' : 'var(--success)'}; font-weight:600;">\${next}</td>
-          </tr>\`;
+          b.innerHTML += `<tr>
+            <td style="font-weight:bold;">${m.label}</td>
+            <td>${curr}</td>
+            <td style="color:${hasChanged ? 'var(--accent2)' : 'var(--success)'}; font-weight:600;">${next}</td>
+          </tr>`;
         });
 
         document.getElementById('myfxbookPreviewModal').classList.remove('hidden');
