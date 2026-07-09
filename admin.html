@@ -278,7 +278,7 @@
         </tbody>
       </table>
       
-      <div class="right">
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:10px;">
         <button class="secondary closeModalBtn">Reject</button>
         <button id="acceptMyfxbookBtn" style="background:linear-gradient(135deg,#22c55e,#16a34a);">Accept & Save</button>
       </div>
@@ -1141,6 +1141,8 @@ let state = {
       } finally {
         document.body.classList.remove('loading-active');
         btn.disabled = false; btn.textContent = 'Pull Live Data';
+        const t = document.querySelector('.toast');
+        if (t && t.innerHTML.includes('Pulling')) t.remove();
       }
     });
 
