@@ -51,12 +51,19 @@ export default async function handler(req, res) {
       .order("month_number", { ascending: true });
     if (histErr) throw histErr;
 
-    // 3. Fetch all Deposits, Withdrawals, Fund Returns, Commission Rules, and Commission Earnings
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
+    // 3. Delete existing commission_earnings where this investor is the SOURCE for the target year
+    await supabase
+      .from("commission_earnings")
+      .delete()
+      .ilike("source_investor_id", investorId)
+      .eq("year", targetYear);
+
+    // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, and Commission Earnings (where investor is recipient)
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commEarnings} ] = await Promise.all([
       supabase.from("deposits").select("*").ilike("investor_id", investorId).not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").ilike("investor_id", investorId).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
-      supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
+      supabase.from("commission_shares").select("*").ilike("source_investor_id", investorId),
       supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
     ]);
 
@@ -99,19 +106,14 @@ export default async function handler(req, res) {
       commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
     });
 
-    // 4. Track balances per account
+    // 5. Track balances per account
     let accountBalances = {};
     accounts.forEach(a => {
       accountBalances[a.id] = Number(a.starting_capital || 0);
     });
 
-    // If startMonth > 1, we need to initialize accountBalances from a previous history row? 
-    // This is hard because history is currently aggregated. 
-    // We'll assume the starting_capital is the source of truth for the beginning of time.
-    // To handle startMonth > 1 properly with multiple accounts, we'd need per-account history.
-    // For now, we'll proportion the opening balance if multiple accounts exist.
-
     const updatedRows = [];
+    const commissionsToInsert = [];
 
     for (let m = 1; m <= 12; m++) {
       const isStarted = !startDate || (targetYear > startDate.getUTCFullYear()) || 
@@ -145,30 +147,29 @@ export default async function handler(req, res) {
         const gain = totalProfit * split;
 
         // Process commissions for this account
-        const rulesByRecipient = {};
-        commRules.forEach(r => {
-          if (r.account_id === acc.id) {
-            rulesByRecipient[r.recipient_id] = r;
-          } else if (!r.account_id && !rulesByRecipient[r.recipient_id]) {
-            rulesByRecipient[r.recipient_id] = r;
-          }
+        // Rule: first affected month is the first calculation period whose date range starts on or after the effective date
+        const monthStart = new Date(Date.UTC(targetYear, m - 1, 1));
+        
+        const activeShares = (commShares || []).filter(share => {
+          if (share.status === 'cancelled') return false;
+          if (share.source_account_id && share.source_account_id !== acc.id) return false;
+          
+          const shareStart = new Date(share.effective_start_date);
+          const shareEnd = share.effective_end_date ? new Date(share.effective_end_date) : null;
+          
+          return monthStart >= shareStart && (!shareEnd || monthStart <= shareEnd);
         });
-        const accRules = Object.values(rulesByRecipient);
 
-        if (totalProfit > 0 && accRules.length > 0) {
-          for (const rule of accRules) {
-            const commAmount = totalProfit * (Number(rule.percent) / 100);
+        if (totalProfit > 0 && activeShares.length > 0) {
+          for (const share of activeShares) {
+            const commAmount = totalProfit * (Number(share.commission_percent) / 100);
             commissionsToInsert.push({
-              recipient_id: rule.recipient_id,
+              recipient_id: share.recipient_investor_id,
               source_investor_id: investorId,
               year: targetYear,
               month_number: m,
               amount: commAmount
             });
-            if (commErr) {
-              console.error("[Recalc ERROR] Failed to insert commission:", commErr.message, commErr);
-              throw commErr;
-            }
           }
         }
 
@@ -178,17 +179,16 @@ export default async function handler(req, res) {
         totalWds += wds;
 
         // Update balance for next month (compounding)
-        // Draw is still handled at investor level below
         accountBalances[acc.id] = adjStart + gain;
       }
 
-      // Handle monthly draw (subtract from first account or split proportionally)
+      // Handle monthly draw
       const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? Number(existing.recurring_draw) : draw;
       if (currentDraw > 0 && accounts.length > 0) {
         accountBalances[accounts[0].id] -= currentDraw;
       }
 
-      if (m < startMonth) continue; // Skip saving if before startMonth
+      if (m < startMonth) continue;
 
       const ending = Object.values(accountBalances).reduce((a, b) => a + b, 0);
       
@@ -228,6 +228,15 @@ export default async function handler(req, res) {
       currentBalance = ending;
     }
     
+    // Bulk insert commissions
+    if (commissionsToInsert.length > 0) {
+      const { error: commErr } = await supabase.from("commission_earnings").insert(commissionsToInsert);
+      if (commErr) {
+        console.error("[Recalc ERROR] Failed to insert commissions:", commErr.message);
+        throw commErr;
+      }
+    }
+
     console.log(`[Recalc] Successfully updated ${updatedRows.length} months for ${investorId}`);
 
     return res.status(200).json({ success: true, updatedCount: updatedRows.length });

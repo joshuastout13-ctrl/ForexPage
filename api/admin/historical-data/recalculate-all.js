@@ -19,11 +19,11 @@ export default async function handler(req, res) {
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commRules}, {data: commEarnings}, {data: allAccounts}, {data: allHistory} ] = await Promise.all([
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commEarnings}, {data: allAccounts}, {data: allHistory} ] = await Promise.all([
       supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
-      supabase.from("commission_rules").select("*"),
+      supabase.from("commission_shares").select("*"),
       supabase.from("commission_earnings").select("*").eq("year", targetYear),
       supabase.from("investor_accounts").select("*").eq("status", "Active"),
       supabase.from("investor_monthly_history").select("*").eq("year", targetYear)
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       
       const invDeps = allDeps.filter(d => d.investor_id?.toLowerCase() === investorId.toLowerCase());
       const invWds = allWds.filter(w => w.investor_id?.toLowerCase() === investorId.toLowerCase());
-      const invCommRules = commRules.filter(r => r.investor_id?.toLowerCase() === investorId.toLowerCase());
+      const invCommShares = commShares.filter(r => r.source_investor_id?.toLowerCase() === investorId.toLowerCase());
       const invCommEarnings = commEarnings.filter(e => e.recipient_id?.toLowerCase() === investorId.toLowerCase());
 
       const depsByMAcc = {};
@@ -121,21 +121,23 @@ export default async function handler(req, res) {
           const totalProfit = opening * (grossPct / 100);
           const gain = totalProfit * split;
 
-          const rulesByRecipient = {};
-          invCommRules.forEach(r => {
-            if (r.account_id === acc.id) {
-              rulesByRecipient[r.recipient_id] = r;
-            } else if (!r.account_id && !rulesByRecipient[r.recipient_id]) {
-              rulesByRecipient[r.recipient_id] = r;
-            }
-          });
-          const accRules = Object.values(rulesByRecipient);
+          const monthStart = new Date(Date.UTC(targetYear, m - 1, 1));
           
-          if (totalProfit > 0 && accRules.length > 0) {
-            for (const rule of accRules) {
-              const commAmount = totalProfit * (Number(rule.percent) / 100);
+          const activeShares = (invCommShares || []).filter(share => {
+            if (share.status === 'cancelled') return false;
+            if (share.source_account_id && share.source_account_id !== acc.id) return false;
+            
+            const shareStart = new Date(share.effective_start_date);
+            const shareEnd = share.effective_end_date ? new Date(share.effective_end_date) : null;
+            
+            return monthStart >= shareStart && (!shareEnd || monthStart <= shareEnd);
+          });
+
+          if (totalProfit > 0 && activeShares.length > 0) {
+            for (const share of activeShares) {
+              const commAmount = totalProfit * (Number(share.commission_percent) / 100);
               commissionsToInsert.push({
-                recipient_id: rule.recipient_id,
+                recipient_id: share.recipient_investor_id,
                 source_investor_id: investorId,
                 year: targetYear,
                 month_number: m,

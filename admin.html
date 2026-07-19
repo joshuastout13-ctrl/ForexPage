@@ -190,6 +190,7 @@
           <button class="nav-btn" data-tab="performance">5. Live Performance</button>
           <button class="nav-btn" data-tab="snapshots">6. Snapshots</button>
           <button class="nav-btn" data-tab="history">7. Historical Data</button>
+          <button class="nav-btn" data-tab="commission_shares">8. Commission Shares</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -367,9 +368,14 @@ let state = {
         e.currentTarget.classList.add('active');
         state.tab = e.currentTarget.dataset.tab;
         
-        const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
+        const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data', commission_shares: 'Commission Sharing' };
         document.getElementById('viewTitle').textContent = titles[state.tab] || '';
         document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
+        if (state.tab === 'commission_shares') {
+          document.getElementById('addEntityBtn').textContent = '+ Add Share';
+        } else {
+          document.getElementById('addEntityBtn').textContent = '+ Add New';
+        }
         document.getElementById('searchBar').style.display = (state.tab === 'history') ? 'none' : 'inline-block';
         document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         document.getElementById('recalcAllBtn').style.display = (state.tab === 'investors') ? 'inline-block' : 'none';
@@ -400,7 +406,8 @@ let state = {
           returns: '/api/admin/monthly-returns', 
           performance: '/api/admin/live-performance', 
           snapshots: '/api/admin/snapshots',
-          history: `/api/admin/historical-data?investorId=${state.filterInvestor}&year=${state.filterYear}`
+          history: `/api/admin/historical-data?investorId=${state.filterInvestor}&year=${state.filterYear}`,
+          commission_shares: '/api/admin/commission-shares'
         };
         
         if (tab === 'investors') {
@@ -412,10 +419,10 @@ let state = {
           state.data.accounts = accRes.accounts || [];
         } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
           const res = await api.request(endpoints[tab]);
-          state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
+          state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : (tab === 'commission_shares' ? 'shares' : tab)))] || [];
         }
         
-        if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
+        if (['accounts', 'deposits', 'withdrawals', 'history', 'commission_shares'].includes(tab) && state.data.investors.length===0) {
            const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
         }
         if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
@@ -622,6 +629,24 @@ let state = {
             }
           }, 0);
         }
+      } else if (state.tab === 'commission_shares') {
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Recipient</th><th>Source</th><th>%</th><th>Effective Start</th><th>Effective End</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.recipient_investor_id} ${i.source_investor_id} ${i.status}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td><span class="badge ${i.status==='active'?'active':(i.status==='cancelled'?'inactive':'pending')}">${i.status}</span></td>
+            <td>${i.id}</td>
+            <td>${i.recipient?.portal_username || i.recipient_investor_id}</td>
+            <td>${i.source?.portal_username || i.source_investor_id}</td>
+            <td><div style="font-weight:600">${i.commission_percent}%</div></td>
+            <td>${i.effective_start_date}</td>
+            <td>${i.effective_end_date || '<span class="muted">Ongoing</span>'}</td>
+            <td>
+              <div class="btn-group">
+                <button class="btn-action btn-action-edit action-btn" data-action="edit_share" data-id="${i.id}">Edit</button>
+                ${i.status!=='cancelled' ? `<button class="btn-action btn-action-deactivate action-btn" data-action="cancel_share" data-id="${i.id}">Cancel</button>` : ''}
+              </div>
+            </td>
+          </tr>`).join('');
       }
 
       if(d.length === 0 && state.tab !== 'history') bd.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>`;
@@ -642,7 +667,7 @@ let state = {
           return;
       }
       
-      if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
+      if(['edit','edit_return','edit_perf','edit_history','edit_share'].includes(action)) openModal(state.tab, action, id);
       else if(action==='delete_user') openConfirm(state.tab, action, id);
       else if(action==='recalc_user') handleRecalcUser(id);
       else openConfirm(state.tab, action, id);
@@ -826,6 +851,17 @@ let state = {
           </div>
           <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">${record.notes||''}</textarea></div>
           <div class="muted" style="margin-top:10px;font-size:12px">Note: Saving will mark this month as manual and update the ending balance. Use "Recalculate Forward" afterward to cascade balances.</div>`;
+      } else if (tab === 'commission_shares') {
+        html = `<div class="form-group"><label>Source Investor</label><select id="f_sourceInvestorId" required>${state.data.investors.map(i => `<option value="${i.id}" ${record.source_investor_id===i.id?'selected':''}>${i.first_name} ${i.last_name} (${i.id})</option>`).join('')}</select></div>
+          <div class="form-group"><label>Recipient Username/Email</label><input id="f_recipientUsername" value="${record.recipient?.portal_username || record.recipient?.email || ''}" required placeholder="Recipient portal username or email" ${action==='edit_share'?'readonly':''} /></div>
+          <div class="grid2">
+            <div class="form-group"><label>Commission %</label><input id="f_commissionPercent" type="number" step="0.1" value="${record.commission_percent||0}" required /></div>
+            <div class="form-group"><label>Effective Start Date</label><input id="f_effectiveStartDate" type="date" value="${record.effective_start_date||''}" required ${action==='edit_share'?'readonly':''} /></div>
+          </div>
+          <div class="grid2">
+            <div class="form-group"><label>Effective End Date</label><input id="f_effectiveEndDate" type="date" value="${record.effective_end_date||''}" /></div>
+            <div class="form-group"><label>Status</label><select id="f_status"><option ${record.status==='active'?'selected':''}>active</option><option ${record.status==='cancelled'?'selected':''}>cancelled</option><option ${record.status==='ended'?'selected':''}>ended</option></select></div>
+          </div>`;
       }
 
       document.getElementById('dynamicFormFields').innerHTML = html;
@@ -966,7 +1002,7 @@ let state = {
        document.getElementById('entityModal').classList.add('saving-active');
 
        try {
-         const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct', 'isCommission'];
+         const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct', 'isCommission', 'sourceInvestorId', 'recipientUsername', 'commissionPercent', 'effectiveStartDate', 'effectiveEndDate'];
          fields.forEach(f => {
            const el = document.getElementById('f_'+f);
            if(el) {
@@ -998,6 +1034,7 @@ let state = {
            payload.investorId = state.filterInvestor; payload.year = state.filterYear; payload.monthNumber = id;
            payload.isManual = true;
          }
+         else if(tab==='commission_shares') endpoint = `/api/admin/commission-shares${method==='PATCH'?'/'+id:''}`;
 
          await api.request(endpoint, { method, body: JSON.stringify(payload) });
          document.getElementById('entityModal').classList.add('hidden');
@@ -1020,6 +1057,7 @@ let state = {
          else if (action === 'delete_user') { endpoint = `/api/admin/investors/${id}`; method = 'DELETE'; }
          else if (action === 'void') endpoint = `/api/admin/deposits/${id}/void`;
          else if (action === 'cancel_wd') endpoint = `/api/admin/withdrawals/${id}/cancel`;
+         else if (action === 'cancel_share') endpoint = `/api/admin/commission-shares/${id}/cancel`;
 
          await api.request(endpoint, { method, body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
