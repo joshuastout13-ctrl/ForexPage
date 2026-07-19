@@ -662,24 +662,39 @@
     }
 
     async function login() {
+      const btn = document.getElementById("loginBtn");
+      const originalText = btn.textContent;
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
       const errorEl = document.getElementById("loginError");
+      
       errorEl.textContent = "";
+      btn.textContent = "Authenticating...";
+      btn.disabled = true;
 
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
 
-      const data = await res.json();
-      if (!res.ok) {
-        errorEl.textContent = data.error || "Login failed. Please check credentials.";
-        return;
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || "Login failed. Please check credentials.";
+          btn.textContent = originalText;
+          btn.disabled = false;
+          return;
+        }
+
+        btn.textContent = "Loading Dashboard...";
+        await loadDashboard();
+      } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
       }
-
-      await loadDashboard();
     }
 
     async function logout() {
@@ -1004,7 +1019,10 @@
               </span>
             </td>
             <td>
-              ${!isEnded ? `<button class="secondary" onclick="endShare('${share.id}')" style="padding: 4px 12px; font-size: 12px;">End Share</button>` : ''}
+              ${!isEnded ? `<div class="btn-group">
+                <button class="secondary" onclick='openEditShareModal(${JSON.stringify(share)})' style="padding: 4px 12px; font-size: 12px;">Edit</button>
+                <button class="secondary" onclick="endShare('${share.id}')" style="padding: 4px 12px; font-size: 12px;">End</button>
+              </div>` : ''}
             </td>
           </tr>
         `;
@@ -1013,9 +1031,12 @@
 
     function openAddShareModal() {
       document.getElementById('shareRecipient').value = '';
+      document.getElementById('shareRecipient').disabled = false;
       document.getElementById('sharePercent').value = '';
       document.getElementById('shareStartDate').value = new Date().toISOString().split('T')[0];
       document.getElementById('shareError').textContent = '';
+      document.getElementById('addShareModal').dataset.editId = '';
+      document.getElementById('addShareModal').querySelector('h2').textContent = 'New Commission Share';
       document.getElementById('addShareModal').classList.add('active');
     }
 
@@ -1024,30 +1045,51 @@
       const commission_percent = document.getElementById('sharePercent').value;
       const effective_start_date = document.getElementById('shareStartDate').value;
       const errorDiv = document.getElementById('shareError');
+      const shareId = document.getElementById('addShareModal').dataset.editId;
       
-      if (!recipient_username || !commission_percent || !effective_start_date) {
-        errorDiv.textContent = 'Please fill out all fields.';
+      if (!commission_percent || !effective_start_date || (!shareId && !recipient_username)) {
+        errorDiv.textContent = 'Please fill out all required fields.';
         return;
       }
 
       errorDiv.textContent = 'Saving...';
       try {
-        const res = await fetch("/api/me/commission-shares", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipient_username, commission_percent, effective_start_date })
-        });
+        let res;
+        if (shareId) {
+          res = await fetch(`/api/me/commission-shares/${shareId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ commission_percent, effective_start_date })
+          });
+        } else {
+          res = await fetch("/api/me/commission-shares", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recipient_username, commission_percent, effective_start_date })
+          });
+        }
         const data = await res.json();
         
         if (res.ok) {
           document.getElementById('addShareModal').classList.remove('active');
           loadCommissionShares();
         } else {
-          errorDiv.textContent = data.error || 'Failed to add share.';
+          errorDiv.textContent = data.error || 'Failed to save share.';
         }
       } catch (err) {
         errorDiv.textContent = err.message || 'Network error.';
       }
+    }
+
+    function openEditShareModal(share) {
+      document.getElementById('shareRecipient').value = share.recipient?.portal_username || share.recipient_investor_id;
+      document.getElementById('shareRecipient').disabled = true;
+      document.getElementById('sharePercent').value = share.commission_percent;
+      document.getElementById('shareStartDate').value = share.effective_start_date;
+      document.getElementById('shareError').textContent = '';
+      document.getElementById('addShareModal').dataset.editId = share.id;
+      document.getElementById('addShareModal').querySelector('h2').textContent = 'Edit Commission Share';
+      document.getElementById('addShareModal').classList.add('active');
     }
 
     async function endShare(id) {
