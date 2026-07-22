@@ -162,6 +162,9 @@
     .recipient-item:last-child { border-bottom: none; }
     .recipient-item.selected { background: rgba(79, 140, 255, 0.08); }
     .composer-box { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+    .file-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(79, 140, 255, 0.12); border: 1px solid rgba(127, 179, 255, 0.2); border-radius: 8px; font-size: 12px; color: var(--accent2); }
+    .file-chip-remove { cursor: pointer; font-weight: bold; margin-left: 4px; opacity: 0.7; }
+    .file-chip-remove:hover { opacity: 1; color: var(--danger); }
 </style>
 </head>
 <body>
@@ -264,9 +267,16 @@
                   </div>
                   <div class="form-group">
                     <label>Message Body (Text or HTML)</label>
-                    <textarea id="emailBodyInput" rows="12" placeholder="Write your email broadcast message here..."></textarea>
+                    <textarea id="emailBodyInput" rows="10" placeholder="Write your email broadcast message here..."></textarea>
                   </div>
                   
+                  <div class="form-group" style="margin-top:12px;">
+                    <label>Attachments (Images, PDFs, Documents, Videos)</label>
+                    <input type="file" id="emailFileInput" multiple style="display:none;" />
+                    <button id="btnChooseFiles" type="button" class="secondary" style="padding:8px 14px; font-size:13px; width:100%; border:1px dashed var(--accent);">📎 Choose Files to Attach</button>
+                    <div id="emailAttachmentChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                  </div>
+
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; flex-wrap:wrap; gap:10px;">
                     <div style="display:flex; gap:8px;">
                       <button id="btnEmailPreview" type="button" class="secondary" style="padding:10px 14px; font-size:13px;">👁 HTML Preview</button>
@@ -418,10 +428,11 @@
     <div class="modal" style="max-width:500px;">
       <h3 style="margin:0 0 12px 0;">Confirm Mass Email Broadcast</h3>
       <p class="muted" style="margin-bottom:16px; font-size:14px;">You are about to send an email broadcast via Resend to <strong id="confirmRecipientCount">0</strong> selected recipients.</p>
-      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:20px;">
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px;">
         <div style="font-size:12px; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Subject</div>
         <div id="confirmSubjectText" style="font-weight:600; color:#fff;"></div>
       </div>
+      <div id="confirmAttachmentsNotice" style="font-size:13px; color:var(--accent2); margin-bottom:20px;"></div>
       <div class="right" style="justify-content:flex-end;">
         <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
         <button id="confirmBroadcastSendBtn" type="button" style="background:linear-gradient(135deg,var(--success),#16a34a);">Confirm & Send Now</button>
@@ -434,7 +445,8 @@ let state = {
       admin: null, tab: 'investors',
       data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [], commission_shares: [] },
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear(),
-      emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active'
+      emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active',
+      emailAttachments: []
     };
 
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -583,7 +595,6 @@ let state = {
         state.emailRecipients = recRes.recipients || [];
         state.emailLogs = logRes.logs || [];
         
-        // Select active recipients by default on initial load if none selected
         if (state.selectedEmails.size === 0) {
           state.emailRecipients.forEach(r => {
             if (r.active) state.selectedEmails.add(r.email);
@@ -599,6 +610,7 @@ let state = {
     function renderEmailCenter() {
       renderRecipientList();
       renderEmailLogs();
+      renderAttachmentChips();
     }
 
     function renderRecipientList() {
@@ -621,7 +633,6 @@ let state = {
         return matchesSearch && matchesStatus;
       });
 
-      // Update badge
       document.getElementById('selectedCountBadge').textContent = `${state.selectedEmails.size} / ${state.emailRecipients.length} Selected`;
 
       if (filtered.length === 0) {
@@ -649,7 +660,6 @@ let state = {
         </div>`;
       }).join('');
 
-      // Add click listener to rows
       list.querySelectorAll('.recipient-item').forEach(item => {
         item.addEventListener('click', () => {
           const email = item.dataset.email;
@@ -666,6 +676,26 @@ let state = {
       }
       renderRecipientList();
     }
+
+    function renderAttachmentChips() {
+      const container = document.getElementById('emailAttachmentChips');
+      if (!container) return;
+
+      if (state.emailAttachments.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = state.emailAttachments.map((att, idx) => {
+        const sizeKb = (att.size / 1024).toFixed(1);
+        return '<span class="file-chip">📎 ' + escapeHtml(att.filename) + ' (' + sizeKb + ' KB) <span class="file-chip-remove" onclick="removeAttachment(' + idx + ')">✕</span></span>';
+      }).join('');
+    }
+
+    window.removeAttachment = function(idx) {
+      state.emailAttachments.splice(idx, 1);
+      renderAttachmentChips();
+    };
 
     function renderEmailLogs() {
       const body = document.getElementById('emailLogsBody');
@@ -727,21 +757,52 @@ let state = {
       renderRecipientList();
     });
 
-    // HTML Preview Button
+    // File Attachment Handler
+    document.getElementById('btnChooseFiles')?.addEventListener('click', () => {
+      document.getElementById('emailFileInput').click();
+    });
+
+    document.getElementById('emailFileInput')?.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          state.emailAttachments.push({
+            filename: file.name,
+            content: evt.target.result,
+            size: file.size,
+            type: file.type
+          });
+          renderAttachmentChips();
+        };
+        reader.readAsDataURL(file);
+      });
+      e.target.value = '';
+    });
+
+    // HTML Preview Button (Includes Subject Line & Attachments Banner)
     document.getElementById('btnEmailPreview')?.addEventListener('click', () => {
       const subject = document.getElementById('emailSubjectInput').value || 'Subject Line Preview';
       const body = document.getElementById('emailBodyInput').value || 'Your email text will appear here.';
       const formattedBody = /<[a-z]/i.test(body) ? body : body.split(String.fromCharCode(10)).join('<br/>');
 
+      let attachmentInfoHtml = '';
+      if (state.emailAttachments.length > 0) {
+        const names = state.emailAttachments.map(a => escapeHtml(a.filename)).join(', ');
+        attachmentInfoHtml = '<div style="margin-top:16px; padding:12px; background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:8px; font-size:12px; color:#7fb3ff;">📎 <strong>Attached Files (' + state.emailAttachments.length + '):</strong> ' + names + '</div>';
+      }
+
       const previewHtml = '<div style="max-width:550px; margin:0 auto; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:24px; color:#e7eefb; font-family:sans-serif;">' +
         '<div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:16px; margin-bottom:16px;">' +
           '<div style="display:inline-block; padding:3px 8px; border-radius:999px; background:rgba(79,140,255,0.15); color:#7fb3ff; font-size:10px; font-weight:bold; text-transform:uppercase;">Official Announcement</div>' +
-          '<h2 style="margin:8px 0 0 0; font-size:18px; color:#fff;">Stone & Company Forex Fund</h2>' +
+          '<h2 style="margin:8px 0 6px 0; font-size:18px; color:#fff;">Stone & Company Forex Fund</h2>' +
+          '<div style="font-size:15px; font-weight:600; color:#7fb3ff; border-left:3px solid #4f8cff; padding-left:10px; margin-top:8px;">Subject: ' + escapeHtml(subject) + '</div>' +
         '</div>' +
-        '<div style="font-size:14px; line-height:1.6; color:#cbd5e1; margin-bottom:24px;">' +
+        '<div style="font-size:14px; line-height:1.6; color:#cbd5e1; margin-bottom:16px;">' +
           formattedBody +
         '</div>' +
-        '<div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:16px; font-size:11px; color:#64748b;">' +
+        attachmentInfoHtml +
+        '<div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:16px; margin-top:16px; font-size:11px; color:#64748b;">' +
           '<p style="margin:0 0 4px 0;"><strong>Stone and Company Forex Fund</strong></p>' +
           '<p style="margin:0;">Official investor communication from fund management.</p>' +
         '</div>' +
@@ -779,6 +840,7 @@ let state = {
             recipients: [testEmail],
             subject: '[TEST] ' + subject,
             body,
+            attachments: state.emailAttachments,
             isTest: true
           })
         });
@@ -810,6 +872,14 @@ let state = {
 
       document.getElementById('confirmRecipientCount').textContent = state.selectedEmails.size;
       document.getElementById('confirmSubjectText').textContent = subject;
+
+      const attNotice = document.getElementById('confirmAttachmentsNotice');
+      if (attNotice) {
+        attNotice.textContent = state.emailAttachments.length > 0 
+          ? '📎 ' + state.emailAttachments.length + ' file attachment(s) included'
+          : '';
+      }
+
       document.getElementById('emailConfirmModal').classList.remove('hidden');
     });
 
@@ -829,6 +899,7 @@ let state = {
             recipients,
             subject,
             body,
+            attachments: state.emailAttachments,
             isTest: false
           })
         });
@@ -837,8 +908,9 @@ let state = {
         document.getElementById('emailConfirmModal').classList.add('hidden');
         document.getElementById('emailSubjectInput').value = '';
         document.getElementById('emailBodyInput').value = '';
+        state.emailAttachments = [];
+        renderAttachmentChips();
         
-        // Switch to logs subtab to display sent history
         document.getElementById('subTabLogsBtn').click();
         await loadEmailCenterData();
       } catch (err) {

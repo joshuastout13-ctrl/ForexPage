@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { recipients, subject, body, isTest } = req.body || {};
+    const { recipients, subject, body, attachments, isTest } = req.body || {};
 
     if (!subject || !subject.trim()) {
       return res.status(400).json({ error: "Email subject line is required." });
@@ -36,13 +36,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No valid email addresses provided." });
     }
 
-    console.log(`[Admin Email] Admin (${session.username || session.adminId}) sending email to ${validRecipients.length} recipients. Subject: "${subject.trim()}"`);
+    console.log(`[Admin Email] Admin (${session.username || session.adminId}) sending email to ${validRecipients.length} recipients. Subject: "${subject.trim()}", Attachments: ${Array.isArray(attachments) ? attachments.length : 0}`);
 
-    // Call Resend email sender
+    // Call Resend email sender with attachments
     const result = await sendEmail({
       recipients: validRecipients,
       subject: subject.trim(),
-      body: body.trim()
+      body: body.trim(),
+      attachments: Array.isArray(attachments) ? attachments : undefined
     });
 
     // Log send results to Supabase admin_email_logs table
@@ -58,7 +59,10 @@ export default async function handler(req, res) {
           sent_by: session.username || session.adminId || "admin",
           is_test: !!isTest,
           error_message: result.errors && result.errors.length > 0 ? JSON.stringify(result.errors) : null,
-          details: result.results || null
+          details: {
+            attachmentCount: Array.isArray(attachments) ? attachments.length : 0,
+            results: result.results || null
+          }
         };
 
         const { data: logData, error: logError } = await supabase
