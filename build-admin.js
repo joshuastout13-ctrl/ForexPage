@@ -727,7 +727,7 @@ let state = {
     document.getElementById('btnEmailPreview')?.addEventListener('click', () => {
       const subject = document.getElementById('emailSubjectInput').value || 'Subject Line Preview';
       const body = document.getElementById('emailBodyInput').value || 'Your email text will appear here.';
-      const formattedBody = /<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>');
+      const formattedBody = /<[a-z]/i.test(body) ? body : body.split(String.fromCharCode(10)).join('<br/>');
 
       const previewHtml = '<div style="max-width:550px; margin:0 auto; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:24px; color:#e7eefb; font-family:sans-serif;">' +
         '<div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:16px; margin-bottom:16px;">' +
