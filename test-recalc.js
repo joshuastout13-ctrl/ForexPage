@@ -1,5 +1,9 @@
 import { supabase } from "./lib/supabase.js";
 
+function precise(val) {
+  return Math.round(Number(val) * 1000000) / 1000000;
+}
+
 export async function handler(req, res) {
   const session = true;
   if (!session) return res.status(401).json({ error: "Unauthorized" });
@@ -57,8 +61,8 @@ export async function handler(req, res) {
       const depsByMAcc = {};
       invDeps.forEach(d => {
         const dt = new Date(d.date);
-        if(dt.getFullYear() === targetYear) {
-          const m = dt.getMonth() + 1;
+        if(dt.getUTCFullYear() === targetYear) {
+          const m = dt.getUTCMonth() + 1;
           const accId = d.account_id || accounts[0]?.id;
           if (accId) {
             if (!depsByMAcc[m]) depsByMAcc[m] = {};
@@ -112,17 +116,27 @@ export async function handler(req, res) {
           const deps = (depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0;
           const wds = (wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0;
           
-          const grossPct = isStarted ? (fundRetByM[m] || 0) : 0;
+          // Zero out grossPct for future projected months unless manual
+          const now = new Date();
+          const currentYearIdx = now.getFullYear();
+          const currentMonthIdx = now.getMonth() + 1;
+          const isPastOrCurrent = (targetYear < currentYearIdx) || (targetYear === currentYearIdx && m <= currentMonthIdx);
+          
+          let grossPct = isStarted ? (fundRetByM[m] || 0) : 0;
+          if (!isPastOrCurrent && !(existing && existing.is_manual)) {
+            grossPct = 0;
+          }
+
           const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
           
-          const adjStart = opening + deps - wds;
-          const totalProfit = adjStart * (grossPct / 100);
-          const gain = totalProfit * split;
+          const adjStart = precise(opening + deps - wds);
+          const totalProfit = precise(adjStart * (grossPct / 100));
+          const gain = precise(totalProfit * split);
 
           const accRules = invCommRules.filter(r => !r.account_id || r.account_id === acc.id);
           if (totalProfit > 0 && accRules.length > 0) {
             for (const rule of accRules) {
-              const commAmount = totalProfit * (Number(rule.percent) / 100);
+              const commAmount = precise(totalProfit * (Number(rule.percent) / 100));
               commissionsToInsert.push({
                 recipient_id: rule.recipient_id,
                 source_investor_id: investorId,

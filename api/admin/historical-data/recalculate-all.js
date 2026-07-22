@@ -1,5 +1,11 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import Decimal from "decimal.js";
+Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
+
+function precise(val) {
+  return new Decimal(val || 0).toNumber();
+}
 
 export default async function handler(req, res) {
   const bypassAuth = req.headers && req.headers['x-bypass-auth'] === 'temp-bypass';
@@ -39,8 +45,8 @@ export default async function handler(req, res) {
     // We process each investor
     for (const inv of investors) {
       const investorId = inv.id;
-      const investorSplit = (inv.split_pct || 100) / 100;
-      const draw = inv.monthly_draw || 0;
+      const investorSplit = new Decimal(inv.split_pct || 100).div(100);
+      const draw = new Decimal(inv.monthly_draw || 0);
       let startDate = null;
       if (inv.start_date) {
         const d = new Date(inv.start_date);
@@ -59,8 +65,8 @@ export default async function handler(req, res) {
       const depsByMAcc = {};
       invDeps.forEach(d => {
         const dt = new Date(d.date);
-        if(dt.getFullYear() === targetYear) {
-          const m = dt.getMonth() + 1;
+        if(dt.getUTCFullYear() === targetYear) {
+          const m = dt.getUTCMonth() + 1;
           const accId = d.account_id || accounts[0]?.id;
           if (accId) {
             if (!depsByMAcc[m]) depsByMAcc[m] = {};
@@ -90,36 +96,52 @@ export default async function handler(req, res) {
       const history = allHistory.filter(h => h.investor_id?.toLowerCase() === investorId.toLowerCase());
 
       let accountBalances = {};
-      accounts.forEach(a => { accountBalances[a.id] = Number(a.starting_capital || 0); });
+      accounts.forEach(a => { accountBalances[a.id] = new Decimal(a.starting_capital || 0); });
 
       for (let m = 1; m <= 12; m++) {
         const isStarted = !startDate || (targetYear > startDate.getUTCFullYear()) || 
                           (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
         
         const existing = history?.find(h => h.month_number === m);
-        const earnedPrevMonth = (m > 1) ? (commEarningsByM[m - 1] || 0) : 0;
+        const earnedPrevMonth = (m > 1) ? new Decimal(commEarningsByM[m - 1] || 0) : new Decimal(0);
         
         const commAcc = accounts.find(a => a.is_commission) || accounts[0];
-        if (commAcc && earnedPrevMonth > 0) {
-          accountBalances[commAcc.id] += earnedPrevMonth;
+        if (commAcc && earnedPrevMonth.gt(0)) {
+          accountBalances[commAcc.id] = accountBalances[commAcc.id].add(earnedPrevMonth);
         }
 
-        let totalOpening = 0;
-        let totalGain = 0;
-        let totalDeps = 0;
-        let totalWds = 0;
+        let totalOpening = new Decimal(0);
+        let totalGain = new Decimal(0);
+        let totalDeps = new Decimal(0);
+        let totalWds = new Decimal(0);
 
         for (const acc of accounts) {
           const opening = accountBalances[acc.id];
-          const deps = (depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0;
-          const wds = (wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0;
+          const deps = new Decimal((depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0);
+          const wds = new Decimal((wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0);
           
-          const grossPct = isStarted ? (fundRetByM[m] || 0) : 0;
-          const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? (acc.split_pct / 100) : investorSplit;
+          // Zero out grossPct for future projected months unless manual
+          const now = new Date();
+          const currentYearIdx = now.getFullYear();
+          const currentMonthIdx = now.getMonth() + 1;
+          const isPastOrCurrent = (targetYear < currentYearIdx) || (targetYear === currentYearIdx && m <= currentMonthIdx);
           
-          const adjStart = opening + deps - wds;
-          const totalProfit = opening * (grossPct / 100);
-          const gain = totalProfit * split;
+          let grossPct = isStarted ? new Decimal(fundRetByM[m] || 0) : new Decimal(0);
+          if (!isPastOrCurrent && !(existing && existing.is_manual)) {
+            grossPct = new Decimal(0);
+          }
+
+          const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? new Decimal(acc.split_pct).div(100) : investorSplit;
+          
+          // Order per TASK 3:
+          // 1. prior ending balance (opening)
+          // 2. + deposits (deps)
+          // 3. - approved/completed withdrawals (wds)
+          // 4. apply gross return x split %
+          // 5. - recurring draw
+          const adjStart = opening.add(deps).sub(wds);
+          const totalProfit = adjStart.mul(grossPct.div(100));
+          const gain = totalProfit.mul(split);
 
           const monthStart = new Date(Date.UTC(targetYear, m - 1, 1));
           
@@ -133,33 +155,33 @@ export default async function handler(req, res) {
             return monthStart >= shareStart && (!shareEnd || monthStart <= shareEnd);
           });
 
-          if (totalProfit > 0 && activeShares.length > 0) {
+          if (totalProfit.gt(0) && activeShares.length > 0) {
             for (const share of activeShares) {
-              const commAmount = totalProfit * (Number(share.commission_percent) / 100);
+              const commAmount = totalProfit.mul(new Decimal(share.commission_percent).div(100));
               commissionsToInsert.push({
                 recipient_id: share.recipient_investor_id,
                 source_investor_id: investorId,
                 year: targetYear,
                 month_number: m,
-                amount: commAmount
+                amount: commAmount.toNumber()
               });
             }
           }
 
-          totalOpening += opening;
-          totalGain += gain;
-          totalDeps += deps;
-          totalWds += wds;
+          totalOpening = totalOpening.add(opening);
+          totalGain = totalGain.add(gain);
+          totalDeps = totalDeps.add(deps);
+          totalWds = totalWds.add(wds);
 
-          accountBalances[acc.id] = adjStart + gain;
+          accountBalances[acc.id] = adjStart.add(gain);
         }
 
-        const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? Number(existing.recurring_draw) : draw;
-        if (currentDraw > 0 && accounts.length > 0) {
-          accountBalances[accounts[0].id] -= currentDraw;
+        const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? new Decimal(existing.recurring_draw) : draw;
+        if (currentDraw.gt(0) && accounts.length > 0) {
+          accountBalances[accounts[0].id] = accountBalances[accounts[0].id].sub(currentDraw);
         }
 
-        const ending = accounts.length > 0 ? Object.values(accountBalances).reduce((a, b) => a + b, 0) : 0;
+        const ending = accounts.length > 0 ? Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0)) : new Decimal(0);
         
         const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         
@@ -168,14 +190,14 @@ export default async function handler(req, res) {
           year: targetYear,
           month_number: m,
           month: monthNames[m],
-          opening_balance: totalOpening,
-          deposits: totalDeps,
-          withdrawals: totalWds,
+          opening_balance: totalOpening.toNumber(),
+          deposits: totalDeps.toNumber(),
+          withdrawals: totalWds.toNumber(),
           gross_return_pct: fundRetByM[m] || 0,
           manual_gain_amount: existing ? existing.manual_gain_amount : null,
           manual_return_pct: existing ? existing.manual_return_pct : null,
-          recurring_draw: currentDraw,
-          ending_balance: ending,
+          recurring_draw: currentDraw.toNumber(),
+          ending_balance: ending.toNumber(),
           is_manual: existing ? !!existing.manual_gain_amount : false,
           updated_at: new Date()
         });

@@ -13,7 +13,7 @@ const css = `
     .muted{color:var(--muted);line-height:1.5}
     .kicker{ display:inline-block; padding:7px 12px; border-radius:999px; background:rgba(79,140,255,.12); color:var(--accent2); font-size:12px; text-transform:uppercase; letter-spacing:.08em; border:1px solid rgba(127,179,255,.2); margin-bottom:12px; }
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-    input, select, textarea{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s; }
+    input, select, textarea{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); font-size:15px; outline:none; transition:border-color 0.2s; font-family:inherit; }
     select option { background: #1e293b; color: #fff; }
     input:focus, select:focus, textarea:focus { border-color:var(--accent); }
     button{ padding:12px 16px; border:none; border-radius:12px; background:linear-gradient(135deg,var(--accent),#2f6df0); color:#fff; font-weight:700; cursor:pointer; transition:transform 0.1s, opacity 0.2s; }
@@ -31,6 +31,7 @@ const css = `
     .badge.active{background:rgba(34,197,94,0.15);color:var(--success)}
     .badge.inactive{background:rgba(239,68,68,0.15);color:var(--danger)}
     .badge.pending{background:rgba(234,179,8,0.15);color:var(--warning)}
+    .badge.partial{background:rgba(234,179,8,0.15);color:var(--warning)}
 
     .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); display:flex; justify-content:center; align-items:flex-start; padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh; }
     .modal{ background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; width:100%; max-width:600px; box-shadow:0 20px 40px rgba(0,0,0,.4); }
@@ -143,6 +144,20 @@ const css = `
     .modal-overlay.saving-active .modal {
       opacity: 0.7;
     }
+
+    /* Email Center Styles */
+    .sub-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+    .sub-tab-btn { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
+    .sub-tab-btn.active { background: rgba(79, 140, 255, 0.15); color: var(--accent2); border-color: rgba(127, 179, 255, 0.25); }
+    .email-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 1024px) { .email-grid { grid-template-columns: 1fr; } }
+    .recipient-box { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+    .recipient-list { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; }
+    .recipient-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.15s; font-size: 13px; }
+    .recipient-item:hover { background: rgba(255, 255, 255, 0.04); }
+    .recipient-item:last-child { border-bottom: none; }
+    .recipient-item.selected { background: rgba(79, 140, 255, 0.08); }
+    .composer-box { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
 `;
 
 const htmlBody = `
@@ -166,6 +181,16 @@ const htmlBody = `
         <div><div class="kicker">Admin Portal</div><h1>ForEx Investment Tracker Management</h1></div>
         <div class="right"><div id="adminName" class="muted">Logged in as Admin</div><button id="logoutBtn" class="secondary">Logout</button></div>
       </div>
+      <div id="adminSummaryBox" class="grid2" style="margin-bottom:24px; gap:20px;">
+        <div class="card" style="margin:0; text-align:center; padding:30px 20px;">
+          <div class="muted" style="font-size:14px; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Total Platform Value</div>
+          <div id="totalPlatformValue" style="font-size:36px; font-weight:700; color:var(--success); font-family:'Outfit', sans-serif;">$0.00</div>
+        </div>
+        <div class="card" style="margin:0; text-align:center; padding:30px 20px;">
+          <div class="muted" style="font-size:14px; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Total Active Accounts</div>
+          <div id="totalPlatformAccounts" style="font-size:36px; font-weight:700; font-family:'Outfit', sans-serif;">0</div>
+        </div>
+      </div>
       <div class="dashboard-layout">
         <div class="sidebar card" style="padding:16px;">
           <button class="nav-btn active" data-tab="investors">1. Investors & Accounts</button>
@@ -175,6 +200,8 @@ const htmlBody = `
           <button class="nav-btn" data-tab="performance">5. Live Performance</button>
           <button class="nav-btn" data-tab="snapshots">6. Snapshots</button>
           <button class="nav-btn" data-tab="history">7. Historical Data</button>
+          <button class="nav-btn" data-tab="commission_shares">8. Commission Shares</button>
+          <button class="nav-btn" data-tab="email_center">9. Email Center</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -182,12 +209,90 @@ const htmlBody = `
             <div id="viewActions" class="right">
               <input id="searchBar" placeholder="Search..." style="max-width:200px" />
               <button id="addEntityBtn">+ Add New</button>
+              <button id="recalcAllBtn" class="secondary" style="background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.2)">Recalculate ALL Investors</button>
+              <button id="pullMyfxbookBtn" class="secondary hidden" style="background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.2);color:#4ade80;">Pull Live Data</button>
               <button id="importBtn" class="secondary hidden">Bulk Import</button>
             </div>
           </div>
           <div id="loadingIndicator" class="muted hidden" style="padding:20px;text-align:center;">Loading data...</div>
-          <div style="overflow-x:auto;">
+          <div id="tableContainer" style="overflow-x:auto;">
             <table id="dataTable"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
+          </div>
+
+          <!-- Dedicated Email Center View -->
+          <div id="emailCenterView" class="hidden">
+            <div class="sub-tabs">
+              <button id="subTabComposeBtn" class="sub-tab-btn active" data-subtab="compose">Compose & Send</button>
+              <button id="subTabLogsBtn" class="sub-tab-btn" data-subtab="logs">Send History & Logs</button>
+            </div>
+
+            <!-- Compose Sub-Tab -->
+            <div id="emailSubTabCompose">
+              <div class="email-grid">
+                <div class="recipient-box">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; font-size:16px;">Recipient Selection</h3>
+                    <span id="selectedCountBadge" class="kicker" style="margin:0; text-transform:none;">0 selected</span>
+                  </div>
+                  <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <input id="emailSearchInput" placeholder="Search name, email, ID..." style="font-size:13px; padding:8px 12px;" />
+                    <select id="emailStatusFilter" style="font-size:13px; padding:8px 12px; width:130px;">
+                      <option value="all">All Status</option>
+                      <option value="active" selected>Active Only</option>
+                      <option value="inactive">Inactive Only</option>
+                    </select>
+                  </div>
+                  <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <button id="btnSelectAll" class="secondary" style="padding:6px 12px; font-size:12px;">Select All</button>
+                    <button id="btnDeselectAll" class="secondary" style="padding:6px 12px; font-size:12px;">Deselect All</button>
+                  </div>
+                  <div id="recipientList" class="recipient-list">
+                    <!-- Recipients rendered via JS -->
+                  </div>
+                </div>
+
+                <div class="composer-box">
+                  <h3 style="margin:0 0 16px 0; font-size:16px;">Email Composer</h3>
+                  <div class="form-group">
+                    <label>Subject Line</label>
+                    <input id="emailSubjectInput" placeholder="e.g. Q3 Investor Update & Performance Announcement" />
+                  </div>
+                  <div class="form-group">
+                    <label>Message Body (Text or HTML)</label>
+                    <textarea id="emailBodyInput" rows="12" placeholder="Write your email broadcast message here..."></textarea>
+                  </div>
+                  
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; gap:8px;">
+                      <button id="btnEmailPreview" type="button" class="secondary" style="padding:10px 14px; font-size:13px;">👁 HTML Preview</button>
+                      <button id="btnEmailTest" type="button" class="secondary" style="padding:10px 14px; font-size:13px;">🧪 Send Test Email</button>
+                    </div>
+                    <button id="btnEmailSend" type="button" style="padding:10px 20px; font-size:14px; background:linear-gradient(135deg,var(--success),#16a34a);">🚀 Send Broadcast</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Send History Sub-Tab -->
+            <div id="emailSubTabLogs" class="hidden">
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse;">
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Subject</th>
+                      <th>Recipients</th>
+                      <th>Status</th>
+                      <th>Sent By</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody id="emailLogsBody">
+                    <!-- Logs rendered via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -242,13 +347,90 @@ const htmlBody = `
       </div>
     </div>
   </div>
+
+  <div id="myfxbookPreviewModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:600px;">
+      <h2 style="margin:0 0 16px 0">Myfxbook Live Preview</h2>
+      <p class="muted" style="margin-bottom:20px;">Review the latest data pulled from Myfxbook. Clicking Accept will update the database and make it live for users.</p>
+      
+      <table style="min-width:auto; margin-bottom:24px; background:rgba(255,255,255,0.02); border-radius:12px;">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Current Value</th>
+            <th>New Value (Scrape.do)</th>
+          </tr>
+        </thead>
+        <tbody id="previewModalBody">
+          <!-- Rows injected via JS -->
+        </tbody>
+      </table>
+      
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:10px;">
+        <button class="secondary closeModalBtn">Reject</button>
+        <button id="acceptMyfxbookBtn" style="background:linear-gradient(135deg,#22c55e,#16a34a);">Accept & Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Test Modal -->
+  <div id="emailTestModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:450px;">
+      <div class="right" style="margin-bottom:16px;">
+        <h3 style="margin:0;">Send Test Email</h3>
+        <button class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
+      </div>
+      <p class="muted" style="margin-bottom:16px; font-size:13px;">Send a single test email via Resend to verify formatting and inbox delivery.</p>
+      <div class="form-group">
+        <label>Recipient Email Address</label>
+        <input id="testEmailAddressInput" type="email" placeholder="admin@example.com" />
+      </div>
+      <div style="margin-top:20px; text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmTestSendBtn" type="button">Send Test Email</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email HTML Preview Modal -->
+  <div id="emailPreviewModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:700px; width:95%;">
+      <div class="right" style="margin-bottom:16px;">
+        <h3 style="margin:0;">Email HTML Preview</h3>
+        <button class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
+      </div>
+      <div id="emailPreviewContent" style="background:#08101d; border:1px solid var(--line); border-radius:12px; padding:16px; max-height:500px; overflow-y:auto;">
+        <!-- HTML Preview Injected -->
+      </div>
+      <div style="margin-top:20px; text-align:right;">
+        <button type="button" class="secondary closeModalBtn">Close Preview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Confirm Broadcast Modal -->
+  <div id="emailConfirmModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:500px;">
+      <h3 style="margin:0 0 12px 0;">Confirm Mass Email Broadcast</h3>
+      <p class="muted" style="margin-bottom:16px; font-size:14px;">You are about to send an email broadcast via Resend to <strong id="confirmRecipientCount">0</strong> selected recipients.</p>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:20px;">
+        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Subject</div>
+        <div id="confirmSubjectText" style="font-weight:600; color:#fff;"></div>
+      </div>
+      <div class="right" style="justify-content:flex-end;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmBroadcastSendBtn" type="button" style="background:linear-gradient(135deg,var(--success),#16a34a);">Confirm & Send Now</button>
+      </div>
+    </div>
+  </div>
 `;
 
 const jsBody = `
 let state = {
       admin: null, tab: 'investors',
-      data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [] },
-      search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear()
+      data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [], commission_shares: [] },
+      search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear(),
+      emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active'
     };
 
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -256,42 +438,29 @@ let state = {
     const money = (n) => Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"});
     
     function showToast(msg, isError = false) {
-      const old = document.querySelector('.toast'); if(old) old.remove();
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
       const t = document.createElement('div');
       t.className = 'toast';
-      t.style.pointerEvents = 'auto';
-      if(isError) t.style.borderColor = 'var(--danger)';
-      t.innerHTML = \`
-        <div style="display:flex; align-items:center; gap:12px; width:100%;">
-          <span>\${isError ? '❌' : '✅'}</span> 
-          <div style="flex:1; margin-right:20px;">\${msg}</div>
-          <button onclick="this.closest('.toast').remove()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:18px; padding:0 5px;">✕</button>
-        </div>
-      \`;
+      if (isError) t.style.borderColor = 'var(--danger)';
+      t.innerHTML = \`<span>\${isError ? '⚠️' : '✅'}</span> <span>\${msg}</span>\`;
       document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
     }
+
     const api = {
-      async request(endpoint, options = {}) {
-        const res = await fetch(endpoint, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers||{}) } });
-        let d = {};
-        const text = await res.text();
-        try { d = JSON.parse(text); } catch(e) { d = { error: 'Server returned non-JSON response', raw: text }; }
-        if(!res.ok) {
-           const msg = d.error || \`HTTP \${res.status}\`;
-           console.error('API Error:', msg, d);
-           // Show first 100 chars of raw response if it's a server error
-           const debugInfo = d.raw ? \`\\n\\nContent: \${d.raw.slice(0, 150)}...\` : '';
-           throw new Error(\`\${msg}\${debugInfo}\`);
-        }
-        return d;
+      request: async (url, opts = {}) => {
+        const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'API Request Failed');
+        return json;
       },
-      login: (u,p) => api.request('/api/admin/login', { method:'POST', body: JSON.stringify({username:u,password:p})}),
-      logout: () => api.request('/api/admin/logout', { method:'POST' }),
+      login: (u, p) => api.request('/api/admin/login', { method: 'POST', body: JSON.stringify({ username: u, password: p }) }),
+      logout: () => api.request('/api/admin/logout', { method: 'POST' }),
       me: () => api.request('/api/admin/me')
     };
 
     async function init() {
-      // Safety net: if it takes > 5s, show login
       const timeout = setTimeout(() => {
         if (document.getElementById('loadingView').classList.contains('hidden')) return;
         console.warn('Init timeout hit, showing login');
@@ -326,61 +495,361 @@ let state = {
         e.currentTarget.classList.add('active');
         state.tab = e.currentTarget.dataset.tab;
         
-        const titles = { investors: 'Investors & Accounts Directory', deposits: 'Deposits', withdrawals: 'Withdrawals', returns: 'Monthly Returns', performance: 'Live Performance', snapshots: 'Snapshots', history: 'Historical Monthly Data' };
-        document.getElementById('viewTitle').textContent = titles[state.tab];
-        document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
-        document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
+        const titles = { 
+          investors: 'Investors & Accounts Directory', 
+          deposits: 'Deposits', 
+          withdrawals: 'Withdrawals', 
+          returns: 'Monthly Returns', 
+          performance: 'Live Performance', 
+          snapshots: 'Snapshots', 
+          history: 'Historical Monthly Data',
+          commission_shares: 'Commission Shares',
+          email_center: 'Admin Email Center'
+        };
+        document.getElementById('viewTitle').textContent = titles[state.tab] || 'Admin Portal';
+        
+        const isEmailTab = state.tab === 'email_center';
+        document.getElementById('viewActions').classList.toggle('hidden', isEmailTab);
+        document.getElementById('tableContainer').classList.toggle('hidden', isEmailTab);
+        document.getElementById('emailCenterView').classList.toggle('hidden', !isEmailTab);
+
+        if (!isEmailTab) {
+          document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history','commission_shares'].includes(state.tab)) ? 'none' : 'inline-block';
+          document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
+        }
+        
         loadTab(state.tab);
       });
     });
- 
+
     async function loadTab(tab) {
       document.body.classList.add('loading-active');
       document.getElementById('loadingIndicator').classList.remove('hidden');
       document.getElementById('dataHead').innerHTML = ''; document.getElementById('dataBody').innerHTML = '';
       try {
-        const endpoints = { 
-          investors: '/api/admin/investors', 
-          accounts: '/api/admin/accounts', 
-          deposits: '/api/admin/deposits', 
-          withdrawals: '/api/admin/withdrawals', 
-          returns: '/api/admin/monthly-returns', 
-          performance: '/api/admin/live-performance', 
-          snapshots: '/api/admin/snapshots',
-          history: \`/api/admin/historical-data?investorId=\${state.filterInvestor}&year=\${state.filterYear}\`
-        };
-        
-        if (tab === 'investors') {
-          const [invRes, accRes] = await Promise.all([
-            api.request('/api/admin/investors'),
-            api.request('/api/admin/accounts')
-          ]);
-          state.data.investors = invRes.investors || [];
-          state.data.accounts = accRes.accounts || [];
-        } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
-          const res = await api.request(endpoints[tab]);
-          state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
+        if (tab === 'email_center') {
+          await loadEmailCenterData();
+        } else {
+          const endpoints = { 
+            investors: '/api/admin/investors', 
+            accounts: '/api/admin/accounts', 
+            deposits: '/api/admin/deposits', 
+            withdrawals: '/api/admin/withdrawals', 
+            returns: '/api/admin/monthly-returns', 
+            performance: '/api/admin/live-performance', 
+            snapshots: '/api/admin/snapshots',
+            commission_shares: '/api/admin/commission-shares',
+            history: \`/api/admin/historical-data?investorId=\${state.filterInvestor}&year=\${state.filterYear}\`
+          };
+          
+          if (tab === 'investors') {
+            const [invRes, accRes] = await Promise.all([
+              api.request('/api/admin/investors'),
+              api.request('/api/admin/accounts')
+            ]);
+            state.data.investors = invRes.investors || [];
+            state.data.accounts = accRes.accounts || [];
+          } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
+            const res = await api.request(endpoints[tab]);
+            state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
+          }
+          
+          if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
+             const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
+          }
+          if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
+             const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
+          }
+          renderTable();
         }
-        
-        if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
-           const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
-        }
-        if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
-           const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
-        }
-        renderTable();
       } catch(e) { alert('Failed to load data: ' + e.message); } 
       finally { 
         document.getElementById('loadingIndicator').classList.add('hidden');
         document.body.classList.remove('loading-active');
       }
     }
- 
+
+    /* Email Center Functions */
+    async function loadEmailCenterData() {
+      try {
+        const [recRes, logRes] = await Promise.all([
+          api.request('/api/admin/email-recipients'),
+          api.request('/api/admin/email-logs')
+        ]);
+        state.emailRecipients = recRes.recipients || [];
+        state.emailLogs = logRes.logs || [];
+        
+        // Select active recipients by default on initial load if none selected
+        if (state.selectedEmails.size === 0) {
+          state.emailRecipients.forEach(r => {
+            if (r.active) state.selectedEmails.add(r.email);
+          });
+        }
+        
+        renderEmailCenter();
+      } catch (err) {
+        showToast("Failed loading email center: " + err.message, true);
+      }
+    }
+
+    function renderEmailCenter() {
+      renderRecipientList();
+      renderEmailLogs();
+    }
+
+    function renderRecipientList() {
+      const list = document.getElementById('recipientList');
+      if (!list) return;
+
+      const search = (state.emailFilterSearch || '').toLowerCase().trim();
+      const statusFilter = state.emailFilterStatus;
+
+      const filtered = state.emailRecipients.filter(r => {
+        const matchesSearch = !search || 
+          (r.name || '').toLowerCase().includes(search) ||
+          (r.email || '').toLowerCase().includes(search) ||
+          (r.id || '').toLowerCase().includes(search);
+        
+        const matchesStatus = statusFilter === 'all' || 
+          (statusFilter === 'active' && r.active) || 
+          (statusFilter === 'inactive' && !r.active);
+
+        return matchesSearch && matchesStatus;
+      });
+
+      // Update badge
+      document.getElementById('selectedCountBadge').textContent = \`\${state.selectedEmails.size} / \${state.emailRecipients.length} Selected\`;
+
+      if (filtered.length === 0) {
+        list.innerHTML = \`<div class="muted" style="padding:16px; text-align:center; font-size:13px;">No recipients match your search filter.</div>\`;
+        return;
+      }
+
+      list.innerHTML = filtered.map(r => {
+        const isChecked = state.selectedEmails.has(r.email);
+        const accCount = (r.accounts || []).length;
+        const accLabel = accCount > 0 ? \`\${accCount} account\${accCount>1?'s':''}\` : 'No accounts';
+
+        return \`<div class="recipient-item \${isChecked?'selected':''}" data-email="\${r.email}">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" \${isChecked?'checked':''} style="width:auto; cursor:pointer;" onclick="event.stopPropagation(); toggleRecipient('\${r.email}')" />
+            <div>
+              <div style="font-weight:600; color:#fff;">\${escapeHtml(r.name)}</div>
+              <div class="muted" style="font-size:11px;">\${escapeHtml(r.email)} • ID: \${r.id}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span class="badge \${r.active?'active':'inactive'}">\${r.active?'Active':'Inactive'}</span>
+            <div class="muted" style="font-size:11px; margin-top:2px;">\${accLabel}</div>
+          </div>
+        </div>\`;
+      }).join('');
+
+      // Add click listener to rows
+      list.querySelectorAll('.recipient-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const email = item.dataset.email;
+          toggleRecipient(email);
+        });
+      });
+    }
+
+    function toggleRecipient(email) {
+      if (state.selectedEmails.has(email)) {
+        state.selectedEmails.delete(email);
+      } else {
+        state.selectedEmails.add(email);
+      }
+      renderRecipientList();
+    }
+
+    function renderEmailLogs() {
+      const body = document.getElementById('emailLogsBody');
+      if (!body) return;
+
+      if (state.emailLogs.length === 0) {
+        body.innerHTML = \`<tr><td colspan="6" class="muted" style="text-align:center; padding:24px;">No email broadcast logs found.</td></tr>\`;
+        return;
+      }
+
+      body.innerHTML = state.emailLogs.map(log => {
+        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A';
+        const stClass = log.status === 'success' ? 'active' : (log.status === 'partial' ? 'partial' : 'inactive');
+
+        return \`<tr>
+          <td>\${dateStr}</td>
+          <td style="font-weight:600; color:#fff;">\${escapeHtml(log.subject)}</td>
+          <td>\${log.recipient_count || 0}</td>
+          <td><span class="badge \${stClass}">\${log.status || 'Sent'}</span></td>
+          <td>\${escapeHtml(log.sent_by || 'admin')}</td>
+          <td>\${log.is_test ? '🧪 Test' : '🚀 Broadcast'}</td>
+        </tr>\`;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    // Sub-tab switcher
+    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        const sub = e.currentTarget.dataset.subtab;
+        state.emailSubTab = sub;
+        document.getElementById('emailSubTabCompose').classList.toggle('hidden', sub !== 'compose');
+        document.getElementById('emailSubTabLogs').classList.toggle('hidden', sub !== 'logs');
+      });
+    });
+
+    // Email Search & Filters
+    document.getElementById('emailSearchInput')?.addEventListener('input', (e) => {
+      state.emailFilterSearch = e.target.value;
+      renderRecipientList();
+    });
+    document.getElementById('emailStatusFilter')?.addEventListener('change', (e) => {
+      state.emailFilterStatus = e.target.value;
+      renderRecipientList();
+    });
+
+    // Select All / Deselect All
+    document.getElementById('btnSelectAll')?.addEventListener('click', () => {
+      state.emailRecipients.forEach(r => state.selectedEmails.add(r.email));
+      renderRecipientList();
+    });
+    document.getElementById('btnDeselectAll')?.addEventListener('click', () => {
+      state.selectedEmails.clear();
+      renderRecipientList();
+    });
+
+    // HTML Preview Button
+    document.getElementById('btnEmailPreview')?.addEventListener('click', () => {
+      const subject = document.getElementById('emailSubjectInput').value || 'Subject Line Preview';
+      const body = document.getElementById('emailBodyInput').value || 'Your email text will appear here.';
+      const formattedBody = /<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>');
+
+      const previewHtml = '<div style="max-width:550px; margin:0 auto; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:24px; color:#e7eefb; font-family:sans-serif;">' +
+        '<div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:16px; margin-bottom:16px;">' +
+          '<div style="display:inline-block; padding:3px 8px; border-radius:999px; background:rgba(79,140,255,0.15); color:#7fb3ff; font-size:10px; font-weight:bold; text-transform:uppercase;">Official Announcement</div>' +
+          '<h2 style="margin:8px 0 0 0; font-size:18px; color:#fff;">Stone & Company Forex Fund</h2>' +
+        '</div>' +
+        '<div style="font-size:14px; line-height:1.6; color:#cbd5e1; margin-bottom:24px;">' +
+          formattedBody +
+        '</div>' +
+        '<div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:16px; font-size:11px; color:#64748b;">' +
+          '<p style="margin:0 0 4px 0;"><strong>Stone and Company Forex Fund</strong></p>' +
+          '<p style="margin:0;">Official investor communication from fund management.</p>' +
+        '</div>' +
+      '</div>';
+
+      document.getElementById('emailPreviewContent').innerHTML = previewHtml;
+      document.getElementById('emailPreviewModal').classList.remove('hidden');
+    });
+
+    // Test Send Button
+    document.getElementById('btnEmailTest')?.addEventListener('click', () => {
+      const subject = document.getElementById('emailSubjectInput').value.trim();
+      const body = document.getElementById('emailBodyInput').value.trim();
+      if (!subject || !body) {
+        return alert("Please enter both a subject and body before sending a test email.");
+      }
+      document.getElementById('emailTestModal').classList.remove('hidden');
+    });
+
+    document.getElementById('confirmTestSendBtn')?.addEventListener('click', async () => {
+      const testEmail = document.getElementById('testEmailAddressInput').value.trim();
+      if (!testEmail || !testEmail.includes('@')) {
+        return alert("Please enter a valid test recipient email address.");
+      }
+      const subject = document.getElementById('emailSubjectInput').value.trim();
+      const body = document.getElementById('emailBodyInput').value.trim();
+
+      const btn = document.getElementById('confirmTestSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending Test...';
+
+      try {
+        const res = await api.request('/api/admin/send-email', {
+          method: 'POST',
+          body: JSON.stringify({
+            recipients: [testEmail],
+            subject: '[TEST] ' + subject,
+            body,
+            isTest: true
+          })
+        });
+
+        showToast('Test email successfully sent to ' + testEmail + '!');
+        document.getElementById('emailTestModal').classList.add('hidden');
+        await loadEmailCenterData();
+      } catch (err) {
+        alert("Failed sending test email: " + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send Test Email';
+      }
+    });
+
+    // Mass Send Broadcast Button
+    document.getElementById('btnEmailSend')?.addEventListener('click', () => {
+      const subject = document.getElementById('emailSubjectInput').value.trim();
+      const body = document.getElementById('emailBodyInput').value.trim();
+
+      if (state.selectedEmails.size === 0) {
+        return alert("Please select at least one recipient to send the broadcast email.");
+      }
+      if (!subject) {
+        return alert("Please enter an email subject line.");
+      }
+      if (!body) {
+        return alert("Please enter an email message body.");
+      }
+
+      document.getElementById('confirmRecipientCount').textContent = state.selectedEmails.size;
+      document.getElementById('confirmSubjectText').textContent = subject;
+      document.getElementById('emailConfirmModal').classList.remove('hidden');
+    });
+
+    document.getElementById('confirmBroadcastSendBtn')?.addEventListener('click', async () => {
+      const subject = document.getElementById('emailSubjectInput').value.trim();
+      const body = document.getElementById('emailBodyInput').value.trim();
+      const recipients = Array.from(state.selectedEmails);
+
+      const btn = document.getElementById('confirmBroadcastSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending Broadcast...';
+      document.getElementById('emailConfirmModal').classList.add('saving-active');
+
+      try {
+        const res = await api.request('/api/admin/send-email', {
+          method: 'POST',
+          body: JSON.stringify({
+            recipients,
+            subject,
+            body,
+            isTest: false
+          })
+        });
+
+        showToast('Broadcast successfully sent to ' + res.sentCount + ' recipients!');
+        document.getElementById('emailConfirmModal').classList.add('hidden');
+        document.getElementById('emailSubjectInput').value = '';
+        document.getElementById('emailBodyInput').value = '';
+        
+        // Switch to logs subtab to display sent history
+        document.getElementById('subTabLogsBtn').click();
+        await loadEmailCenterData();
+      } catch (err) {
+        alert("Failed sending broadcast: " + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Confirm & Send Now';
+        document.getElementById('emailConfirmModal').classList.remove('saving-active');
+      }
+    });
+
     function renderTable() {
       const hd = document.getElementById('dataHead'), bd = document.getElementById('dataBody');
       const s = state.search.toLowerCase();
       let d = state.data[state.tab];
- 
+
       if (state.tab === 'investors') {
         hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
@@ -449,457 +918,51 @@ let state = {
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
-                \${i.status!=='Cancelled'? \`<button class="btn-action btn-action-deactivate action-btn" data-action="cancel_wd" data-id="\${i.id}">Cancel</button>\` : ''}
+                \${i.status==='Pending'? \`<button class="btn-action btn-action-delete action-btn" data-action="cancel_wd" data-id="\${i.id}">Cancel</button>\` : ''}
               </div>
             </td>
           </tr>\`;
         }).join('');
       } else if (state.tab === 'returns') {
-        hd.innerHTML = \`<tr><th>Date</th><th>Gross %</th><th>Src</th><th>Locked</th><th>Updated</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.year} \${i.month}\`.toLowerCase().includes(s));
+        hd.innerHTML = \`<tr><th>Month</th><th>Year</th><th>Gross Return %</th><th>Created</th><th>Actions</th></tr>\`;
+        d = d.filter(i => !s || \`\${i.month} \${i.year}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month} \${i.year}</td><td>\${i.gross_return_pct}%</td><td>\${i.source}</td><td>\${i.locked?'Yes':'No'}</td><td>\${new Date(i.last_updated).toLocaleDateString()}</td>
+            <td>\${i.month}</td><td>\${i.year}</td><td><div style="font-weight:600">\${i.gross_return_pct}%</div></td>
+            <td>\${i.created_at ? i.created_at.split('T')[0] : ''}</td>
             <td>
               <div class="btn-group">
-                <button class="btn-action btn-action-edit action-btn" data-action="edit_return" data-id="\${i.year}_\${i.month_number}">Edit</button>
+                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
               </div>
             </td>
           </tr>\`).join('');
       } else if (state.tab === 'performance') {
-        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Override</th><th>Updated</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.metric}\`.toLowerCase().includes(s));
+        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th></tr>\`;
         bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.metric}</td><td>\${i.value_pct}%</td><td>\${i.source}</td><td>\${i.is_override?'Yes':'No'}</td><td>\${new Date(i.updated_at).toLocaleDateString()}</td>
-            <td>
-              <div class="btn-group">
-                <button class="btn-action btn-action-edit action-btn" data-action="edit_perf" data-id="\${i.metric}">Edit</button>
-              </div>
-            </td>
+            <td>\${i.metric}</td><td><div style="font-weight:600">\${i.value_pct}%</div></td>
+            <td>\${i.source || ''}</td><td>\${i.last_updated || ''}</td>
           </tr>\`).join('');
       } else if (state.tab === 'snapshots') {
-        hd.innerHTML = \`<tr><th>Date</th><th>Investor</th><th>Account</th><th>Open Bal</th><th>Return %</th><th>Gain</th><th>Close Bal</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.investor_id} \${i.account_id} \${i.month} \${i.year}\`.toLowerCase().includes(s));
+        hd.innerHTML = \`<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>\`;
         bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month} \${i.year}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td>
-            <td>\${money(i.opening_balance)}</td><td>\${i.effective_return_pct}%</td><td>\${money(i.gain_amount)}</td><td>\${money(i.ending_balance)}</td>
+            <td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${i.month}</td><td>\${i.year}</td>
+            <td>\${money(i.ending_balance)}</td><td>\${money(i.net_draw)}</td>
           </tr>\`).join('');
       } else if (state.tab === 'history') {
-        hd.innerHTML = \`<tr><th>Month</th><th>Opening</th><th>Deps/Wds</th><th>Gross %</th><th>Manual Gain</th><th>Total Gain</th><th>Draw</th><th>Ending</th><th>Action</th></tr>\`;
-        if(!state.filterInvestor) {
-          bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px">
-            <div class="muted" style="margin-bottom:12px">Select an investor and year to manage history:</div>
-            <div style="display:flex;justify-content:center;gap:10px;">
-              <select id="histInvSel" style="max-width:200px">\${state.data.investors.map(i => \`<option value="\${i.id}">\${i.first_name} \${i.last_name}</option>\`).join('')}</select>
-              <input id="histYearSel" type="number" value="\${state.filterYear}" style="width:100px" />
-              <button onclick="state.filterInvestor=document.getElementById('histInvSel').value; state.filterYear=document.getElementById('histYearSel').value; loadTab('history')">Load History</button>
-            </div>
-          </td></tr>\`;
-        } else {
-          bd.innerHTML = \`<tr><td colspan="9" style="background:rgba(255,255,255,.02);padding:12px;">
-             <div class="right">
-               <span class="muted">Investor ID: \${state.filterInvestor} | Year: \${state.filterYear}</span>
-               <div class="right">
-                 <button class="secondary" onclick="state.filterInvestor=''; loadTab('history')">Change Investor</button>
-                 <button id="recalcBtn" class="secondary" style="background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.2)">Recalculate Remaining Year</button>
-               </div>
-             </div>
-          </td></tr>\`;
-          bd.innerHTML += d.map(i => \`<tr>
-              <td style="font-weight:600">\${i.month}</td>
-              <td>\${money(i.opening_balance)}</td>
-              <td>+\${money(i.deposits)} / -\${money(i.withdrawals)}</td>
-              <td>\${i.gross_return_pct}%</td>
-              <td>\${i.is_manual ? \`<span style="color:var(--success)">\${money(i.manual_gain_amount)}</span>\` : '<span class="muted">Auto</span>'}</td>
-              <td>\${money(i.ending_balance - (i.opening_balance + i.deposits - i.withdrawals) + i.recurring_draw)}</td>
-              <td>\${money(i.recurring_draw)}</td>
-              <td style="font-weight:600">\${money(i.ending_balance)}</td>
-              <td>
-                <div class="btn-group">
-                  <button class="btn-action btn-action-edit action-btn" data-action="edit_history" data-id="\${i.month_number}">Edit</button>
-                </div>
-              </td>
-            </tr>\`).join('');
-          
-          setTimeout(() => {
-            if(document.getElementById('recalcBtn')) {
-              document.getElementById('recalcBtn').onclick = async () => {
-                 if(!confirm('Recalculate balances from this point forward? Manual entries will be preserved but balances will be cascaded. Ensure you have entered correct Gross Returns for the fund first.')) return;
-                 const rb = document.getElementById('recalcBtn');
-                 rb.disabled = true; rb.textContent = 'Recalculating...';
-                 document.body.classList.add('loading-active');
-                 try { await api.request('/api/admin/historical-data/recalculate', { method:'POST', body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) }); loadTab('history'); }
-                 catch(e) { alert(e.message); }
-                 finally { document.body.classList.remove('loading-active'); if(document.getElementById('recalcBtn')){ rb.disabled=false; rb.textContent='Recalculate Remaining Year'; } }
-              };
-            }
-          }, 0);
-        }
-      }
-
-      if(d.length === 0 && state.tab !== 'history') bd.innerHTML = \`<tr><td colspan="9" style="text-align:center;padding:30px" class="muted">No records found.</td></tr>\`;
-      else if(d.length === 0 && state.tab === 'history' && state.filterInvestor) {
-        bd.innerHTML += \`<tr><td colspan="9" style="text-align:center;padding:60px">
-          <div class="muted" style="margin-bottom:20px; font-size:16px;">No history records found for this investor in \${state.filterYear}.</div>
-          <button type="button" id="initRecalcBtn" style="padding:16px 32px; font-size:16px;">Generate \${state.filterYear} Monthly Rows</button>
-        </td></tr>\`;
+        hd.innerHTML = \`<tr><th>Month</th><th>Year</th><th>Open Bal</th><th>Deposits</th><th>Withdrawals</th><th>Gross %</th><th>End Bal</th><th>Notes</th></tr>\`;
+        bd.innerHTML = d.map(i => \`<tr>
+            <td>\${i.month}</td><td>\${i.year}</td><td>\${money(i.opening_balance)}</td>
+            <td>\${money(i.deposits)}</td><td>\${money(i.withdrawals)}</td><td>\${i.gross_return_pct}%</td>
+            <td><div style="font-weight:600">\${money(i.ending_balance)}</div></td><td>\${i.notes||''}</td>
+          </tr>\`).join('');
+      } else if (state.tab === 'commission_shares') {
+        hd.innerHTML = \`<tr><th>Investor ID</th><th>Account ID</th><th>Recipient</th><th>Share %</th><th>Notes</th></tr>\`;
+        bd.innerHTML = d.map(i => \`<tr>
+            <td>\${i.investor_id}</td><td>\${i.account_id || 'All'}</td>
+            <td><div style="font-weight:600">\${i.recipient_name || i.recipient_id}</div></td>
+            <td>\${i.percent}%</td><td>\${i.notes || ''}</td>
+          </tr>\`).join('');
       }
     }
-
-    document.getElementById('dataBody').onclick = function(e) {
-      const btn = e.target.closest('.action-btn, #initRecalcBtn'); if(!btn) return;
-      const { action, id } = btn.dataset;
-      
-      if (btn.id === 'initRecalcBtn') {
-          handleInitHistory();
-          return;
-      }
-      
-      if(['edit','edit_return','edit_perf','edit_history'].includes(action)) openModal(state.tab, action, id);
-      else if(action==='delete_user') openConfirm(state.tab, action, id);
-      else openConfirm(state.tab, action, id);
-    };
-
-    async function handleInitHistory() {
-      if(!confirm(\`This will initialize the \${state.filterYear} monthly rows for this investor. Proceed?\`)) return;
-      
-      const btn = document.getElementById('initRecalcBtn');
-      const originalText = btn.textContent;
-      btn.disabled = true; btn.textContent = 'Initializing...';
-      showToast('Generating history records. Please wait...');
-      
-      try { 
-        await api.request('/api/admin/historical-data/recalculate', { 
-          method:'POST', 
-          body: JSON.stringify({ investorId: state.filterInvestor, year: state.filterYear, startMonthNumber: 1 }) 
-        }); 
-        showToast('Success! 2026 History has been generated.');
-        loadTab('history'); 
-      }
-      catch(e) { 
-        showToast(\`Error: \${e.message}\`, true);
-        console.error(e);
-      } finally {
-        if(document.getElementById('initRecalcBtn')) {
-          btn.disabled = false; btn.textContent = originalText;
-        }
-      }
-    }
-
-    function openModal(tab, action, id) {
-      document.getElementById('formAction').value = action; document.getElementById('formId').value = id || '';
-      document.getElementById('modalError').textContent = '';
-      
-      let html = '', record = {};
-      if(action.startsWith('edit')) {
-        document.getElementById('modalTitle').textContent = \`Edit Item\`;
-        if(tab === 'returns') { const [y, m] = id.split('_'); record = state.data[tab].find(r => r.year==y && r.month_number==m) || {}; }
-        else if(tab === 'performance') record = state.data[tab].find(r => r.metric == id) || {};
-        else record = state.data[tab].find(r => r.id === id) || {};
-      } else document.getElementById('modalTitle').textContent = \`Add Item\`;
-
-      const getInvOpts = () => state.data.investors.map(i => \`<option value="\${i.id}" \${record.investor_id===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('');
-      const getAccOpts = () => state.data.accounts.map(a => \`<option value="\${a.id}" \${record.account_id===a.id?'selected':''}>\${a.name} - Inv \${a.investor_id}</option>\`).join('');
-
-      if(tab === 'investors') {
-        const primaryAcc = action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {};
-        const rules = primaryAcc.commissionRules || [];
-        html = \`<div class="grid2">
-            <div class="form-group"><label>First Name</label><input id="f_firstName" value="\${record.first_name||''}" required /></div>
-            <div class="form-group"><label>Last Name</label><input id="f_lastName" value="\${record.last_name||''}" required /></div>
-            <div class="form-group"><label>Email</label><input id="f_email" type="email" value="\${record.email||''}" /></div>
-            <div class="form-group"><label>Portal Username</label><input id="f_portalUsername" value="\${record.portal_username||''}" required /></div>
-            <div class="form-group"><label>Role</label><select id="f_role"><option \${record.role==='Investor'?'selected':''}>Investor</option><option \${record.role==='Admin'?'selected':''}>Admin</option></select></div>
-            <div class="form-group"><label>Temp Password</label><input id="f_tempPassword" placeholder="Leave blank to keep" /></div>
-            <div class="form-group"><label>Monthly Draw</label><input id="f_monthlyDraw" type="number" step="1" value="\${record.monthly_draw||0}" required /></div>
-            <div class="form-group"><label>Start Date</label><input id="f_startDate" type="date" value="\${record.start_date||''}" required /></div>
-          </div>
-          
-          <h3 style="margin-top:20px;border-bottom:1px solid var(--line);padding-bottom:8px;font-size:15px;color:var(--text);">Linked Account Details</h3>
-          <div class="grid2">
-            <div class="form-group"><label>Account ID</label><input id="f_accountId" value="\${primaryAcc.id||''}" placeholder="Auto-generated if blank" \${action==='edit'?'readonly':''} /></div>
-            <div class="form-group"><label>Account Name</label><input id="f_name" value="\${primaryAcc.name||''}" required /></div>
-            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="\${primaryAcc.starting_capital||0}" required /></div>
-            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="\${primaryAcc.total_cash_in||primaryAcc.starting_capital||0}" required /></div>
-          </div>
-          <div class="grid2">
-            <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;"><input type="checkbox" id="f_isCommission" style="width:auto; transform:scale(1.2);" \${primaryAcc.is_commission ? 'checked' : ''} /><label style="margin:0; font-size:15px; color:var(--text);">Is Commission Account?</label></div>
-            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="\${primaryAcc.split_pct !== undefined ? primaryAcc.split_pct : 100}" required /></div>
-          </div>
-          <div id="commissionDistributionContainer" style="margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <h4 style="margin:0;">Commission Distribution</h4>
-              <div id="commissionStatus" class="badge pending">Calculating...</div>
-            </div>
-            <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
-            <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
-          </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
-      } else if (tab === 'accounts') {
-        html = \`<div class="form-group"><label>Account ID</label><input id="f_id" value="\${record.id||''}" placeholder="Leave blank to auto-generate" /></div>
-          <div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account Name</label><input id="f_name" value="\${record.name||''}" required /></div>
-          <div class="grid2">
-            <div class="form-group"><label>Starting Capital ($)</label><input id="f_startingCapital" type="number" step="0.01" value="\${record.starting_capital||0}" required /></div>
-            <div class="form-group"><label>Total Cash In ($ Override)</label><input id="f_totalCashIn" type="number" step="0.01" value="\${record.total_cash_in||record.totalcashin||0}" required /></div>
-          </div>
-          <div class="grid2">
-            <div class="form-group"><label>Open Date</label><input id="f_openDate" type="date" value="\${record.open_date||''}" required /></div>
-            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Active'?'selected':''}>Active</option><option \${record.status==='Closed'?'selected':''}>Closed</option></select></div>
-          </div>
-          <div class="grid2">
-            <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;"><input type="checkbox" id="f_isCommission" style="width:auto; transform:scale(1.2);" \${record.is_commission ? 'checked' : ''} /><label style="margin:0; font-size:15px; color:var(--text);">Is Commission Account?</label></div>
-            <div class="form-group"><label>Split %</label><input id="f_splitPct" type="number" step="0.1" value="\${record.split_pct !== undefined ? record.split_pct : 100}" required /></div>
-          </div>
-          <div id="commissionDistributionContainer" style="margin-top:8px; margin-bottom: 16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,0.02);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <h4 style="margin:0;">Commission Distribution</h4>
-              <div id="commissionStatus" class="badge pending">Calculating...</div>
-            </div>
-            <div id="commissionRows" style="display:flex; flex-direction:column; gap:8px;"></div>
-            <button type="button" class="secondary" id="addCommissionBtn" style="margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Recipient</button>
-          </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
-      } else if (tab === 'deposits' || tab === 'withdrawals') {
-        html = \`<div class="form-group"><label>Investor</label><select id="f_investorId" required>\${getInvOpts()}</select></div>
-          <div class="form-group"><label>Account</label><select id="f_accountId" required>\${getAccOpts()}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="f_amount" type="number" step="0.01" value="\${record.amount||0}" required /></div>
-          \${tab==='deposits' ? \`
-            <div class="grid2">
-              <div class="form-group"><label>Date</label><input id="f_date" type="date" value="\${record.date||''}" required /></div>
-              <div class="form-group"><label>Type</label><select id="f_type"><option \${record.type==='Deposit'?'selected':''}>Deposit</option><option \${record.type==='Initial'?'selected':''}>Initial</option><option \${record.type==='VOID'?'selected':''}>VOID</option></select></div>
-            </div>
-          \` : \`
-            <div class="grid2">
-            <div class="form-group"><label>Request Date</label><input id="f_requestDate" type="date" value="\${record.request_date||''}" required /></div>
-              <div class="form-group"><label>Eff. Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required /></div>
-              <div class="form-group"><label>Month Name</label>
-                <select id="f_month" required>
-                  <option value="" disabled \${!record.month?'selected':''}>Select Month</option>
-                  \${MONTHS.map(m => \`<option value="\${m}" \${record.month===m?'selected':''}>\${m}</option>\`).join('')}
-                </select>
-              </div>
-              <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
-            </div>
-            <div class="form-group"><label>Status</label><select id="f_status"><option \${record.status==='Pending'?'selected':''}>Pending</option><option \${record.status==='Approved'?'selected':''}>Approved</option><option \${record.status==='Completed'?'selected':''}>Completed</option><option \${record.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
-          \`}
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
-      } else if (tab === 'returns') {
-        html = \`<div class="grid2">
-            <div class="form-group"><label>Year</label><input id="f_year" type="number" value="\${record.year||new Date().getFullYear()}" required \${action==='edit_return'?'readonly':''} /></div>
-            <div class="form-group"><label>Month Name</label>
-              <select id="f_month" required \${action==='edit_return'?'disabled':''}>
-                <option value="" disabled \${!record.month?'selected':''}>Select Month</option>
-                \${MONTHS.map(m => \`<option value="\${m}" \${record.month===m?'selected':''}>\${m}</option>\`).join('')}
-              </select>
-            </div>
-            <div class="form-group"><label>Month (1-12)</label><input id="f_monthNumber" type="number" min="1" max="12" value="\${record.month_number||''}" required readonly style="background:rgba(255,255,255,0.02); opacity:0.7;" /></div>
-            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="\${record.gross_return_pct||0}" required /></div>
-            <div class="form-group"><label>Source</label><select id="f_source"><option \${record.source==='Manual'?'selected':''}>Manual</option><option \${record.source==='Myfxbook'?'selected':''}>Myfxbook</option></select></div>
-            <div class="form-group"><label>Locked</label><select id="f_locked"><option value="false" \${!record.locked?'selected':''}>No</option><option value="true" \${record.locked?'selected':''}>Yes</option></select></div>
-          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
-      } else if (tab === 'performance') {
-        html = \`<div class="form-group"><label>Metric</label><input id="f_metric" value="\${record.metric}" readonly /></div>
-          <div class="form-group"><label>Value %</label><input id="f_valuePct" type="number" step="0.01" value="\${record.value_pct}" required /></div>
-          <div class="grid2">
-             <div class="form-group"><label>Source</label><input id="f_source" value="\${record.source||''}" /></div>
-             <div class="form-group"><label>Is Override</label><select id="f_isOverride"><option value="true" \${record.is_override?'selected':''}>Yes</option><option value="false" \${!record.is_override?'selected':''}>No</option></select></div>
-          </div><div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>\`;
-      } else if (tab === 'history') {
-        record = state.data[tab].find(r => r.month_number == id) || {};
-        html = \`<div class="grid2">
-            <div class="form-group"><label>Month</label><input value="\${record.month}" readonly /></div>
-            <div class="form-group"><label>Opening Balance ($)</label><input id="f_openingBalance" type="number" step="0.01" value="\${record.opening_balance}" required /></div>
-            <div class="form-group"><label>Deposits ($)</label><input id="f_deposits" type="number" step="0.01" value="\${record.deposits}" /></div>
-            <div class="form-group"><label>Withdrawals ($)</label><input id="f_withdrawals" type="number" step="0.01" value="\${record.withdrawals}" /></div>
-            <div class="form-group"><label>Recurring Draw ($)</label><input id="f_recurringDraw" type="number" step="0.01" value="\${record.recurring_draw}" /></div>
-            <div class="form-group"><label>Gross Return %</label><input id="f_grossReturnPct" type="number" step="0.001" value="\${record.gross_return_pct}" /></div>
-            <div class="form-group"><label>Manual Gain ($ Override)</label><input id="f_manualGainAmount" type="number" step="0.01" value="\${record.manual_gain_amount||''}" placeholder="Leave blank for auto" /></div>
-            <div class="form-group"><label>Manual Return % Override</label><input id="f_manualReturnPct" type="number" step="0.001" value="\${record.manual_return_pct||''}" placeholder="Leave blank for auto" /></div>
-          </div>
-          <div class="form-group"><label>Notes</label><textarea id="f_notes" rows="2">\${record.notes||''}</textarea></div>
-          <div class="muted" style="margin-top:10px;font-size:12px">Note: Saving will mark this month as manual and update the ending balance. Use "Recalculate Forward" afterward to cascade balances.</div>\`;
-      }
-
-      document.getElementById('dynamicFormFields').innerHTML = html;
-      document.getElementById('entityModal').classList.remove('hidden');
-
-      if (tab === 'investors' || tab === 'accounts') {
-        const primaryAcc = tab === 'investors' ? (action === 'edit' ? (state.data.accounts.find(a => a.investor_id === record.id) || {}) : {}) : record;
-        const rules = primaryAcc.commissionRules || [];
-        const rowsContainer = document.getElementById('commissionRows');
-        const addBtn = document.getElementById('addCommissionBtn');
-        const splitInput = document.getElementById('f_splitPct');
-        const statusEl = document.getElementById('commissionStatus');
-        
-        const updateStatus = () => {
-          let split = parseFloat(splitInput.value) || 0;
-          let sumCommissions = 0;
-          document.querySelectorAll('.comm-row-pct').forEach(inp => sumCommissions += (parseFloat(inp.value)||0));
-          let total = split + sumCommissions;
-          
-          if (Math.abs(total - 100) < 0.01) {
-             statusEl.className = 'badge active'; statusEl.textContent = '100% Allocated';
-             document.getElementById('saveEntityBtn').disabled = false;
-          } else {
-             statusEl.className = 'badge inactive'; statusEl.textContent = \`Total: \${total.toFixed(1)}% (Needs 100%)\`;
-             document.getElementById('saveEntityBtn').disabled = true;
-          }
-          const rowCount = document.querySelectorAll('.comm-row').length;
-          addBtn.style.display = rowCount >= 4 ? 'none' : 'inline-block';
-        };
-
-        const addRow = (recipientId = '', pct = '') => {
-          if (document.querySelectorAll('.comm-row').length >= 4) return;
-          const div = document.createElement('div'); div.className = 'comm-row right';
-          div.innerHTML = \`
-            <select class="comm-row-user" required style="flex:1; padding:8px; font-size:13px;">
-              <option value="" disabled \${!recipientId?'selected':''}>Select User</option>
-              \${state.data.investors.map(i => \`<option value="\${i.id}" \${recipientId===i.id?'selected':''}>\${i.first_name} \${i.last_name} (\${i.id})</option>\`).join('')}
-            </select>
-            <input class="comm-row-pct" type="number" step="0.1" placeholder="%" value="\${pct}" required style="width:80px; padding:8px; font-size:13px;" />
-            <button type="button" class="danger remove-comm-btn" style="padding:8px 12px; font-size:13px;">✕</button>
-          \`;
-          rowsContainer.appendChild(div);
-          div.querySelector('.remove-comm-btn').onclick = () => { div.remove(); updateStatus(); };
-          div.querySelector('.comm-row-pct').oninput = updateStatus;
-          updateStatus();
-        };
-
-        rules.forEach(r => addRow(r.recipient_id, r.percent));
-        addBtn.onclick = () => addRow();
-        splitInput.oninput = updateStatus;
-        updateStatus();
-
-        if (tab === 'investors' && action === 'add') {
-          const fName = document.getElementById('f_firstName');
-          const lName = document.getElementById('f_lastName');
-          const usernameInp = document.getElementById('f_portalUsername');
-          const accNameInp = document.getElementById('f_name');
-          const startCapInp = document.getElementById('f_startingCapital');
-          const cashInInp = document.getElementById('f_totalCashIn');
-          
-          const updateDefaults = () => {
-            const first = fName.value.trim();
-            const last = lName.value.trim();
-            
-            if (first || last) {
-              accNameInp.value = [first, last].filter(Boolean).join(' ') + ' Main Account';
-              if (first) {
-                usernameInp.value = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
-              }
-            }
-          };
-
-          const updateCashIn = () => {
-            cashInInp.value = startCapInp.value;
-          };
-          
-          fName.addEventListener('input', updateDefaults);
-          lName.addEventListener('input', updateDefaults);
-          startCapInp.addEventListener('input', updateCashIn);
-        }
-      }
-
-      // Sync Month Number when Month Name changes
-      const monthSel = document.getElementById('f_month');
-      const monthNumInp = document.getElementById('f_monthNumber');
-      if (monthSel && monthNumInp) {
-        monthSel.onchange = () => {
-          const idx = MONTHS.indexOf(monthSel.value);
-          if (idx !== -1) monthNumInp.value = idx + 1;
-        };
-        // Trigger once if adding
-        if (action === 'add' && !monthSel.value) {
-            const curMonth = new Date().getMonth();
-            monthSel.value = MONTHS[curMonth];
-            monthNumInp.value = curMonth + 1;
-        }
-      }
-
-      // Link Investor and Account
-      const invSel = document.getElementById('f_investorId');
-      const accSel = document.getElementById('f_accountId');
-      if (invSel && accSel) {
-        const updateAccounts = (investorId, selectedAccId) => {
-          const filtered = state.data.accounts.filter(a => a.investor_id === investorId);
-          accSel.innerHTML = \`<option value="" disabled \${!selectedAccId?'selected':''}>Select Account</option>\` + 
-            filtered.map(a => \`<option value="\${a.id}" \${selectedAccId===a.id?'selected':''}>\${a.name} (\${a.id})</option>\`).join('');
-          
-          if (!selectedAccId && filtered.length > 0) {
-            accSel.value = filtered[0].id;
-          }
-        };
-
-        invSel.onchange = () => updateAccounts(invSel.value);
-        accSel.onchange = () => {
-          const acc = state.data.accounts.find(a => a.id === accSel.value);
-          if (acc && invSel.value !== acc.investor_id) {
-            invSel.value = acc.investor_id;
-          }
-        };
-
-        // Initialize if editing or if investor already selected
-        if (invSel.value) updateAccounts(invSel.value, record.account_id);
-      }
-    }
-
-    function openConfirm(tab, action, id) {
-      state.targetContext = tab; state.targetAction = action; state.targetId = id;
-      document.getElementById('statusModalTitle').textContent = 'Confirm Action';
-      document.getElementById('statusModalText').textContent = \`Are you sure you want to \${action.replace('_',' ')} record \${id}?\`;
-      document.getElementById('statusModal').classList.remove('hidden');
-    }
-
-    document.getElementById('entityForm').addEventListener('submit', async (e) => {
-       e.preventDefault();
-       const btn = document.getElementById('saveEntityBtn'), err = document.getElementById('modalError');
-       const action = document.getElementById('formAction').value, id = document.getElementById('formId').value;
-       const tab = state.tab; let payload = {}; err.textContent = ''; btn.disabled = true; btn.textContent = 'Saving...';
-       document.getElementById('entityModal').classList.add('saving-active');
-
-       try {
-         const fields = ['id', 'firstName', 'lastName', 'email', 'portalUsername', 'role', 'tempPassword', 'splitPct', 'monthlyDraw', 'startDate', 'startingCapital', 'totalCashIn', 'notes', 'investorId', 'name', 'openDate', 'status', 'accountId', 'amount', 'date', 'type', 'requestDate', 'year', 'monthNumber', 'month', 'grossReturnPct', 'source', 'locked', 'valuePct', 'isOverride', 'metric', 'openingBalance', 'deposits', 'withdrawals', 'recurringDraw', 'manualGainAmount', 'manualReturnPct', 'isCommission'];
-         fields.forEach(f => {
-           const el = document.getElementById('f_'+f);
-           if(el) {
-              let v = el.type === 'checkbox' ? el.checked : el.value;
-              if (el.type !== 'checkbox' && v === '') return;
-              if (el.tagName === 'SELECT' && (v==='true'||v==='false')) v = (v==='true');
-              payload[f] = v;
-           }
-         });
-         
-         if (tab === 'investors' || tab === 'accounts') {
-            payload.commissionRules = [];
-            document.querySelectorAll('.comm-row').forEach(row => {
-               const rec = row.querySelector('.comm-row-user').value;
-               const pct = parseFloat(row.querySelector('.comm-row-pct').value);
-               if (rec && !isNaN(pct)) payload.commissionRules.push({ recipientId: rec, percent: pct });
-            });
-         }
-
-         let endpoint = '', method = action.startsWith('edit') ? 'PATCH' : 'POST';
-         if(tab==='investors') endpoint = \`/api/admin/investors\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='accounts') endpoint = \`/api/admin/accounts\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='deposits') endpoint = \`/api/admin/deposits\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='withdrawals') endpoint = \`/api/admin/withdrawals\${method==='PATCH'?'/'+id:''}\`;
-         else if(tab==='returns') { endpoint = \`/api/admin/monthly-returns\`; }
-         else if(tab==='performance') { endpoint = \`/api/admin/live-performance\`; payload.metric = id; }
-         else if(tab==='history') { 
-           endpoint = \`/api/admin/historical-data\`; 
-           payload.investorId = state.filterInvestor; payload.year = state.filterYear; payload.monthNumber = id;
-           payload.isManual = true;
-         }
-
-         await api.request(endpoint, { method, body: JSON.stringify(payload) });
-         document.getElementById('entityModal').classList.add('hidden');
-         loadTab(tab); 
-       } catch(ex) { 
-         err.textContent = ex.message; 
-         alert('Save Failed: ' + ex.message);
-       } 
-       finally { btn.disabled = false; btn.textContent = 'Save Changes'; document.getElementById('entityModal').classList.remove('saving-active'); }
-    });
 
     document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
        const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
@@ -919,7 +982,6 @@ let state = {
        } catch(ex) { alert('Action Failed: ' + ex.message); } 
        finally { btn.disabled = false; btn.textContent = 'Confirm'; document.getElementById('statusModal').classList.remove('saving-active'); }
     });
-
 
     document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
     document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
