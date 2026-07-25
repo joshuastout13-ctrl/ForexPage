@@ -65,14 +65,49 @@ export default async function handler(req, res) {
       .ilike("source_investor_id", investorId)
       .eq("year", targetYear);
 
-    // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, and Commission Earnings (where investor is recipient)
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commEarnings} ] = await Promise.all([
+    // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, Commission Rules, and Commission Earnings (where investor is recipient)
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
       supabase.from("deposits").select("*").ilike("investor_id", investorId).not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").ilike("investor_id", investorId).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_shares").select("*").ilike("source_investor_id", investorId),
+      supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
       supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
     ]);
+
+    // Build unified commission rules/shares list
+    const unifiedCommRules = [];
+    (commShares || []).forEach(s => {
+      unifiedCommRules.push({
+        id: s.id,
+        source_investor_id: String(s.source_investor_id || s.investor_id || '').trim(),
+        source_account_id: s.source_account_id ? String(s.source_account_id).trim() : null,
+        recipient_investor_id: String(s.recipient_investor_id || s.recipient_id || '').trim(),
+        commission_percent: Number(s.commission_percent || s.percent || 0),
+        effective_start_date: s.effective_start_date || '2000-01-01',
+        effective_end_date: s.effective_end_date || null,
+        status: String(s.status || 'active').toLowerCase()
+      });
+    });
+
+    (commRules || []).forEach(r => {
+      const srcId = String(r.source_investor_id || r.investor_id || r.investorid || '').trim();
+      const recId = String(r.recipient_investor_id || r.recipient_id || r.recipientid || '').trim();
+      const accId = r.source_account_id || r.account_id || r.accountid;
+      const pct = Number(r.commission_percent || r.percent || 0);
+      if (srcId && recId && pct > 0) {
+        unifiedCommRules.push({
+          id: r.id,
+          source_investor_id: srcId,
+          source_account_id: accId ? String(accId).trim() : null,
+          recipient_investor_id: recId,
+          commission_percent: pct,
+          effective_start_date: r.effective_start_date || r.created_at || r.createdat || '2000-01-01',
+          effective_end_date: r.effective_end_date || null,
+          status: String(r.status || 'active').toLowerCase()
+        });
+      }
+    });
 
     // Map data by month and account
     const depsByM = {}; 
@@ -158,27 +193,44 @@ export default async function handler(req, res) {
 
         const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? new Decimal(acc.split_pct).div(100) : investorSplit;
         
-        // Order per TASK 3:
-        // 1. prior ending balance (opening)
-        // 2. + deposits (deps)
-        // 3. - approved/completed withdrawals (wds)
-        // 4. apply gross return x split %
-        // 5. - recurring draw
         const adjStart = opening.add(deps).sub(wds);
         const totalProfit = adjStart.mul(grossPct.div(100));
         const gain = totalProfit.mul(split);
 
         // Process commissions for this account
-        const monthStart = new Date(Date.UTC(targetYear, m - 1, 1));
+        const monthStart = new Date(Date.UTC(targetYear, m - 1, 1, 0, 0, 0));
+        const monthEnd = new Date(Date.UTC(targetYear, m, 0, 23, 59, 59));
         
-        const activeShares = (commShares || []).filter(share => {
-          if (share.status === 'cancelled') return false;
-          if (share.source_account_id && share.source_account_id !== acc.id) return false;
+        const activeShares = (unifiedCommRules || []).filter(share => {
+          if (share.status === 'cancelled' || share.status === 'inactive' || share.status === 'ended') return false;
           
-          const shareStart = new Date(share.effective_start_date);
-          const shareEnd = share.effective_end_date ? new Date(share.effective_end_date) : null;
+          if (share.source_account_id) {
+            const sAcc = String(share.source_account_id).trim().toLowerCase();
+            const aAcc = String(acc.id).trim().toLowerCase();
+            const aName = String(acc.name || '').trim().toLowerCase();
+            if (sAcc !== aAcc && sAcc !== aName) return false;
+          }
           
-          return monthStart >= shareStart && (!shareEnd || monthStart <= shareEnd);
+          let shareStart = null;
+          if (share.effective_start_date) {
+            const parts = String(share.effective_start_date).split('T')[0].split('-');
+            if (parts.length === 3) {
+              shareStart = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0));
+            }
+          }
+          
+          let shareEnd = null;
+          if (share.effective_end_date) {
+            const parts = String(share.effective_end_date).split('T')[0].split('-');
+            if (parts.length === 3) {
+              shareEnd = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59));
+            }
+          }
+
+          const isStartValid = !shareStart || shareStart <= monthEnd;
+          const isEndValid = !shareEnd || shareEnd >= monthStart;
+          
+          return isStartValid && isEndValid;
         });
 
         if (totalProfit.gt(0) && activeShares.length > 0) {
