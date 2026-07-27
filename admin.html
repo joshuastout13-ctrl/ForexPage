@@ -1300,8 +1300,7 @@ let state = {
 
       try {
         const text = await file.text();
-        const lines = text.split('
-').map(l => l.split(',').map(c => c.trim()));
+        const lines = text.split('\n').map(l => l.split(',').map(c => c.trim()));
         const header = lines[0];
         const rows = lines.slice(1).filter(l => l.length > 1).map(l => {
           let r = { investor_id: state.filterInvestor };
