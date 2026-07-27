@@ -37,7 +37,8 @@
     .badge.pending{background:rgba(234,179,8,0.15);color:var(--warning)}
     .badge.partial{background:rgba(234,179,8,0.15);color:var(--warning)}
 
-    .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); display:flex; justify-content:center; align-items:flex-start; padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh; }
+    .modal-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); display:flex; justify-content:center; align-items:flex-start; padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh; transition:opacity 0.2s ease; }
+    .modal-overlay.hidden{ display:none !important; opacity:0; pointer-events:none; visibility:hidden; }
     .modal{ background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; width:100%; max-width:600px; box-shadow:0 20px 40px rgba(0,0,0,.4); }
     .form-group{margin-bottom:16px;}
     .form-group label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;}
@@ -573,9 +574,10 @@ let state = {
           if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
              const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
           }
-          if (['deposits', 'withdrawals'].includes(tab) && state.data.accounts.length===0) {
+          if (state.data.accounts.length===0) {
              const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
           }
+          updateSummaryCards();
           renderTable();
         }
       } catch(e) { alert('Failed to load data: ' + e.message); } 
@@ -1040,6 +1042,211 @@ let state = {
       }
     }
 
+    function updateSummaryCards() {
+      const accounts = state.data.accounts || [];
+      const activeAccounts = accounts.filter(a => String(a.status || 'Active').toLowerCase() === 'active');
+      const totalValue = activeAccounts.reduce((sum, a) => {
+        const bal = a.current_balance !== undefined ? Number(a.current_balance) : Number(a.starting_capital || 0);
+        return sum + (isNaN(bal) ? 0 : bal);
+      }, 0);
+      
+      const valEl = document.getElementById('totalPlatformValue');
+      const accEl = document.getElementById('totalPlatformAccounts');
+      if (valEl) valEl.textContent = money(totalValue);
+      if (accEl) accEl.textContent = activeAccounts.length;
+    }
+
+    function openModal(tab, action, id = null) {
+      const modal = document.getElementById('entityModal');
+      const title = document.getElementById('modalTitle');
+      const fields = document.getElementById('dynamicFormFields');
+      const formAction = document.getElementById('formAction');
+      const formId = document.getElementById('formId');
+      const errorEl = document.getElementById('modalError');
+      if (errorEl) errorEl.textContent = '';
+      
+      formAction.value = action;
+      formId.value = id || '';
+      
+      let item = null;
+      if (action === 'edit' && id) {
+        const list = state.data[tab] || [];
+        item = list.find(i => String(i.id || '').toLowerCase() === String(id).toLowerCase()) || null;
+      }
+
+      title.textContent = (action === 'add' ? 'Add New ' : 'Edit ') + (
+        tab === 'investors' ? 'Investor' :
+        tab === 'accounts' ? 'Account' :
+        tab === 'deposits' ? 'Deposit' :
+        tab === 'withdrawals' ? 'Withdrawal' :
+        tab === 'returns' ? 'Monthly Return' : 'Item'
+      );
+
+      let html = '';
+      if (tab === 'investors') {
+        html = `
+          <div class="form-group"><label>First Name</label><input id="field_first_name" value="${item ? escapeHtml(item.first_name || item.firstname || '') : ''}" required /></div>
+          <div class="form-group"><label>Last Name</label><input id="field_last_name" value="${item ? escapeHtml(item.last_name || item.lastname || '') : ''}" required /></div>
+          <div class="form-group"><label>Email</label><input id="field_email" type="email" value="${item ? escapeHtml(item.email || '') : ''}" required /></div>
+          <div class="form-group"><label>Portal Username</label><input id="field_portal_username" value="${item ? escapeHtml(item.portal_username || item.portalusername || '') : ''}" required /></div>
+          ${action === 'add' ? '<div class="form-group"><label>Initial Password</label><input id="field_password" type="password" placeholder="Leave blank to auto-generate" /></div>' : ''}
+          <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
+          <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
+        `;
+      } else if (tab === 'accounts') {
+        const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
+        html = `
+          <div class="form-group"><label>Investor</label><select id="field_investor_id" required>${invOptions}</select></div>
+          <div class="form-group"><label>Account Name</label><input id="field_name" value="${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>
+          <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${item ? (item.starting_capital || 0) : 0}" required /></div>
+          <div class="form-group"><label>Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct || 100) : 100}" required /></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" ${!item || item.status === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" ${item && item.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
+        `;
+      } else if (tab === 'deposits') {
+        const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
+        html = `
+          <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
+          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : 0}" required /></div>
+          <div class="form-group"><label>Date</label><input id="field_date" type="date" value="${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
+          <div class="form-group"><label>Type</label><select id="field_type"><option value="DEPOSIT" ${!item || item.type === 'DEPOSIT' ? 'selected' : ''}>DEPOSIT</option><option value="VOID" ${item && item.type === 'VOID' ? 'selected' : ''}>VOID</option></select></div>
+        `;
+      } else if (tab === 'withdrawals') {
+        const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
+        html = `
+          <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
+          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : 0}" required /></div>
+          <div class="form-group"><label>Effective Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" ${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" ${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+        `;
+      } else if (tab === 'returns') {
+        html = `
+          <div class="form-group"><label>Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div class="form-group"><label>Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="number" step="0.01" value="${item ? item.gross_return_pct : 0}" required /></div>
+        `;
+      }
+
+      fields.innerHTML = html;
+      modal.classList.remove('hidden');
+    }
+
+    document.getElementById('entityForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('saveEntityBtn');
+      const errorEl = document.getElementById('modalError');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      if (errorEl) errorEl.textContent = '';
+      document.getElementById('entityModal').classList.add('saving-active');
+
+      const action = document.getElementById('formAction').value;
+      const id = document.getElementById('formId').value;
+      const tab = state.tab;
+
+      try {
+        let endpoint = '', method = 'POST', body = {};
+        if (tab === 'investors') {
+          endpoint = action === 'edit' ? `/api/admin/investors/${id}` : '/api/admin/investors';
+          method = action === 'edit' ? 'PUT' : 'POST';
+          body = {
+            firstName: document.getElementById('field_first_name')?.value,
+            lastName: document.getElementById('field_last_name')?.value,
+            email: document.getElementById('field_email')?.value,
+            portalUsername: document.getElementById('field_portal_username')?.value,
+            splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
+            monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0)
+          };
+          if (action === 'add' && document.getElementById('field_password')?.value) {
+            body.password = document.getElementById('field_password').value;
+          }
+        } else if (tab === 'accounts') {
+          endpoint = action === 'edit' ? `/api/admin/accounts/${id}` : '/api/admin/accounts';
+          method = action === 'edit' ? 'PUT' : 'POST';
+          body = {
+            investorId: document.getElementById('field_investor_id')?.value,
+            name: document.getElementById('field_name')?.value,
+            startingCapital: Number(document.getElementById('field_starting_capital')?.value || 0),
+            splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
+            status: document.getElementById('field_status')?.value || 'Active'
+          };
+        } else if (tab === 'deposits') {
+          endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
+          method = action === 'edit' ? 'PUT' : 'POST';
+          body = {
+            accountId: document.getElementById('field_account_id')?.value,
+            amount: Number(document.getElementById('field_amount')?.value || 0),
+            date: document.getElementById('field_date')?.value,
+            type: document.getElementById('field_type')?.value || 'DEPOSIT'
+          };
+        } else if (tab === 'withdrawals') {
+          endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
+          method = action === 'edit' ? 'PUT' : 'POST';
+          body = {
+            accountId: document.getElementById('field_account_id')?.value,
+            amount: Number(document.getElementById('field_amount')?.value || 0),
+            month: document.getElementById('field_month')?.value,
+            year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
+            status: document.getElementById('field_status')?.value || 'Pending'
+          };
+        } else if (tab === 'returns') {
+          endpoint = action === 'edit' ? `/api/admin/monthly-returns/${id}` : '/api/admin/monthly-returns';
+          method = action === 'edit' ? 'PUT' : 'POST';
+          body = {
+            month: document.getElementById('field_month')?.value,
+            year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
+            grossReturnPct: Number(document.getElementById('field_gross_return_pct')?.value || 0)
+          };
+        }
+
+        await api.request(endpoint, { method, body: JSON.stringify(body) });
+        showToast('Saved successfully!');
+        document.getElementById('entityModal').classList.add('hidden');
+        await loadTab(tab);
+      } catch (err) {
+        if (errorEl) errorEl.textContent = err.message || 'Save failed';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Changes';
+        document.getElementById('entityModal').classList.remove('saving-active');
+      }
+    });
+
+    document.getElementById('dataBody').addEventListener('click', (e) => {
+      const btn = e.target.closest('.action-btn');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (!action || !id) return;
+
+      if (action === 'edit') {
+        openModal(state.tab, 'edit', id);
+      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd'].includes(action)) {
+        state.targetContext = state.tab;
+        state.targetAction = action;
+        state.targetId = id;
+
+        const modalTitle = document.getElementById('statusModalTitle');
+        const modalDesc = document.getElementById('statusModalDesc');
+        if (modalTitle) modalTitle.textContent = action.replace('_', ' ').toUpperCase();
+        if (modalDesc) modalDesc.textContent = `Are you sure you want to ${action.replace('_', ' ')} item ID: ${id}?`;
+
+        document.getElementById('statusModal').classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('recalcAllBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('recalcAllBtn');
+      btn.disabled = true; btn.textContent = 'Recalculating...';
+      try {
+        await api.request('/api/admin/accounts');
+        await loadTab(state.tab);
+        showToast('All investor balances recalculated successfully!');
+      } catch(e) {
+        alert('Recalculation failed: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Recalculate ALL Investors';
+      }
+    });
+
     document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
        const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
        document.getElementById('statusModal').classList.add('saving-active');
@@ -1076,6 +1283,7 @@ let state = {
     });
     document.getElementById('statusModal').querySelector('.closeModalBtn').addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
     document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
+    document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); }));
 
     document.getElementById('importBtn').addEventListener('click', () => {
       document.getElementById('importPreview').innerHTML = '';
@@ -1092,7 +1300,8 @@ let state = {
 
       try {
         const text = await file.text();
-        const lines = text.split('\n').map(l => l.split(',').map(c => c.trim()));
+        const lines = text.split('
+').map(l => l.split(',').map(c => c.trim()));
         const header = lines[0];
         const rows = lines.slice(1).filter(l => l.length > 1).map(l => {
           let r = { investor_id: state.filterInvestor };
