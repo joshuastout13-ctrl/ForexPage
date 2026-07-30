@@ -1084,6 +1084,9 @@ let state = {
 
       let html = '';
       if (tab === 'investors') {
+        const primaryAcc = item ? (state.data.accounts || []).find(a => a.investor_id === item.id) : null;
+        const commRules = item && item.commissionRules && item.commissionRules.length > 0 ? item.commissionRules[0] : null;
+        const isComm = primaryAcc ? (primaryAcc.is_commission || primaryAcc.iscommission) : false;
         html = `
           <div class="form-group"><label>First Name</label><input id="field_first_name" value="${item ? escapeHtml(item.first_name || item.firstname || '') : ''}" required /></div>
           <div class="form-group"><label>Last Name</label><input id="field_last_name" value="${item ? escapeHtml(item.last_name || item.lastname || '') : ''}" required /></div>
@@ -1092,6 +1095,26 @@ let state = {
           ${action === 'add' ? '<div class="form-group"><label>Initial Password</label><input id="field_password" type="password" placeholder="Leave blank to auto-generate" /></div>' : ''}
           <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
+          
+          <hr style="border: 1px solid var(--line); margin: 16px 0;" />
+          <h4 style="margin-top:0; margin-bottom:12px;">Primary Account Details (Optional)</h4>
+          <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${primaryAcc ? (primaryAcc.starting_capital || 0) : ''}" placeholder="Optional" /></div>
+          <div class="form-group"><label>Total Cash In ($)</label><input id="field_total_cash_in" type="number" step="0.01" value="${primaryAcc ? (primaryAcc.total_cash_in || '') : ''}" placeholder="Defaults to Starting Capital" /></div>
+          <div class="form-group"><label>Is Commission Account?</label>
+            <select id="field_is_commission" onchange="document.getElementById('commission_options').style.display = this.value === 'true' ? 'block' : 'none'">
+              <option value="false" ${!isComm ? 'selected' : ''}>No</option>
+              <option value="true" ${isComm ? 'selected' : ''}>Yes</option>
+            </select>
+          </div>
+          <div id="commission_options" style="display: ${isComm ? 'block' : 'none'}; padding-left: 10px; border-left: 2px solid var(--primary); margin-bottom: 12px;">
+            <div class="form-group"><label>Commission Recipient</label>
+              <select id="field_commission_recipient">
+                <option value="">Select Recipient...</option>
+                ${(state.data.investors || []).map(inv => `<option value="${inv.id}" ${commRules && commRules.recipient_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Commission %</label><input id="field_commission_percent" type="number" step="0.1" value="${commRules ? commRules.percent : 0}" /></div>
+          </div>
         `;
       } else if (tab === 'accounts') {
         const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
@@ -1147,7 +1170,7 @@ let state = {
         let endpoint = '', method = 'POST', body = {};
         if (tab === 'investors') {
           endpoint = action === 'edit' ? `/api/admin/investors/${id}` : '/api/admin/investors';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             firstName: document.getElementById('field_first_name')?.value,
             lastName: document.getElementById('field_last_name')?.value,
@@ -1159,9 +1182,23 @@ let state = {
           if (action === 'add' && document.getElementById('field_password')?.value) {
             body.password = document.getElementById('field_password').value;
           }
+          
+          const scEl = document.getElementById('field_starting_capital');
+          if (scEl && scEl.value !== "") body.startingCapital = Number(scEl.value);
+          const tciEl = document.getElementById('field_total_cash_in');
+          if (tciEl && tciEl.value !== "") body.totalCashIn = Number(tciEl.value);
+          
+          const isCommEl = document.getElementById('field_is_commission');
+          if (isCommEl) body.isCommission = isCommEl.value === 'true';
+          
+          const crEl = document.getElementById('field_commission_recipient');
+          const cpEl = document.getElementById('field_commission_percent');
+          if (body.isCommission && crEl && crEl.value && cpEl && Number(cpEl.value) > 0) {
+            body.commissionRules = [{ recipientId: crEl.value, percent: Number(cpEl.value) }];
+          }
         } else if (tab === 'accounts') {
           endpoint = action === 'edit' ? `/api/admin/accounts/${id}` : '/api/admin/accounts';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             investorId: document.getElementById('field_investor_id')?.value,
             name: document.getElementById('field_name')?.value,
@@ -1171,7 +1208,7 @@ let state = {
           };
         } else if (tab === 'deposits') {
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             accountId: document.getElementById('field_account_id')?.value,
             amount: Number(document.getElementById('field_amount')?.value || 0),
@@ -1180,7 +1217,7 @@ let state = {
           };
         } else if (tab === 'withdrawals') {
           endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             accountId: document.getElementById('field_account_id')?.value,
             amount: Number(document.getElementById('field_amount')?.value || 0),
@@ -1190,7 +1227,7 @@ let state = {
           };
         } else if (tab === 'returns') {
           endpoint = action === 'edit' ? `/api/admin/monthly-returns/${id}` : '/api/admin/monthly-returns';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             month: document.getElementById('field_month')?.value,
             year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
