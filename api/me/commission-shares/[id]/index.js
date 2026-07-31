@@ -1,5 +1,5 @@
-import { parseCookies, verifySession } from "../../../../lib/auth.js";
-import { supabase } from "../../../../lib/supabase.js";
+import { parseCookies, verifySession } from "../../../../../lib/auth.js";
+import { supabase } from "../../../../../lib/supabase.js";
 
 export default async function handler(req, res) {
   try {

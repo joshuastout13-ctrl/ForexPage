@@ -1118,12 +1118,29 @@ let state = {
         `;
       } else if (tab === 'accounts') {
         const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
+        const isComm = item ? (item.is_commission || item.iscommission) : false;
+        const commRules = item && item.commissionRules && item.commissionRules.length > 0 ? item.commissionRules[0] : null;
         html = `
           <div class="form-group"><label>Investor</label><select id="field_investor_id" required>${invOptions}</select></div>
           <div class="form-group"><label>Account Name</label><input id="field_name" value="${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>
           <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${item ? (item.starting_capital || 0) : 0}" required /></div>
           <div class="form-group"><label>Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct || 100) : 100}" required /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" ${!item || item.status === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" ${item && item.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
+          <div class="form-group"><label>Is Commission Account?</label>
+            <select id="field_is_commission_acc" onchange="document.getElementById('commission_options_acc').style.display = this.value === 'true' ? 'block' : 'none'">
+              <option value="false" ${!isComm ? 'selected' : ''}>No</option>
+              <option value="true" ${isComm ? 'selected' : ''}>Yes</option>
+            </select>
+          </div>
+          <div id="commission_options_acc" style="display: ${isComm ? 'block' : 'none'}; padding-left: 10px; border-left: 2px solid var(--primary); margin-bottom: 12px;">
+            <div class="form-group"><label>Commission Recipient</label>
+              <select id="field_commission_recipient_acc">
+                <option value="">Select Recipient...</option>
+                ${(state.data.investors || []).map(inv => `<option value="${inv.id}" ${commRules && commRules.recipient_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Commission %</label><input id="field_commission_percent_acc" type="number" step="0.1" value="${commRules ? commRules.percent : 0}" /></div>
+          </div>
         `;
       } else if (tab === 'deposits') {
         const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
@@ -1166,6 +1183,36 @@ let state = {
       const id = document.getElementById('formId').value;
       const tab = state.tab;
 
+      // Validation for 100% split+commission
+      let isCommVal = false;
+      let sPctVal = 100;
+      let cPctVal = 0;
+      
+      if (tab === 'investors') {
+        const isCommEl = document.getElementById('field_is_commission');
+        if (isCommEl && isCommEl.value === 'true') {
+           isCommVal = true;
+           sPctVal = Number(document.getElementById('field_split_pct')?.value || 100);
+           cPctVal = Number(document.getElementById('field_commission_percent')?.value || 0);
+        }
+      } else if (tab === 'accounts') {
+        const isCommElAcc = document.getElementById('field_is_commission_acc');
+        if (isCommElAcc && isCommElAcc.value === 'true') {
+           isCommVal = true;
+           sPctVal = Number(document.getElementById('field_split_pct')?.value || 100);
+           cPctVal = Number(document.getElementById('field_commission_percent_acc')?.value || 0);
+        }
+      }
+
+      if (isCommVal) {
+         if (Math.abs(sPctVal + cPctVal - 100) > 0.01) {
+            btn.disabled = false; btn.textContent = 'Save Changes';
+            document.getElementById('entityModal').classList.remove('saving-active');
+            if (errorEl) errorEl.textContent = `Split (${sPctVal}%) and Commission (${cPctVal}%) must equal 100%. Please assign the remaining percentage.`;
+            return;
+         }
+      }
+
       try {
         let endpoint = '', method = 'POST', body = {};
         if (tab === 'investors') {
@@ -1206,6 +1253,15 @@ let state = {
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             status: document.getElementById('field_status')?.value || 'Active'
           };
+          
+          const isCommElAcc = document.getElementById('field_is_commission_acc');
+          if (isCommElAcc) body.isCommission = isCommElAcc.value === 'true';
+          
+          const crElAcc = document.getElementById('field_commission_recipient_acc');
+          const cpElAcc = document.getElementById('field_commission_percent_acc');
+          if (body.isCommission && crElAcc && crElAcc.value && cpElAcc && Number(cpElAcc.value) > 0) {
+            body.commissionRules = [{ recipientId: crElAcc.value, percent: Number(cpElAcc.value) }];
+          }
         } else if (tab === 'deposits') {
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PATCH' : 'POST';
