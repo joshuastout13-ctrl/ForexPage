@@ -20,7 +20,18 @@ export default async function handler(req, res) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return res.status(200).json({ shares: data });
+      
+      const mapped = data.map(i => ({
+        id: i.id,
+        investor_id: i.source_investor_id,
+        account_id: i.source_account_id,
+        recipient_id: i.recipient_investor_id,
+        recipient_name: i.recipient ? (i.recipient.portal_username || i.recipient.first_name || i.recipient_investor_id) : i.recipient_investor_id,
+        percent: i.commission_percent,
+        notes: i.status
+      }));
+      
+      return res.status(200).json({ commission_shares: mapped });
     }
 
     if (req.method === "POST") {

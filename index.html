@@ -807,7 +807,7 @@
         </div>
       `).join("");
 
-      document.getElementById("liveMeta").textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
+      document.getElementById("liveMeta").textContent = `Last sync: ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })} PST`;
     }
 
     function renderMonths(monthlyHistory) {

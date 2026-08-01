@@ -181,9 +181,10 @@ export default async function handler(req, res) {
         const wds = new Decimal((wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0);
         
         // Zero out grossPct for future projected months unless manual
-        const now = new Date();
-        const currentYearIdx = now.getFullYear();
+        const ptString = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+        const now = new Date(ptString);
         const currentMonthIdx = now.getMonth() + 1;
+        const currentYearIdx = now.getFullYear();
         const isPastOrCurrent = (targetYear < currentYearIdx) || (targetYear === currentYearIdx && m <= currentMonthIdx);
         
         let grossPct = isStarted ? new Decimal(fundRetByM[m] || 0) : new Decimal(0);
