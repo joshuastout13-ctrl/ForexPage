@@ -925,7 +925,7 @@ let state = {
       let d = state.data[state.tab];
 
       if (state.tab === 'investors') {
-        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Username</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
+        hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Username</th><th>Password</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.first_name} \${i.last_name} \${i.email}\`.toLowerCase().includes(s));
         d.sort((a, b) => (a.portal_username || '').localeCompare(b.portal_username || ''));
         bd.innerHTML = d.map(i => {
@@ -934,10 +934,12 @@ let state = {
           const startCap = primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A';
           const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A');
           const split = primaryAcc.split_pct !== undefined ? \`\${primaryAcc.split_pct}%\` : \`\${i.split_pct}%\`;
+          const pass = i.temp_password || i.password || i.temppasswordprototypeonly || '••••••••';
           
           return \`<tr>
             <td><span class="badge \${stClass}">\${i.active?'Active':'Inactive'}</span></td>
             <td>\${i.id}</td><td>\${i.portal_username}</td>
+            <td><code style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-family:monospace;">\${escapeHtml(pass)}</code></td>
             <td>\${startCap}</td><td><div style="font-weight:600">\${currBal}</div></td>
             <td>\${split}</td><td>\${money(i.monthly_draw)}</td>
             <td>
@@ -950,7 +952,6 @@ let state = {
           </tr>\`;
         }).join('');
       } else if (state.tab === 'accounts') {
-        hd.innerHTML = \`<tr><th>Status</th><th>Acc ID</th><th>Investor ID</th><th>Name</th><th>Capital</th><th>Comm</th><th>Date</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.name}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => \`<tr>
             <td><span class="badge \${i.status==='Active'?'active':'inactive'}">\${i.status}</span></td>
@@ -1085,7 +1086,7 @@ let state = {
           <div class="form-group"><label>Last Name</label><input id="field_last_name" value="\${item ? escapeHtml(item.last_name || item.lastname || '') : ''}" required /></div>
           <div class="form-group"><label>Email</label><input id="field_email" type="email" value="\${item ? escapeHtml(item.email || '') : ''}" required /></div>
           <div class="form-group"><label>Portal Username</label><input id="field_portal_username" value="\${item ? escapeHtml(item.portal_username || item.portalusername || '') : ''}" required /></div>
-          \${action === 'add' ? '<div class="form-group"><label>Initial Password</label><input id="field_password" type="password" placeholder="Leave blank to auto-generate" /></div>' : ''}
+          <div class="form-group"><label>Password</label><input id="field_password" value="\${item ? escapeHtml(item.temp_password || item.password || item.temppasswordprototypeonly || '') : ''}" placeholder="\${action === 'add' ? 'Leave blank to auto-generate' : 'Enter new password or leave unchanged'}" /></div>
           <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="\${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="\${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
         \`;
@@ -1144,6 +1145,7 @@ let state = {
         if (tab === 'investors') {
           endpoint = action === 'edit' ? \`/api/admin/investors/\${id}\` : '/api/admin/investors';
           method = action === 'edit' ? 'PUT' : 'POST';
+          const passVal = document.getElementById('field_password')?.value;
           body = {
             firstName: document.getElementById('field_first_name')?.value,
             lastName: document.getElementById('field_last_name')?.value,
@@ -1152,8 +1154,9 @@ let state = {
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0)
           };
-          if (action === 'add' && document.getElementById('field_password')?.value) {
-            body.password = document.getElementById('field_password').value;
+          if (passVal) {
+            body.password = passVal;
+            body.tempPassword = passVal;
           }
         } else if (tab === 'accounts') {
           endpoint = action === 'edit' ? \`/api/admin/accounts/\${id}\` : '/api/admin/accounts';

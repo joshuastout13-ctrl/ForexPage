@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     // 1. Fetch all investors
     const { data: investors, error: invErr } = await supabase
       .from("investors")
-      .select("id, split_pct, monthly_draw, start_date");
+      .select("id, portal_username, username, email, split_pct, monthly_draw, start_date");
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
@@ -90,12 +90,19 @@ export default async function handler(req, res) {
         }
       }
 
-      const accounts = allAccounts.filter(a => a.investor_id?.toLowerCase() === investorId.toLowerCase());
+      const sourceIdSet = new Set([
+        investorId,
+        inv.portal_username,
+        inv.username,
+        inv.email
+      ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
+
+      const accounts = allAccounts.filter(a => sourceIdSet.has(String(a.investor_id || '').toLowerCase()));
       
-      const invDeps = allDeps.filter(d => d.investor_id?.toLowerCase() === investorId.toLowerCase());
-      const invWds = allWds.filter(w => w.investor_id?.toLowerCase() === investorId.toLowerCase());
-      const invCommShares = unifiedCommRules.filter(r => r.source_investor_id.toLowerCase() === investorId.toLowerCase());
-      const invCommEarnings = commEarnings.filter(e => e.recipient_id?.toLowerCase() === investorId.toLowerCase());
+      const invDeps = allDeps.filter(d => sourceIdSet.has(String(d.investor_id || '').toLowerCase()));
+      const invWds = allWds.filter(w => sourceIdSet.has(String(w.investor_id || '').toLowerCase()));
+      const invCommShares = unifiedCommRules.filter(r => sourceIdSet.has(r.source_investor_id.toLowerCase()));
+      const invCommEarnings = commEarnings.filter(e => sourceIdSet.has(String(e.recipient_id || '').toLowerCase()));
 
       const depsByMAcc = {};
       invDeps.forEach(d => {

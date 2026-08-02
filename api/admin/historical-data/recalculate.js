@@ -25,10 +25,17 @@ export default async function handler(req, res) {
     // 1. Get Investor split, draw, and start date
     const { data: inv, error: invErr } = await supabase
       .from("investors")
-      .select("split_pct, monthly_draw, start_date")
-      .ilike("id", investorId)
+      .select("id, portal_username, username, email, split_pct, monthly_draw, start_date")
+      .or(`id.eq.${investorId},portal_username.ilike.${investorId},username.ilike.${investorId},email.ilike.${investorId}`)
       .single();
     if (invErr) throw invErr;
+
+    const sourceIdSet = new Set([
+      inv.id,
+      inv.portal_username,
+      inv.username,
+      inv.email
+    ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
     const investorSplit = new Decimal(inv.split_pct || 100).div(100);
     const draw = new Decimal(inv.monthly_draw || 0);
@@ -45,7 +52,7 @@ export default async function handler(req, res) {
     const { data: accounts, error: accsErr } = await supabase
       .from("investor_accounts")
       .select("*")
-      .eq("investor_id", investorId)
+      .in("investor_id", Array.from(sourceIdSet))
       .eq("status", "Active");
     if (accsErr) throw accsErr;
 
@@ -53,7 +60,7 @@ export default async function handler(req, res) {
     const { data: history, error: histErr } = await supabase
       .from("investor_monthly_history")
       .select("*")
-      .eq("investor_id", investorId)
+      .in("investor_id", Array.from(sourceIdSet))
       .eq("year", targetYear)
       .order("month_number", { ascending: true });
     if (histErr) throw histErr;
@@ -62,17 +69,17 @@ export default async function handler(req, res) {
     await supabase
       .from("commission_earnings")
       .delete()
-      .ilike("source_investor_id", investorId)
+      .in("source_investor_id", Array.from(sourceIdSet))
       .eq("year", targetYear);
 
     // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, Commission Rules, and Commission Earnings (where investor is recipient)
     const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
-      supabase.from("deposits").select("*").ilike("investor_id", investorId).not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").ilike("investor_id", investorId).in("status", ["Approved", "Completed"]),
+      supabase.from("deposits").select("*").in("investor_id", Array.from(sourceIdSet)).not("type", "ilike", "VOID"),
+      supabase.from("withdrawals").select("*").in("investor_id", Array.from(sourceIdSet)).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
-      supabase.from("commission_shares").select("*").ilike("source_investor_id", investorId),
-      supabase.from("commission_rules").select("*").ilike("investor_id", investorId),
-      supabase.from("commission_earnings").select("*").ilike("recipient_id", investorId).eq("year", targetYear)
+      supabase.from("commission_shares").select("*").in("source_investor_id", Array.from(sourceIdSet)),
+      supabase.from("commission_rules").select("*").in("investor_id", Array.from(sourceIdSet)),
+      supabase.from("commission_earnings").select("*").in("recipient_id", Array.from(sourceIdSet)).eq("year", targetYear)
     ]);
 
     // Build unified commission rules/shares list

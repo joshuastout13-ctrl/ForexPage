@@ -47,7 +47,7 @@ export default async function handler(req, res) {
         last_name: body.lastName || "",
         email: body.email || "",
         portal_username: body.portalUsername || newId,
-        temp_password: body.tempPassword || "",
+        temp_password: body.tempPassword || body.password || "",
         active: body.active !== false, // Default true
         split_pct: splitPct,
         monthly_draw: Number(body.monthlyDraw || 0),

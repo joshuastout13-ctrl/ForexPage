@@ -35,8 +35,9 @@ export default async function handler(req, res) {
       // Skip inactive investors
       if (!bool(row.active ?? row.Active)) return false;
 
-      const rowUser = String(row.portalusername ?? row.username ?? "").trim().toLowerCase();
+      const rowUser = String(row.portal_username ?? row.portalusername ?? row.username ?? "").trim().toLowerCase();
       const rowPass = String(
+        row.temp_password ?? 
         row.temppassword ?? 
         row.password ?? 
         row.temppasswordprototypeonly ?? 
@@ -54,12 +55,12 @@ export default async function handler(req, res) {
     console.log(`[Login] Successful login for: "${username}"`);
 
     const investorId = String(
-      investor.investorid ?? 
       investor.id ?? 
+      investor.investorid ?? 
+      investor.portal_username ?? 
       investor.portalusername ?? 
-      investor.investorsinvestorid ?? 
       ""
-    ).trim().toLowerCase();
+    ).trim();
 
     const token = createSession({ investorId });
     res.setHeader("Set-Cookie", sessionCookie(token));

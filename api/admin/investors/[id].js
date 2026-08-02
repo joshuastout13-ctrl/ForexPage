@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: "Missing investor ID" });
 
-  if (req.method === "PATCH") {
+  if (req.method === "PATCH" || req.method === "PUT") {
     try {
       const body = req.body || {};
       const updates = {};
@@ -18,6 +18,7 @@ export default async function handler(req, res) {
       if (body.email !== undefined) updates.email = body.email;
       if (body.portalUsername !== undefined) updates.portal_username = body.portalUsername;
       if (body.tempPassword !== undefined) updates.temp_password = body.tempPassword;
+      if (body.password !== undefined) updates.temp_password = body.password;
       if (body.splitPct !== undefined) updates.split_pct = Number(body.splitPct);
       if (body.monthlyDraw !== undefined) updates.monthly_draw = Number(body.monthlyDraw);
       if (body.startDate !== undefined) updates.start_date = body.startDate;
