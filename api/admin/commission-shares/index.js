@@ -72,33 +72,78 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Find recipient
-      const { data: recipient, error: recErr } = await supabase
+      // Find recipient by id, portal_username, or email
+      let { data: recipient } = await supabase
         .from("investors")
-        .select("id")
-        .or(`portal_username.ilike.${recipientUsername},email.ilike.${recipientUsername},id.eq.${recipientUsername}`)
-        .single();
-        
-      if (recErr || !recipient) {
-        return res.status(404).json({ error: "Recipient not found" });
+        .select("id, portal_username")
+        .eq("id", recipientUsername)
+        .maybeSingle();
+
+      if (!recipient) {
+        const { data: recByUsername } = await supabase
+          .from("investors")
+          .select("id, portal_username")
+          .ilike("portal_username", recipientUsername)
+          .maybeSingle();
+        recipient = recByUsername;
       }
-      
+
+      if (!recipient) {
+        const { data: recByEmail } = await supabase
+          .from("investors")
+          .select("id, portal_username")
+          .ilike("email", recipientUsername)
+          .maybeSingle();
+        recipient = recByEmail;
+      }
+
+      if (!recipient) {
+        return res.status(404).json({ error: "Recipient investor not found" });
+      }
+
       if (recipient.id.toLowerCase() === sourceInvestorId.toLowerCase()) {
         return res.status(400).json({ error: "Cannot share commission with yourself" });
       }
 
-      // Validate total active percentage does not exceed 100%
-      const { data: activeShares, error: activeErr } = await supabase
+      // Look up source investor to get their split_pct
+      let { data: sourceInv } = await supabase
+        .from("investors")
+        .select("id, split_pct, portal_username")
+        .eq("id", sourceInvestorId)
+        .maybeSingle();
+
+      if (!sourceInv) {
+        const { data: srcByUsername } = await supabase
+          .from("investors")
+          .select("id, split_pct, portal_username")
+          .ilike("portal_username", sourceInvestorId)
+          .maybeSingle();
+        sourceInv = srcByUsername;
+      }
+
+      const invSplit = sourceInv ? Number(sourceInv.split_pct || 100) : 100;
+      const maxPool = 100 - invSplit;
+
+      // Validate total active percentage does not exceed available pool
+      const { data: activeShares } = await supabase
         .from("commission_shares")
-        .select("commission_percent")
-        .ilike("source_investor_id", sourceInvestorId)
+        .select("commission_percent, source_investor_id")
         .in("status", ["active", "pending"])
         .is("effective_end_date", null); 
 
-      if (!activeErr && activeShares) {
-        const totalPct = activeShares.reduce((sum, s) => sum + Number(s.commission_percent), 0);
-        if (totalPct + Number(commissionPercent) > 100) {
-          return res.status(400).json({ error: "Total commission sharing exceeds 100%" });
+      if (activeShares && activeShares.length > 0) {
+        const matchingShares = activeShares.filter(s => {
+          const sId = String(s.source_investor_id || '').toLowerCase();
+          return sId === String(sourceInvestorId).toLowerCase() ||
+            (sourceInv && sId === String(sourceInv.id).toLowerCase()) ||
+            (sourceInv && sId === String(sourceInv.portal_username).toLowerCase());
+        });
+        const currentTotalAssigned = matchingShares.reduce((sum, s) => sum + Number(s.commission_percent || 0), 0);
+        
+        if (currentTotalAssigned + Number(commissionPercent) > maxPool + 0.01) {
+          return res.status(400).json({ 
+            error: `Total assigned commission (${(currentTotalAssigned + Number(commissionPercent)).toFixed(2)}%) exceeds available commission pool (${maxPool.toFixed(2)}%) for this investor.` 
+          });
         }
       }
 

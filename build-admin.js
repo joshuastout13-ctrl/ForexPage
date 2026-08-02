@@ -1096,6 +1096,7 @@ let state = {
           }).join('');
 
           const hasShares = g.shares.length > 0;
+          const invIdForAdd = inv.id || g.investor_id;
           return \`
             <tr style="cursor: pointer;" onclick="document.querySelectorAll('.row-group-\${g.investor_id}-\${g.account_id}').forEach(r => r.classList.toggle('hidden'))">
               <td><strong>\${g.investor_id}</strong><br><span class="muted" style="font-size:12px">\${g.account_id}</span></td>
@@ -1103,7 +1104,12 @@ let state = {
               <td>\${commissionPool.toFixed(2)}%</td>
               <td>\${totalAssigned.toFixed(2)}%</td>
               <td><span style="color: \${remaining < 0 ? 'var(--danger)' : remaining === 0 ? 'var(--muted)' : 'var(--success)'}">\${remaining.toFixed(2)}%</span></td>
-              <td>\${hasShares ? \`<button class="btn-action">View Details ▼</button>\` : \`<span class="muted" style="font-size:12px">No shares yet</span>\`}</td>
+              <td>
+                <div class="btn-group" onclick="event.stopPropagation()">
+                  <button class="btn-action btn-action-add-share action-btn" data-action="add_share_for" data-investor="\${invIdForAdd}" data-remaining="\${remaining > 0 ? remaining.toFixed(2) : 10}">+ Assign Share</button>
+                  \${hasShares ? \`<button class="btn-action">Details ▼</button>\` : ''}
+                </div>
+              </td>
             </tr>
             \${subRows}
           \`;
@@ -1125,7 +1131,7 @@ let state = {
       if (accEl) accEl.textContent = activeAccounts.length;
     }
 
-    function openModal(tab, action, id = null) {
+    function openModal(tab, action, id = null, extraData = null) {
       const modal = document.getElementById('entityModal');
       const title = document.getElementById('modalTitle');
       const fields = document.getElementById('dynamicFormFields');
@@ -1200,17 +1206,29 @@ let state = {
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="\${item ? item.gross_return_pct : 0}" required /></div>
         \`;
       } else if (tab === 'commission_shares') {
-        const invOptions = (state.data.investors || []).map(inv => \`<option value="\${inv.id}" \${item && (item.investor_id === inv.id || item.investor_id === inv.portal_username) ? 'selected' : ''}>\${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})</option>\`).join('');
+        const targetSrc = (extraData && extraData.sourceInvestorId) || (item ? item.investor_id : '');
+        const invOptions = (state.data.investors || []).map(inv => {
+          const isSel = (targetSrc && (targetSrc === inv.id || targetSrc === inv.portal_username)) || (item && (item.investor_id === inv.id || item.investor_id === inv.portal_username));
+          return \`<option value="\${inv.id}" \${isSel ? 'selected' : ''}>\${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})</option>\`;
+        }).join('');
+
         let accOptions = \`<option value="">All Accounts</option>\`;
         if (state.data.accounts) {
           accOptions += state.data.accounts.map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${acc.id} (\${acc.investor_id})</option>\`).join('');
         }
+
+        const recOptions = (state.data.investors || []).map(inv => {
+          const isSel = item && (item.recipient_id === inv.id || item.recipient_name === inv.portal_username || item.recipient_id === inv.portal_username);
+          return \`<option value="\${inv.id}" \${isSel ? 'selected' : ''}>\${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})</option>\`;
+        }).join('');
+
+        const defaultPct = (extraData && extraData.defaultPercent !== undefined) ? extraData.defaultPercent : (item ? item.percent : 10);
         
         html = \`
           <div class="form-group"><label>Source Investor</label><select id="field_source_investor_id" required>\${invOptions}</select></div>
           <div class="form-group"><label>Source Account (Optional)</label><select id="field_source_account_id">\${accOptions}</select></div>
-          <div class="form-group"><label>Recipient Username or Email</label><input id="field_recipient_username" value="\${item ? (item.recipient_name || item.recipient_id) : ''}" required \${item ? 'disabled' : ''} placeholder="jdoe" /></div>
-          <div class="form-group"><label>Commission %</label><input id="field_commission_percent" type="number" step="0.1" value="\${item ? item.percent : 10}" required /></div>
+          <div class="form-group"><label>Commission Recipient</label><select id="field_recipient_username" required \${item ? 'disabled' : ''}>\${recOptions}</select></div>
+          <div class="form-group"><label>Commission %</label><input id="field_commission_percent" type="number" step="0.1" value="\${defaultPct}" required /></div>
           <div class="form-group"><label>Effective Start Date</label><input id="field_effective_start_date" type="date" value="\${item && item.effective_start_date ? item.effective_start_date : new Date().toISOString().split('T')[0]}" required /></div>
           <div class="form-group"><label>Effective End Date (Optional)</label><input id="field_effective_end_date" type="date" value="\${item && item.effective_end_date ? item.effective_end_date : ''}" /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="active" \${!item || item.status === 'active' ? 'selected' : ''}>Active</option><option value="cancelled" \${item && item.status === 'cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
@@ -1333,11 +1351,18 @@ let state = {
       if (!btn) return;
       const action = btn.dataset.action;
       const id = btn.dataset.id;
-      if (!action || !id) return;
+      if (!action) return;
 
-      if (action === 'edit') {
+      if (action === 'add_share_for') {
+        const targetInv = btn.dataset.investor;
+        const rem = parseFloat(btn.dataset.remaining) || 10;
+        openModal('commission_shares', 'add', null, { sourceInvestorId: targetInv, defaultPercent: rem });
+        return;
+      }
+
+      if (action === 'edit' && id) {
         openModal(state.tab, 'edit', id);
-      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd', 'commission_deactivate', 'commission_reactivate'].includes(action)) {
+      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd', 'commission_deactivate', 'commission_reactivate'].includes(action) && id) {
         state.targetContext = state.tab;
         state.targetAction = action;
         state.targetId = id;
