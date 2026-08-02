@@ -275,7 +275,7 @@ export default async function handler(req, res) {
       const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       
       const rowPayload = {
-        investor_id: investorId,
+        investor_id: inv.id,
         year: targetYear,
         month_number: m,
         month: monthNames[m],

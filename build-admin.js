@@ -995,47 +995,56 @@ let state = {
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
                 \${i.status==='Pending'? \`<button class="btn-action btn-action-delete action-btn" data-action="cancel_wd" data-id="\${i.id}">Cancel</button>\` : ''}
               </div>
-            </td>
-          </tr>\`;
-        }).join('');
-      } else if (state.tab === 'returns') {
-        hd.innerHTML = \`<tr><th>Month</th><th>Year</th><th>Gross Return %</th><th>Created</th><th>Actions</th></tr>\`;
-        d = d.filter(i => !s || \`\${i.month} \${i.year}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month}</td><td>\${i.year}</td><td><div style="font-weight:600">\${i.gross_return_pct}%</div></td>
-            <td>\${i.created_at ? i.created_at.split('T')[0] : ''}</td>
+          return `<tr>
+            <td><span class="badge ${cls}">${i.status}</span></td>
+            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
+            <td>${i.month} ${i.year}</td>
             <td>
               <div class="btn-group">
-                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
+                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
+                ${i.status==='Pending'? `<button class="btn-action btn-action-delete action-btn" data-action="cancel_wd" data-id="${i.id}">Cancel</button>` : ''}
               </div>
             </td>
-          </tr>\`).join('');
+          </tr>`;
+        }).join('');
+      } else if (state.tab === 'returns') {
+        hd.innerHTML = `<tr><th>Month</th><th>Year</th><th>Gross Return %</th><th>Created</th><th>Actions</th></tr>`;
+        d = d.filter(i => !s || `${i.month} ${i.year}`.toLowerCase().includes(s));
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.month}</td><td>${i.year}</td><td><div style="font-weight:600">${i.gross_return_pct}%</div></td>
+            <td>${i.created_at ? i.created_at.split('T')[0] : ''}</td>
+            <td>
+              <div class="btn-group">
+                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.month}_${i.year}">Edit</button>
+              </div>
+            </td>
+          </tr>`).join('');
       } else if (state.tab === 'performance') {
-        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th></tr>\`;
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.metric}</td><td><div style="font-weight:600">\${i.value_pct}%</div></td>
-            <td>\${i.source || ''}</td><td>\${i.last_updated || ''}</td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th></tr>`;
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.metric}</td><td><div style="font-weight:600">${i.value_pct}%</div></td>
+            <td>${i.source || ''}</td><td>${i.last_updated || ''}</td>
+          </tr>`).join('');
       } else if (state.tab === 'snapshots') {
-        hd.innerHTML = \`<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>\`;
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${i.month}</td><td>\${i.year}</td>
-            <td>\${money(i.ending_balance)}</td><td>\${money(i.net_draw)}</td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>`;
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.investor_id}</td><td>${i.account_id}</td><td>${i.month}</td><td>${i.year}</td>
+            <td>${money(i.ending_balance)}</td><td>${money(i.net_draw)}</td>
+          </tr>`).join('');
       } else if (state.tab === 'history') {
-        hd.innerHTML = \`<tr><th>Month</th><th>Year</th><th>Open Bal</th><th>Deposits</th><th>Withdrawals</th><th>Gross %</th><th>End Bal</th><th>Notes</th></tr>\`;
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.month}</td><td>\${i.year}</td><td>\${money(i.opening_balance)}</td>
-            <td>\${money(i.deposits)}</td><td>\${money(i.withdrawals)}</td><td>\${i.gross_return_pct}%</td>
-            <td><div style="font-weight:600">\${money(i.ending_balance)}</div></td><td>\${i.notes||''}</td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Month</th><th>Year</th><th>Open Bal</th><th>Deposits</th><th>Withdrawals</th><th>Gross %</th><th>End Bal</th><th>Notes</th></tr>`;
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.month}</td><td>${i.year}</td><td>${money(i.opening_balance)}</td>
+            <td>${money(i.deposits)}</td><td>${money(i.withdrawals)}</td><td>${i.gross_return_pct}%</td>
+            <td><div style="font-weight:600">${money(i.ending_balance)}</div></td><td>${i.notes||''}</td>
+          </tr>`).join('');
       } else if (state.tab === 'commission_shares') {
-        hd.innerHTML = \`<tr><th>Investor ID</th><th>Account ID</th><th>Recipient</th><th>Share %</th><th>Notes</th></tr>\`;
-        bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.investor_id}</td><td>\${i.account_id || 'All'}</td>
-            <td><div style="font-weight:600">\${i.recipient_name || i.recipient_id}</div></td>
-            <td>\${i.percent}%</td><td>\${i.notes || ''}</td>
-          </tr>\`).join('');
+        hd.innerHTML = `<tr><th>Investor ID</th><th>Account ID</th><th>Recipient</th><th>Share %</th><th>Notes</th></tr>`;
+        bd.innerHTML = d.map(i => `<tr>
+            <td>${i.investor_id}</td><td>${i.account_id || 'All'}</td>
+            <td><div style="font-weight:600">${i.recipient_name || i.recipient_id}</div></td>
+            <td>${i.percent}%</td><td>${i.notes || ''}</td>
+          </tr>`).join('');
       }
     }
 
@@ -1068,7 +1077,11 @@ let state = {
       let item = null;
       if (action === 'edit' && id) {
         const list = state.data[tab] || [];
-        item = list.find(i => String(i.id || '').toLowerCase() === String(id).toLowerCase()) || null;
+        item = list.find(i => 
+          String(i.id || '').toLowerCase() === String(id).toLowerCase() ||
+          `${i.month}_${i.year}`.toLowerCase() === String(id).toLowerCase() ||
+          `${i.month_number || ''}_${i.year}`.toLowerCase() === String(id).toLowerCase()
+        ) || null;
       }
 
       title.textContent = (action === 'add' ? 'Add New ' : 'Edit ') + (
@@ -1109,19 +1122,20 @@ let state = {
         \`;
       } else if (tab === 'withdrawals') {
         const accOptions = (state.data.accounts || []).map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${acc.id} (\${acc.investor_id})</option>\`).join('');
-        html = \`
-          <div class="form-group"><label>Account</label><select id="field_account_id" required>\${accOptions}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : 0}" required /></div>
-          <div class="form-group"><label>Effective Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
-          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" \${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" \${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
-        \`;
+        const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
+        html = `
+          <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
+          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : 0}" required /></div>
+          <div class="form-group"><label>Effective Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" ${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" ${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+        `;
       } else if (tab === 'returns') {
-        html = \`
-          <div class="form-group"><label>Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
-          <div class="form-group"><label>Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="number" step="0.01" value="\${item ? item.gross_return_pct : 0}" required /></div>
-        \`;
+        html = `
+          <div class="form-group"><label>Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div class="form-group"><label>Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="${item ? item.gross_return_pct : 0}" required /></div>
+        `;
       }
 
       fields.innerHTML = html;
@@ -1143,7 +1157,7 @@ let state = {
       try {
         let endpoint = '', method = 'POST', body = {};
         if (tab === 'investors') {
-          endpoint = action === 'edit' ? \`/api/admin/investors/\${id}\` : '/api/admin/investors';
+          endpoint = action === 'edit' ? `/api/admin/investors/${id}` : '/api/admin/investors';
           method = action === 'edit' ? 'PUT' : 'POST';
           const passVal = document.getElementById('field_password')?.value;
           body = {
@@ -1159,7 +1173,7 @@ let state = {
             body.tempPassword = passVal;
           }
         } else if (tab === 'accounts') {
-          endpoint = action === 'edit' ? \`/api/admin/accounts/\${id}\` : '/api/admin/accounts';
+          endpoint = action === 'edit' ? `/api/admin/accounts/${id}` : '/api/admin/accounts';
           method = action === 'edit' ? 'PUT' : 'POST';
           body = {
             investorId: document.getElementById('field_investor_id')?.value,
@@ -1169,7 +1183,7 @@ let state = {
             status: document.getElementById('field_status')?.value || 'Active'
           };
         } else if (tab === 'deposits') {
-          endpoint = action === 'edit' ? \`/api/admin/deposits/\${id}\` : '/api/admin/deposits';
+          endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PUT' : 'POST';
           body = {
             accountId: document.getElementById('field_account_id')?.value,
@@ -1178,7 +1192,7 @@ let state = {
             type: document.getElementById('field_type')?.value || 'DEPOSIT'
           };
         } else if (tab === 'withdrawals') {
-          endpoint = action === 'edit' ? \`/api/admin/withdrawals/\${id}\` : '/api/admin/withdrawals';
+          endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
           method = action === 'edit' ? 'PUT' : 'POST';
           body = {
             accountId: document.getElementById('field_account_id')?.value,
@@ -1188,16 +1202,30 @@ let state = {
             status: document.getElementById('field_status')?.value || 'Pending'
           };
         } else if (tab === 'returns') {
-          endpoint = action === 'edit' ? \`/api/admin/monthly-returns/\${id}\` : '/api/admin/monthly-returns';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          endpoint = '/api/admin/monthly-returns';
+          method = 'POST';
+          const rawGross = String(document.getElementById('field_gross_return_pct')?.value || '0');
+          const cleanGross = parseFloat(rawGross.replace(/[^0-9.-]/g, '')) || 0;
           body = {
             month: document.getElementById('field_month')?.value,
             year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
-            grossReturnPct: Number(document.getElementById('field_gross_return_pct')?.value || 0)
+            grossReturnPct: cleanGross
           };
         }
 
         await api.request(endpoint, { method, body: JSON.stringify(body) });
+
+        if (tab === 'returns') {
+          try {
+            await api.request('/api/admin/historical-data/recalculate-all', {
+              method: 'POST',
+              body: JSON.stringify({ year: body.year })
+            });
+          } catch (recalcErr) {
+            console.error('Auto-recalculate after returns update failed:', recalcErr);
+          }
+        }
+
         showToast('Saved successfully!');
         document.getElementById('entityModal').classList.add('hidden');
         await loadTab(tab);

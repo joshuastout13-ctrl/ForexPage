@@ -1,6 +1,11 @@
 import { verifyAdminSession } from "../../lib/adminAuth.js";
 import { supabase } from "../../lib/supabase.js";
 
+const MONTH_MAP = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+};
+
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
@@ -15,46 +20,36 @@ export default async function handler(req, res) {
     }
   }
 
-  if (req.method === "POST") {
+  if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
     try {
       const body = req.body || {};
-      
-      const payload = {
-        year: Number(body.year),
-        month_number: Number(body.monthNumber),
-        month: body.month,
-        gross_return_pct: Number(body.grossReturnPct || 0),
-        source: body.source || "Manual",
-        notes: body.notes || "",
-        locked: body.locked === true
-        // created_at is default
+      const year = Number(body.year);
+      const monthStr = String(body.month || "").trim();
+      const monthNumber = Number(body.monthNumber || body.month_number || MONTH_MAP[monthStr.toLowerCase()] || 0);
+
+      if (!year || !monthNumber) {
+        throw new Error("Year and valid Month are required");
+      }
+
+      const grossReturnPct = Number(body.grossReturnPct ?? body.gross_return_pct ?? 0);
+
+      const updates = {
+        year,
+        month_number: monthNumber,
+        month: monthStr || Object.keys(MONTH_MAP).find(k => MONTH_MAP[k] === monthNumber) || "Unknown",
+        gross_return_pct: grossReturnPct,
+        last_updated: new Date().toISOString()
       };
 
-      if (!payload.year || !payload.month_number || !payload.month) throw new Error("Year, month_number, and month are required");
-
-      const { data, error } = await supabase.from("monthly_returns").insert([payload]).select();
-      if (error) throw error;
-
-      return res.status(200).json({ success: true, monthlyReturn: data[0] });
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
-    }
-  }
-
-  if (req.method === "PATCH") {
-    try {
-      const body = req.body || {};
-      const { year, monthNumber } = body;
-      if (!year || !monthNumber) throw new Error("year and monthNumber are required for update");
-
-      const updates = {};
-      if (body.grossReturnPct !== undefined) updates.gross_return_pct = Number(body.grossReturnPct);
       if (body.source !== undefined) updates.source = body.source;
       if (body.notes !== undefined) updates.notes = body.notes;
       if (body.locked !== undefined) updates.locked = Boolean(body.locked);
-      updates.last_updated = new Date().toISOString();
 
-      const { data, error } = await supabase.from("monthly_returns").update(updates).eq("year", Number(year)).eq("month_number", Number(monthNumber)).select();
+      const { data, error } = await supabase
+        .from("monthly_returns")
+        .upsert(updates, { onConflict: "year,month_number" })
+        .select();
+
       if (error) throw error;
 
       return res.status(200).json({ success: true, monthlyReturn: data[0] });
@@ -65,3 +60,4 @@ export default async function handler(req, res) {
 
   res.status(405).json({ error: "Method not allowed" });
 }
+
