@@ -531,7 +531,7 @@ let state = {
         document.getElementById('emailCenterView').classList.toggle('hidden', !isEmailTab);
 
         if (!isEmailTab) {
-          document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history','commission_shares'].includes(state.tab)) ? 'none' : 'inline-block';
+          document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
           document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         }
         
@@ -1034,9 +1034,9 @@ let state = {
             <td><div style="font-weight:600">${money(i.ending_balance)}</div></td><td>${i.notes||''}</td>
           </tr>`).join('');
       } else if (state.tab === 'commission_shares') {
-        hd.innerHTML = `<tr><th>Investor & Account</th><th>Investor Split</th><th>Total Assigned</th><th>Remaining</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Investor & Account</th><th>Investor Keeps</th><th>Commission Pool</th><th>Assigned</th><th>Remaining</th><th>Actions</th></tr>`;
         
-        // Group shares by investor_id and account_id
+        // Group existing shares by investor_id and account_id
         const groups = {};
         d.forEach(i => {
           const key = `${i.investor_id}_${i.account_id}`;
@@ -1044,17 +1044,33 @@ let state = {
           groups[key].shares.push(i);
         });
 
-        bd.innerHTML = Object.values(groups).map(g => {
+        // Also add investors who have NO shares yet so they appear in the list
+        (state.data.investors || []).forEach(inv => {
+          const username = inv.portal_username || inv.id;
+          const key = `${username}_All`;
+          if (!groups[key]) {
+            groups[key] = { investor_id: username, account_id: 'All', shares: [] };
+          }
+        });
+
+        // Filter by search
+        const filteredGroups = Object.values(groups).filter(g => {
+          if (!s) return true;
+          return `${g.investor_id} ${g.account_id}`.toLowerCase().includes(s);
+        });
+
+        bd.innerHTML = filteredGroups.map(g => {
           // Look up investor to get their split
           const inv = state.data.investors.find(inv => inv.portal_username === g.investor_id || inv.id === g.investor_id) || {};
-          let invSplit = inv.split_pct !== undefined ? inv.split_pct : 100;
+          let invSplit = inv.split_pct !== undefined ? Number(inv.split_pct) : 100;
           if (g.account_id && g.account_id !== 'All') {
              const acc = state.data.accounts.find(a => a.id === g.account_id);
-             if (acc && acc.split_pct !== undefined) invSplit = acc.split_pct;
+             if (acc && acc.split_pct !== undefined) invSplit = Number(acc.split_pct);
           }
 
+          const commissionPool = 100 - invSplit;
           const totalAssigned = g.shares.filter(s => s.status !== 'cancelled' && s.status !== 'ended').reduce((sum, s) => sum + Number(s.percent || 0), 0);
-          const remaining = invSplit - totalAssigned;
+          const remaining = commissionPool - totalAssigned;
           
           let subRows = g.shares.map(s => {
             const isInactive = s.status === 'cancelled' || s.status === 'ended';
@@ -1062,7 +1078,7 @@ let state = {
             return `
               <tr class="sub-row row-group-${g.investor_id}-${g.account_id} hidden" style="background: rgba(255,255,255,0.02)">
                 <td style="padding-left: 32px">↳ <strong>${s.recipient_name || s.recipient_id}</strong></td>
-                <td>${s.percent}%</td>
+                <td colspan="2">${s.percent}%</td>
                 <td colspan="2">
                   <div style="font-size:12px">
                     Start: ${s.effective_start_date || 'N/A'}<br>
@@ -1083,13 +1099,15 @@ let state = {
             `;
           }).join('');
 
+          const hasShares = g.shares.length > 0;
           return `
             <tr style="cursor: pointer;" onclick="document.querySelectorAll('.row-group-${g.investor_id}-${g.account_id}').forEach(r => r.classList.toggle('hidden'))">
               <td><strong>${g.investor_id}</strong><br><span class="muted" style="font-size:12px">${g.account_id}</span></td>
               <td>${invSplit}%</td>
+              <td>${commissionPool.toFixed(2)}%</td>
               <td>${totalAssigned.toFixed(2)}%</td>
               <td><span style="color: ${remaining < 0 ? 'var(--danger)' : remaining === 0 ? 'var(--muted)' : 'var(--success)'}">${remaining.toFixed(2)}%</span></td>
-              <td><button class="btn-action">View Details ▼</button></td>
+              <td>${hasShares ? `<button class="btn-action">View Details ▼</button>` : `<span class="muted" style="font-size:12px">No shares yet</span>`}</td>
             </tr>
             ${subRows}
           `;
@@ -1185,6 +1203,22 @@ let state = {
           <div class="form-group"><label>Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="${item ? item.gross_return_pct : 0}" required /></div>
         `;
+      } else if (tab === 'commission_shares') {
+        const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && (item.investor_id === inv.id || item.investor_id === inv.portal_username) ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})</option>`).join('');
+        let accOptions = `<option value="">All Accounts</option>`;
+        if (state.data.accounts) {
+          accOptions += state.data.accounts.map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
+        }
+        
+        html = `
+          <div class="form-group"><label>Source Investor</label><select id="field_source_investor_id" required>${invOptions}</select></div>
+          <div class="form-group"><label>Source Account (Optional)</label><select id="field_source_account_id">${accOptions}</select></div>
+          <div class="form-group"><label>Recipient Username or Email</label><input id="field_recipient_username" value="${item ? (item.recipient_name || item.recipient_id) : ''}" required ${item ? 'disabled' : ''} placeholder="jdoe" /></div>
+          <div class="form-group"><label>Commission %</label><input id="field_commission_percent" type="number" step="0.1" value="${item ? item.percent : 10}" required /></div>
+          <div class="form-group"><label>Effective Start Date</label><input id="field_effective_start_date" type="date" value="${item && item.effective_start_date ? item.effective_start_date : new Date().toISOString().split('T')[0]}" required /></div>
+          <div class="form-group"><label>Effective End Date (Optional)</label><input id="field_effective_end_date" type="date" value="${item && item.effective_end_date ? item.effective_end_date : ''}" /></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="active" ${!item || item.status === 'active' ? 'selected' : ''}>Active</option><option value="cancelled" ${item && item.status === 'cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+        `;
       }
 
       fields.innerHTML = html;
@@ -1260,6 +1294,18 @@ let state = {
             year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
             grossReturnPct: cleanGross
           };
+        } else if (tab === 'commission_shares') {
+          endpoint = action === 'edit' ? `/api/admin/commission-shares/${id}` : '/api/admin/commission-shares';
+          method = action === 'edit' ? 'PATCH' : 'POST';
+          body = {
+            sourceInvestorId: document.getElementById('field_source_investor_id')?.value,
+            accountId: document.getElementById('field_source_account_id')?.value || null,
+            recipientUsername: document.getElementById('field_recipient_username')?.value,
+            commissionPercent: Number(document.getElementById('field_commission_percent')?.value || 0),
+            effectiveStartDate: document.getElementById('field_effective_start_date')?.value,
+            effectiveEndDate: document.getElementById('field_effective_end_date')?.value || null,
+            status: document.getElementById('field_status')?.value || 'active'
+          };
         }
 
         await api.request(endpoint, { method, body: JSON.stringify(body) });
@@ -1295,7 +1341,7 @@ let state = {
 
       if (action === 'edit') {
         openModal(state.tab, 'edit', id);
-      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd'].includes(action)) {
+      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd', 'commission_deactivate', 'commission_reactivate'].includes(action)) {
         state.targetContext = state.tab;
         state.targetAction = action;
         state.targetId = id;
@@ -1334,6 +1380,8 @@ let state = {
          else if (action === 'delete_user') { endpoint = `/api/admin/investors/${id}`; method = 'DELETE'; }
          else if (action === 'void') endpoint = `/api/admin/deposits/${id}/void`;
          else if (action === 'cancel_wd') endpoint = `/api/admin/withdrawals/${id}/cancel`;
+         else if (action === 'commission_deactivate') endpoint = `/api/admin/commission-shares/${id}/deactivate`;
+         else if (action === 'commission_reactivate') endpoint = `/api/admin/commission-shares/${id}/reactivate`;
 
          await api.request(endpoint, { method, body: JSON.stringify({ action }) });
          document.getElementById('statusModal').classList.add('hidden');
