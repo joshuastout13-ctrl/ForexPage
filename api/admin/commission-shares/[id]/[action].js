@@ -15,7 +15,7 @@ export default async function handler(req, res) {
         .from("commission_shares")
         .update({ 
           status: "cancelled",
-          effective_end_date: new Date(),
+          effective_end_date: new Date().toISOString().split('T')[0],
           updated_at: new Date()
         })
         .eq("id", id)

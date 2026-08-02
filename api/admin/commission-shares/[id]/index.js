@@ -17,6 +17,7 @@ export default async function handler(req, res) {
       if (req.body.effectiveEndDate !== undefined) updates.effective_end_date = req.body.effectiveEndDate || null;
       if (req.body.status !== undefined) updates.status = req.body.status;
       if (req.body.sourceInvestorId !== undefined) updates.source_investor_id = req.body.sourceInvestorId;
+      if (req.body.accountId !== undefined) updates.source_account_id = req.body.accountId;
       
       if (req.body.recipientUsername) {
         const { data: recipient } = await supabase

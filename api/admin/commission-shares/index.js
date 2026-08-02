@@ -27,7 +27,10 @@ export default async function handler(req, res) {
           recipient_id: i.recipient_investor_id,
           recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : i.recipient_investor_id,
           percent: i.commission_percent,
-          notes: i.status || "active"
+          effective_start_date: i.effective_start_date,
+          effective_end_date: i.effective_end_date,
+          status: i.status || "active",
+          notes: i.notes || ""
         };
       });
 
@@ -41,7 +44,10 @@ export default async function handler(req, res) {
           recipient_id: r.recipient_id || r.recipient_investor_id,
           recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : (r.recipient_id || r.recipient_investor_id),
           percent: r.percent || r.commission_percent,
-          notes: "active"
+          effective_start_date: null,
+          effective_end_date: null,
+          status: "active",
+          notes: ""
         };
       });
 
