@@ -577,6 +577,13 @@ let state = {
           if (state.data.accounts.length===0) {
              const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
           }
+          if (state.data.investors && state.data.investors.length > 0) {
+            state.data.investors.sort((a, b) => {
+              const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.portal_username || a.id;
+              const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.portal_username || b.id;
+              return nameA.localeCompare(nameB);
+            });
+          }
           updateSummaryCards();
           renderTable();
         }
@@ -1089,7 +1096,7 @@ let state = {
                   <div class="right">
                     ${statusBadge}
                     <div class="btn-group">
-                      <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${s.id}">Edit</button>
+                      <button class="btn-action btn-action-edit action-btn" data-action="add_share_for" data-investor="${invIdForAdd}">Manage Shares</button>
                       ${isInactive ? `<button class="btn-action btn-action-reactivate action-btn" data-action="commission_reactivate" data-id="${s.id}">Reactivate</button>` : 
                                      `<button class="btn-action btn-action-deactivate action-btn" data-action="commission_deactivate" data-id="${s.id}">Deactivate</button>`}
                     </div>
@@ -1110,7 +1117,7 @@ let state = {
               <td><span style="color: ${remaining < 0 ? 'var(--danger)' : remaining === 0 ? 'var(--muted)' : 'var(--success)'}">${remaining.toFixed(2)}%</span></td>
               <td>
                 <div class="btn-group" onclick="event.stopPropagation()">
-                  <button class="btn-action btn-action-add-share action-btn" data-action="add_share_for" data-investor="${invIdForAdd}" data-remaining="${remaining > 0 ? remaining.toFixed(2) : 10}">+ Assign Share</button>
+                  <button class="btn-action btn-action-add-share action-btn" data-action="add_share_for" data-investor="${invIdForAdd}" data-remaining="${remaining > 0 ? remaining.toFixed(2) : 10}">Manage Shares</button>
                   ${hasShares ? `<button class="btn-action">Details ▼</button>` : ''}
                 </div>
               </td>
@@ -1210,36 +1217,223 @@ let state = {
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="${item ? item.gross_return_pct : 0}" required /></div>
         `;
       } else if (tab === 'commission_shares') {
-        const targetSrc = (extraData && extraData.sourceInvestorId) || (item ? item.investor_id : '');
-        const invOptions = (state.data.investors || []).map(inv => {
-          const isSel = (targetSrc && (targetSrc === inv.id || targetSrc === inv.portal_username)) || (item && (item.investor_id === inv.id || item.investor_id === inv.portal_username));
-          return `<option value="${inv.id}" ${isSel ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})</option>`;
-        }).join('');
+        const sourceInvId = (extraData && extraData.sourceInvestorId) || (item ? item.investor_id : (state.data.investors[0] ? state.data.investors[0].id : ''));
+        const sourceInv = state.data.investors.find(inv => inv.id === sourceInvId || inv.portal_username === sourceInvId) || (state.data.investors[0] || {});
+        const invSplit = sourceInv.split_pct !== undefined ? Number(sourceInv.split_pct) : 100;
+        const commissionPool = 100 - invSplit;
 
-        let accOptions = `<option value="">All Accounts</option>`;
-        if (state.data.accounts) {
-          accOptions += state.data.accounts.map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${acc.id} (${acc.investor_id})</option>`).join('');
+        // Fetch all existing shares for this source investor
+        const existingShares = (state.data.commission_shares || []).filter(s => 
+          s.investor_id === sourceInv.id || s.investor_id === sourceInv.portal_username || s.investor_id === sourceInvId
+        );
+
+        // Alphabetically sorted investors for dropdowns
+        const sortedInvestors = [...(state.data.investors || [])].sort((a,b) => {
+          const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.portal_username || a.id;
+          const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.portal_username || b.id;
+          return nameA.localeCompare(nameB);
+        });
+
+        const getRecOptionsHtml = (selectedId) => sortedInvestors.map(inv => `
+          <option value="${inv.id}" ${selectedId && (selectedId === inv.id || selectedId === inv.portal_username) ? 'selected' : ''}>
+            ${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})
+          </option>
+        `).join('');
+
+        const sourceInvOptions = sortedInvestors.map(inv => `
+          <option value="${inv.id}" ${sourceInv.id === inv.id || sourceInv.portal_username === inv.portal_username ? 'selected' : ''}>
+            ${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})
+          </option>
+        `).join('');
+
+        // Build list of rows
+        let rowsHtml = '';
+        if (existingShares.length > 0) {
+          rowsHtml = existingShares.map(s => `
+            <tr class="bulk-share-row" data-share-id="${s.id || ''}">
+              <td style="padding:6px;">
+                <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                  ${getRecOptionsHtml(s.recipient_id || s.recipient_name)}
+                </select>
+              </td>
+              <td style="padding:6px; width:90px;">
+                <input type="number" step="0.1" class="bulk-pct-input form-control" value="${s.percent}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+              </td>
+              <td style="padding:6px; width:130px;">
+                <input type="date" class="bulk-start-date form-control" value="${s.effective_start_date || new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+              </td>
+              <td style="padding:6px; width:130px;">
+                <input type="date" class="bulk-end-date form-control" value="${s.effective_end_date || ''}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
+              </td>
+              <td style="padding:6px; width:90px;">
+                <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                  <option value="active" ${s.status !== 'cancelled' ? 'selected' : ''}>Active</option>
+                  <option value="cancelled" ${s.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                </select>
+              </td>
+              <td style="padding:6px; width:40px; text-align:center;">
+                <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          const defaultRec = sortedInvestors.find(inv => inv.id !== sourceInv.id) || sortedInvestors[0];
+          const initialPct = (extraData && extraData.defaultPercent !== undefined) ? extraData.defaultPercent : (commissionPool > 0 ? commissionPool : 10);
+          rowsHtml = `
+            <tr class="bulk-share-row" data-share-id="">
+              <td style="padding:6px;">
+                <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                  ${getRecOptionsHtml(defaultRec ? defaultRec.id : '')}
+                </select>
+              </td>
+              <td style="padding:6px; width:90px;">
+                <input type="number" step="0.1" class="bulk-pct-input form-control" value="${initialPct}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+              </td>
+              <td style="padding:6px; width:130px;">
+                <input type="date" class="bulk-start-date form-control" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+              </td>
+              <td style="padding:6px; width:130px;">
+                <input type="date" class="bulk-end-date form-control" value="" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
+              </td>
+              <td style="padding:6px; width:90px;">
+                <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                  <option value="active" selected>Active</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </td>
+              <td style="padding:6px; width:40px; text-align:center;">
+                <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
+              </td>
+            </tr>
+          `;
         }
 
-        const recOptions = (state.data.investors || []).map(inv => {
-          const isSel = item && (item.recipient_id === inv.id || item.recipient_name === inv.portal_username || item.recipient_id === inv.portal_username);
-          return `<option value="${inv.id}" ${isSel ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})</option>`;
-        }).join('');
-
-        const defaultPct = (extraData && extraData.defaultPercent !== undefined) ? extraData.defaultPercent : (item ? item.percent : 10);
-        
         html = `
-          <div class="form-group"><label>Source Investor</label><select id="field_source_investor_id" required>${invOptions}</select></div>
-          <div class="form-group"><label>Source Account (Optional)</label><select id="field_source_account_id">${accOptions}</select></div>
-          <div class="form-group"><label>Commission Recipient</label><select id="field_recipient_username" required ${item ? 'disabled' : ''}>${recOptions}</select></div>
-          <div class="form-group"><label>Commission %</label><input id="field_commission_percent" type="number" step="0.1" value="${defaultPct}" required /></div>
-          <div class="form-group"><label>Effective Start Date</label><input id="field_effective_start_date" type="date" value="${item && item.effective_start_date ? item.effective_start_date : new Date().toISOString().split('T')[0]}" required /></div>
-          <div class="form-group"><label>Effective End Date (Optional)</label><input id="field_effective_end_date" type="date" value="${item && item.effective_end_date ? item.effective_end_date : ''}" /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="active" ${!item || item.status === 'active' ? 'selected' : ''}>Active</option><option value="cancelled" ${item && item.status === 'cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:8px;">
+              <label>Source Investor</label>
+              <select id="bulk_source_investor_id" class="form-control" onchange="openModal('commission_shares', 'edit', null, { sourceInvestorId: this.value })" required>
+                ${sourceInvOptions}
+              </select>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:8px; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px;">
+              <div>Investor Keeps: <strong>${invSplit}%</strong></div>
+              <div>Commission Pool: <strong>${commissionPool.toFixed(2)}%</strong></div>
+              <div>Total Assigned: <strong id="bulkAssignedVal">0%</strong></div>
+              <div>Remaining: <strong id="bulkRemainingVal" style="color:var(--success)">${commissionPool.toFixed(2)}%</strong></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px; max-height:280px; overflow-y:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+              <thead>
+                <tr style="text-align:left; border-bottom:1px solid var(--border);">
+                  <th style="padding:6px;">Recipient</th>
+                  <th style="padding:6px;">Share %</th>
+                  <th style="padding:6px;">Start Date</th>
+                  <th style="padding:6px;">End Date</th>
+                  <th style="padding:6px;">Status</th>
+                  <th style="padding:6px; text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="bulkSharesTableBody">
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <button type="button" id="addBulkRowBtn" class="btn-action" style="background:var(--accent); color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">+ Add Recipient Line</button>
+          </div>
         `;
       }
 
       fields.innerHTML = html;
+
+      if (tab === 'commission_shares') {
+        const selectedSrcId = document.getElementById('bulk_source_investor_id')?.value;
+        const currentSrcInv = state.data.investors.find(i => i.id === selectedSrcId || i.portal_username === selectedSrcId) || {};
+        const poolVal = 100 - (currentSrcInv.split_pct !== undefined ? Number(currentSrcInv.split_pct) : 100);
+
+        const updateCalculations = () => {
+          let total = 0;
+          document.querySelectorAll('.bulk-share-row').forEach(row => {
+            const st = row.querySelector('.bulk-status')?.value;
+            const pct = parseFloat(row.querySelector('.bulk-pct-input')?.value || '0');
+            if (st !== 'cancelled') total += pct;
+          });
+          const rem = poolVal - total;
+          const assEl = document.getElementById('bulkAssignedVal');
+          const remEl = document.getElementById('bulkRemainingVal');
+          if (assEl) assEl.textContent = total.toFixed(2) + '%';
+          if (remEl) {
+            remEl.textContent = rem.toFixed(2) + '%';
+            remEl.style.color = rem < 0 ? 'var(--danger)' : (rem === 0 ? 'var(--muted)' : 'var(--success)');
+          }
+        };
+
+        updateCalculations();
+
+        document.getElementById('bulkSharesTableBody')?.addEventListener('input', updateCalculations);
+        document.getElementById('bulkSharesTableBody')?.addEventListener('change', updateCalculations);
+
+        document.getElementById('bulkSharesTableBody')?.addEventListener('click', (e) => {
+          if (e.target.classList.contains('remove-bulk-row-btn')) {
+            const row = e.target.closest('.bulk-share-row');
+            if (row) {
+              row.remove();
+              updateCalculations();
+            }
+          }
+        });
+
+        document.getElementById('addBulkRowBtn')?.addEventListener('click', () => {
+          const bodyEl = document.getElementById('bulkSharesTableBody');
+          if (!bodyEl) return;
+          const sortedInvestors = [...(state.data.investors || [])].sort((a,b) => {
+            const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.portal_username || a.id;
+            const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.portal_username || b.id;
+            return nameA.localeCompare(nameB);
+          });
+          const recOpts = sortedInvestors.map(inv => `
+            <option value="${inv.id}">
+              ${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})
+            </option>
+          `).join('');
+
+          const tr = document.createElement('tr');
+          tr.className = 'bulk-share-row';
+          tr.dataset.shareId = '';
+          tr.innerHTML = `
+            <td style="padding:6px;">
+              <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                ${recOpts}
+              </select>
+            </td>
+            <td style="padding:6px; width:90px;">
+              <input type="number" step="0.1" class="bulk-pct-input form-control" value="10" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+            </td>
+            <td style="padding:6px; width:130px;">
+              <input type="date" class="bulk-start-date form-control" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+            </td>
+            <td style="padding:6px; width:130px;">
+              <input type="date" class="bulk-end-date form-control" value="" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
+            </td>
+            <td style="padding:6px; width:90px;">
+              <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                <option value="active" selected>Active</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </td>
+            <td style="padding:6px; width:40px; text-align:center;">
+              <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
+            </td>
+          `;
+          bodyEl.appendChild(tr);
+          updateCalculations();
+        });
+      }
+
       modal.classList.remove('hidden');
     }
 
@@ -1313,16 +1507,34 @@ let state = {
             grossReturnPct: cleanGross
           };
         } else if (tab === 'commission_shares') {
-          endpoint = action === 'edit' ? `/api/admin/commission-shares/${id}` : '/api/admin/commission-shares';
-          method = action === 'edit' ? 'PATCH' : 'POST';
+          endpoint = '/api/admin/commission-shares/bulk';
+          method = 'POST';
+          const sourceInvestorId = document.getElementById('bulk_source_investor_id')?.value;
+          const rows = document.querySelectorAll('.bulk-share-row');
+          const sharesPayload = [];
+          rows.forEach(r => {
+            const shareId = r.dataset.shareId || null;
+            const recipientId = r.querySelector('.bulk-rec-id')?.value;
+            const commissionPercent = parseFloat(r.querySelector('.bulk-pct-input')?.value || '0');
+            const effectiveStartDate = r.querySelector('.bulk-start-date')?.value;
+            const effectiveEndDate = r.querySelector('.bulk-end-date')?.value || null;
+            const status = r.querySelector('.bulk-status')?.value || 'active';
+            if (recipientId) {
+              sharesPayload.push({
+                id: shareId,
+                recipientId,
+                commissionPercent,
+                effectiveStartDate,
+                effectiveEndDate,
+                status
+              });
+            }
+          });
+
           body = {
-            sourceInvestorId: document.getElementById('field_source_investor_id')?.value,
-            accountId: document.getElementById('field_source_account_id')?.value || null,
-            recipientUsername: document.getElementById('field_recipient_username')?.value,
-            commissionPercent: Number(document.getElementById('field_commission_percent')?.value || 0),
-            effectiveStartDate: document.getElementById('field_effective_start_date')?.value,
-            effectiveEndDate: document.getElementById('field_effective_end_date')?.value || null,
-            status: document.getElementById('field_status')?.value || 'active'
+            sourceInvestorId,
+            accountId: null,
+            shares: sharesPayload
           };
         }
 
