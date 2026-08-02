@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     // 1. Fetch all investors
     const { data: investors, error: invErr } = await supabase
       .from("investors")
-      .select("id, portal_username, username, email, split_pct, monthly_draw, start_date");
+      .select("id, portal_username, email, split_pct, monthly_draw, start_date");
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
@@ -93,7 +93,6 @@ export default async function handler(req, res) {
       const sourceIdSet = new Set([
         investorId,
         inv.portal_username,
-        inv.username,
         inv.email
       ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 

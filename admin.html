@@ -1240,7 +1240,7 @@ let state = {
       const btn = document.getElementById('recalcAllBtn');
       btn.disabled = true; btn.textContent = 'Recalculating...';
       try {
-        await api.request('/api/admin/accounts');
+        await api.request('/api/admin/historical-data/recalculate-all', { method: 'POST' });
         await loadTab(state.tab);
         showToast('All investor balances recalculated successfully!');
       } catch(e) {

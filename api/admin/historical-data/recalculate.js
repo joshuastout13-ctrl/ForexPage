@@ -25,15 +25,14 @@ export default async function handler(req, res) {
     // 1. Get Investor split, draw, and start date
     const { data: inv, error: invErr } = await supabase
       .from("investors")
-      .select("id, portal_username, username, email, split_pct, monthly_draw, start_date")
-      .or(`id.eq.${investorId},portal_username.ilike.${investorId},username.ilike.${investorId},email.ilike.${investorId}`)
+      .select("id, portal_username, email, split_pct, monthly_draw, start_date")
+      .or(`id.eq.${investorId},portal_username.ilike.${investorId},email.ilike.${investorId}`)
       .single();
     if (invErr) throw invErr;
 
     const sourceIdSet = new Set([
       inv.id,
       inv.portal_username,
-      inv.username,
       inv.email
     ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
