@@ -567,7 +567,7 @@ let state = {
             state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
           }
           
-          if (['accounts', 'deposits', 'withdrawals', 'history'].includes(tab) && state.data.investors.length===0) {
+          if (['accounts', 'deposits', 'withdrawals', 'history', 'commission_shares'].includes(tab) && state.data.investors.length===0) {
              const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
           }
           if (state.data.accounts.length===0) {
@@ -1134,7 +1134,8 @@ let state = {
         tab === 'accounts' ? 'Account' :
         tab === 'deposits' ? 'Deposit' :
         tab === 'withdrawals' ? 'Withdrawal' :
-        tab === 'returns' ? 'Monthly Return' : 'Item'
+        tab === 'returns' ? 'Monthly Return' :
+        tab === 'commission_shares' ? 'Commission Share' : 'Item'
       );
 
       let html = '';
