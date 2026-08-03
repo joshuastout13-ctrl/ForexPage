@@ -37,17 +37,21 @@ export default async function handler(req, res) {
     const invSplit = sourceInv ? Number(sourceInv.split_pct || 100) : 100;
     const maxPool = 100 - invSplit;
 
-    // Validate total active percentage in payload
-    const activePayloadShares = shares.filter(s => s.status !== "cancelled" && s.status !== "ended");
+    const nowIso = new Date().toISOString().split('T')[0];
+
+    // Validate total active percentage in payload (excluding ended/historical shares)
+    const activePayloadShares = shares.filter(s => {
+      if (s.status === "cancelled" || s.status === "ended") return false;
+      if (s.effectiveEndDate && s.effectiveEndDate < nowIso) return false;
+      return true;
+    });
     const totalAllocated = activePayloadShares.reduce((sum, s) => sum + Number(s.commissionPercent || 0), 0);
 
     if (totalAllocated > maxPool + 0.01) {
       return res.status(400).json({
-        error: `Total assigned commission (${totalAllocated.toFixed(2)}%) exceeds available commission pool (${maxPool.toFixed(2)}%) for this investor.`
+        error: `Total active assigned commission (${totalAllocated.toFixed(2)}%) exceeds available commission pool (${maxPool.toFixed(2)}%) for this investor.`
       });
     }
-
-    const nowIso = new Date().toISOString().split('T')[0];
 
     // Fetch existing shares for this source investor
     const { data: existingShares } = await supabase

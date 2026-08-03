@@ -1071,13 +1071,21 @@ let state = {
              if (acc && acc.split_pct !== undefined) invSplit = Number(acc.split_pct);
           }
 
+          const invIdForAdd = inv.id || g.investor_id;
+          const todayIsoStr = new Date().toISOString().split('T')[0];
           const commissionPool = 100 - invSplit;
-          const totalAssigned = g.shares.filter(s => s.status !== 'cancelled' && s.status !== 'ended').reduce((sum, s) => sum + Number(s.percent || 0), 0);
+          const totalAssigned = g.shares.filter(s => {
+            if (s.status === 'cancelled' || s.status === 'ended') return false;
+            if (s.effective_end_date && s.effective_end_date < todayIsoStr) return false;
+            return true;
+          }).reduce((sum, s) => sum + Number(s.percent || 0), 0);
           const remaining = commissionPool - totalAssigned;
           
           let subRows = g.shares.map(s => {
-            const isInactive = s.status === 'cancelled' || s.status === 'ended';
-            const statusBadge = \`<span class="badge \${isInactive ? 'inactive' : 'active'}">\${s.status}</span>\`;
+            const isPastEnd = s.effective_end_date && s.effective_end_date < todayIsoStr;
+            const isInactive = s.status === 'cancelled' || s.status === 'ended' || isPastEnd;
+            const displayStatus = isPastEnd ? 'ended (historical)' : (s.status || 'active');
+            const statusBadge = \`<span class="badge \${isInactive ? 'inactive' : 'active'}">\${displayStatus}</span>\`;
             return \`
               <tr class="sub-row row-group-\${g.investor_id}-\${g.account_id} hidden" style="background: rgba(255,255,255,0.02)">
                 <td style="padding-left: 32px">↳ <strong>\${s.recipient_name || s.recipient_id}</strong></td>
@@ -1103,7 +1111,6 @@ let state = {
           }).join('');
 
           const hasShares = g.shares.length > 0;
-          const invIdForAdd = inv.id || g.investor_id;
           return \`
             <tr style="cursor: pointer;" onclick="document.querySelectorAll('.row-group-\${g.investor_id}-\${g.account_id}').forEach(r => r.classList.toggle('hidden'))">
               <td><strong>\${g.investor_id}</strong><br><span class="muted" style="font-size:12px">\${g.account_id}</span></td>
@@ -1351,12 +1358,15 @@ let state = {
         const currentSrcInv = state.data.investors.find(i => i.id === selectedSrcId || i.portal_username === selectedSrcId) || {};
         const poolVal = 100 - (currentSrcInv.split_pct !== undefined ? Number(currentSrcInv.split_pct) : 100);
 
+        const todayIsoStr = new Date().toISOString().split('T')[0];
         const updateCalculations = () => {
           let total = 0;
           document.querySelectorAll('.bulk-share-row').forEach(row => {
             const st = row.querySelector('.bulk-status')?.value;
             const pct = parseFloat(row.querySelector('.bulk-pct-input')?.value || '0');
-            if (st !== 'cancelled') total += pct;
+            const endDate = row.querySelector('.bulk-end-date')?.value;
+            const isPastEnd = endDate && endDate < todayIsoStr;
+            if (st !== 'cancelled' && st !== 'ended' && !isPastEnd) total += pct;
           });
           const rem = poolVal - total;
           const assEl = document.getElementById('bulkAssignedVal');
