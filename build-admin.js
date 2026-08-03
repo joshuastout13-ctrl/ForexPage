@@ -449,6 +449,9 @@ let state = {
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     
     const money = (n) => Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD"});
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
     
     function showToast(msg, isError = false) {
       const existing = document.querySelector('.toast');
@@ -724,10 +727,6 @@ let state = {
           <td>\${log.is_test ? '🧪 Test' : '🚀 Broadcast'}</td>
         </tr>\`;
       }).join('');
-    }
-
-    function escapeHtml(str) {
-      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
     // Sub-tab switcher
