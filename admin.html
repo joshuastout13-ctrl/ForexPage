@@ -1215,9 +1215,7 @@ let state = {
           <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : 0}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
           <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" ${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" ${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
-        `;
-      } else if (tab === 'returns') {
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" ${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" ${item       } else if (tab === 'returns') {
         html = `
           <div class="form-group"><label>Month</label><select id="field_month">${MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
           <div class="form-group"><label>Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
@@ -1228,6 +1226,10 @@ let state = {
         const sourceInv = state.data.investors.find(inv => inv.id === sourceInvId || inv.portal_username === sourceInvId) || (state.data.investors[0] || {});
         const invSplit = sourceInv.split_pct !== undefined ? Number(sourceInv.split_pct) : 100;
         const commissionPool = 100 - invSplit;
+
+        const sourceAcc = (state.data.accounts || []).find(a => a.investor_id === sourceInv.id || a.investor_id === sourceInv.portal_username);
+        const accOpenDate = (sourceAcc && sourceAcc.open_date) ? sourceAcc.open_date : (sourceInv.created_at ? sourceInv.created_at.split('T')[0] : '2026-05-01');
+        const todayIsoStr = new Date().toISOString().split('T')[0];
 
         // Fetch all existing shares for this source investor
         const existingShares = (state.data.commission_shares || []).filter(s => 
@@ -1256,33 +1258,40 @@ let state = {
         // Build list of rows
         let rowsHtml = '';
         if (existingShares.length > 0) {
-          rowsHtml = existingShares.map(s => `
-            <tr class="bulk-share-row" data-share-id="${s.id || ''}">
-              <td style="padding:6px;">
-                <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                  ${getRecOptionsHtml(s.recipient_id || s.recipient_name)}
-                </select>
-              </td>
-              <td style="padding:6px; width:90px;">
-                <input type="number" step="0.1" class="bulk-pct-input form-control" value="${s.percent}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-              </td>
-              <td style="padding:6px; width:130px;">
-                <input type="date" class="bulk-start-date form-control" value="${s.effective_start_date || new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-              </td>
-              <td style="padding:6px; width:130px;">
-                <input type="date" class="bulk-end-date form-control" value="${s.effective_end_date || ''}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
-              </td>
-              <td style="padding:6px; width:90px;">
-                <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                  <option value="active" ${s.status !== 'cancelled' ? 'selected' : ''}>Active</option>
-                  <option value="cancelled" ${s.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
-                </select>
-              </td>
-              <td style="padding:6px; width:40px; text-align:center;">
-                <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
-              </td>
-            </tr>
-          `).join('');
+          rowsHtml = existingShares.map(s => {
+            const isEnded = (s.effective_end_date && s.effective_end_date < todayIsoStr) || s.status === 'ended';
+            const curStatus = isEnded ? 'ended' : (s.status || 'active');
+            const rowStyle = isEnded ? 'background: rgba(255,255,255,0.01); opacity: 0.75;' : '';
+
+            return `
+              <tr class="bulk-share-row" data-share-id="${s.id || ''}" style="${rowStyle}">
+                <td style="padding:6px;">
+                  <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                    ${getRecOptionsHtml(s.recipient_id || s.recipient_name)}
+                  </select>
+                </td>
+                <td style="padding:6px; width:90px;">
+                  <input type="number" step="0.1" class="bulk-pct-input form-control" value="${s.percent}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+                </td>
+                <td style="padding:6px; width:130px;">
+                  <input type="date" class="bulk-start-date form-control" value="${s.effective_start_date || accOpenDate}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+                </td>
+                <td style="padding:6px; width:130px;">
+                  <input type="date" class="bulk-end-date form-control" value="${s.effective_end_date || ''}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
+                </td>
+                <td style="padding:6px; width:110px;">
+                  <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                    <option value="active" ${curStatus === 'active' ? 'selected' : ''}>Active</option>
+                    <option value="ended" ${curStatus === 'ended' ? 'selected' : ''}>Ended (Historical)</option>
+                    <option value="cancelled" ${curStatus === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                  </select>
+                </td>
+                <td style="padding:6px; width:40px; text-align:center;">
+                  <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
         } else {
           const defaultRec = sortedInvestors.find(inv => inv.id !== sourceInv.id) || sortedInvestors[0];
           const initialPct = (extraData && extraData.defaultPercent !== undefined) ? extraData.defaultPercent : (commissionPool > 0 ? commissionPool : 10);
@@ -1297,14 +1306,15 @@ let state = {
                 <input type="number" step="0.1" class="bulk-pct-input form-control" value="${initialPct}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
               </td>
               <td style="padding:6px; width:130px;">
-                <input type="date" class="bulk-start-date form-control" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
+                <input type="date" class="bulk-start-date form-control" value="${accOpenDate}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
               </td>
               <td style="padding:6px; width:130px;">
                 <input type="date" class="bulk-end-date form-control" value="" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
               </td>
-              <td style="padding:6px; width:90px;">
+              <td style="padding:6px; width:110px;">
                 <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
                   <option value="active" selected>Active</option>
+                  <option value="ended">Ended (Historical)</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
               </td>
@@ -1323,10 +1333,11 @@ let state = {
                 ${sourceInvOptions}
               </select>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:8px; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:8px; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px; flex-wrap:wrap; gap:8px;">
+              <div>Account Start Date: <strong style="color:var(--accent2);">${accOpenDate}</strong></div>
               <div>Investor Keeps: <strong>${invSplit}%</strong></div>
               <div>Commission Pool: <strong>${commissionPool.toFixed(2)}%</strong></div>
-              <div>Total Assigned: <strong id="bulkAssignedVal">0%</strong></div>
+              <div>Total Active Assigned: <strong id="bulkAssignedVal">0%</strong></div>
               <div>Remaining: <strong id="bulkRemainingVal" style="color:var(--success)">${commissionPool.toFixed(2)}%</strong></div>
             </div>
           </div>
