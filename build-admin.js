@@ -1038,18 +1038,23 @@ let state = {
       } else if (state.tab === 'commission_shares') {
         hd.innerHTML = \`<tr><th>Investor & Account</th><th>Investor Keeps</th><th>Commission Pool</th><th>Assigned</th><th>Remaining</th><th>Actions</th></tr>\`;
         
-        // Group existing shares by investor_id and account_id
+        // Group existing shares by investor (one row per investor)
         const groups = {};
         d.forEach(i => {
-          const key = \`\${i.investor_id}_\${i.account_id}\`;
-          if (!groups[key]) groups[key] = { investor_id: i.investor_id, account_id: i.account_id, shares: [] };
+          const invObj = (state.data.investors || []).find(inv => 
+            String(inv.id || '').toLowerCase() === String(i.investor_id || '').toLowerCase() ||
+            String(inv.portal_username || '').toLowerCase() === String(i.investor_id || '').toLowerCase()
+          );
+          const username = invObj ? (invObj.portal_username || invObj.id) : i.investor_id;
+          const key = String(username).toLowerCase();
+          if (!groups[key]) groups[key] = { investor_id: username, account_id: 'All', shares: [] };
           groups[key].shares.push(i);
         });
 
         // Also add investors who have NO shares yet so they appear in the list
         (state.data.investors || []).forEach(inv => {
           const username = inv.portal_username || inv.id;
-          const key = \`\${username}_All\`;
+          const key = String(username).toLowerCase();
           if (!groups[key]) {
             groups[key] = { investor_id: username, account_id: 'All', shares: [] };
           }
