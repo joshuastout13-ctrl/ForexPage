@@ -1112,14 +1112,14 @@ let state = {
 
           const hasShares = g.shares.length > 0;
           return \`
-            <tr style="cursor: pointer;" onclick="document.querySelectorAll('.row-group-\${g.investor_id}-\${g.account_id}').forEach(r => r.classList.toggle('hidden'))">
+            <tr style="cursor: pointer;" onclick="if (!event.target.closest('.btn-group') && !event.target.closest('button')) document.querySelectorAll('.row-group-\${g.investor_id}-\${g.account_id}').forEach(r => r.classList.toggle('hidden'))">
               <td><strong>\${g.investor_id}</strong><br><span class="muted" style="font-size:12px">\${g.account_id}</span></td>
               <td>\${invSplit}%</td>
               <td>\${commissionPool.toFixed(2)}%</td>
               <td>\${totalAssigned.toFixed(2)}%</td>
               <td><span style="color: \${remaining < 0 ? 'var(--danger)' : remaining === 0 ? 'var(--muted)' : 'var(--success)'}">\${remaining.toFixed(2)}%</span></td>
               <td>
-                <div class="btn-group" onclick="event.stopPropagation()">
+                <div class="btn-group">
                   <button class="btn-action btn-action-add-share action-btn" data-action="add_share_for" data-investor="\${invIdForAdd}" data-remaining="\${remaining > 0 ? remaining.toFixed(2) : 10}">Manage Shares</button>
                   \${hasShares ? \`<button class="btn-action action-btn" data-action="toggle_details" data-group="row-group-\${g.investor_id}-\${g.account_id}">Details ▼</button>\` : ''}
                 </div>
