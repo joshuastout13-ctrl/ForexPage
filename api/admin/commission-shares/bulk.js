@@ -53,6 +53,12 @@ export default async function handler(req, res) {
       });
     }
 
+    // Clean up legacy rules for this source investor
+    await supabase
+      .from("commission_rules")
+      .delete()
+      .or(`investor_id.eq.${sourceInvestorId},investor_id.eq.${sourceInv ? sourceInv.id : ''},investor_id.eq.${sourceInv ? sourceInv.portal_username : ''}`);
+
     // Fetch existing shares for this source investor
     const { data: existingShares } = await supabase
       .from("commission_shares")

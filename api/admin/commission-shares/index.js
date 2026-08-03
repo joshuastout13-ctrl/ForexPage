@@ -17,6 +17,13 @@ export default async function handler(req, res) {
 
       const invMap = new Map((investorsData || []).map(i => [String(i.id).toLowerCase(), i]));
       
+      const sourceInvsWithShares = new Set(
+        (sharesData || []).map(s => {
+          const src = invMap.get(String(s.source_investor_id || "").toLowerCase());
+          return src ? (src.portal_username || src.id).toLowerCase() : String(s.source_investor_id).toLowerCase();
+        })
+      );
+
       const mappedShares = (sharesData || []).map(i => {
         const src = invMap.get(String(i.source_investor_id || "").toLowerCase());
         const rec = invMap.get(String(i.recipient_investor_id || "").toLowerCase());
@@ -34,22 +41,28 @@ export default async function handler(req, res) {
         };
       });
 
-      const mappedRules = (rulesData || []).map(r => {
-        const src = invMap.get(String(r.investor_id || r.source_investor_id || "").toLowerCase());
-        const rec = invMap.get(String(r.recipient_id || r.recipient_investor_id || "").toLowerCase());
-        return {
-          id: r.id,
-          investor_id: src ? (src.portal_username || src.id) : (r.investor_id || r.source_investor_id),
-          account_id: r.account_id || r.source_account_id || "All",
-          recipient_id: r.recipient_id || r.recipient_investor_id,
-          recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : (r.recipient_id || r.recipient_investor_id),
-          percent: r.percent || r.commission_percent,
-          effective_start_date: null,
-          effective_end_date: null,
-          status: "active",
-          notes: ""
-        };
-      });
+      const mappedRules = (rulesData || [])
+        .filter(r => {
+          const src = invMap.get(String(r.investor_id || r.source_investor_id || "").toLowerCase());
+          const srcKey = src ? (src.portal_username || src.id).toLowerCase() : String(r.investor_id || r.source_investor_id).toLowerCase();
+          return !sourceInvsWithShares.has(srcKey);
+        })
+        .map(r => {
+          const src = invMap.get(String(r.investor_id || r.source_investor_id || "").toLowerCase());
+          const rec = invMap.get(String(r.recipient_id || r.recipient_investor_id || "").toLowerCase());
+          return {
+            id: r.id,
+            investor_id: src ? (src.portal_username || src.id) : (r.investor_id || r.source_investor_id),
+            account_id: r.account_id || r.source_account_id || "All",
+            recipient_id: r.recipient_id || r.recipient_investor_id,
+            recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : (r.recipient_id || r.recipient_investor_id),
+            percent: r.percent || r.commission_percent,
+            effective_start_date: null,
+            effective_end_date: null,
+            status: "active",
+            notes: ""
+          };
+        });
 
       const combined = [...mappedShares, ...mappedRules];
       return res.status(200).json({ commission_shares: combined });
