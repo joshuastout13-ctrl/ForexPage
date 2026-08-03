@@ -1121,7 +1121,7 @@ let state = {
               <td>
                 <div class="btn-group" onclick="event.stopPropagation()">
                   <button class="btn-action btn-action-add-share action-btn" data-action="add_share_for" data-investor="\${invIdForAdd}" data-remaining="\${remaining > 0 ? remaining.toFixed(2) : 10}">Manage Shares</button>
-                  \${hasShares ? \`<button class="btn-action">Details ▼</button>\` : ''}
+                  \${hasShares ? \`<button class="btn-action action-btn" data-action="toggle_details" data-group="row-group-\${g.investor_id}-\${g.account_id}">Details ▼</button>\` : ''}
                 </div>
               </td>
             </tr>
@@ -1220,19 +1220,29 @@ let state = {
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="\${item ? item.gross_return_pct : 0}" required /></div>
         \`;
       } else if (tab === 'commission_shares') {
-        const sourceInvId = (extraData && extraData.sourceInvestorId) || (item ? item.investor_id : (state.data.investors[0] ? state.data.investors[0].id : ''));
-        const sourceInv = state.data.investors.find(inv => inv.id === sourceInvId || inv.portal_username === sourceInvId) || (state.data.investors[0] || {});
+        const rawSourceId = String((extraData && extraData.sourceInvestorId) || (item ? item.investor_id : (state.data.investors[0] ? state.data.investors[0].id : ''))).trim().toLowerCase();
+        const sourceInv = state.data.investors.find(inv => 
+          String(inv.id || '').trim().toLowerCase() === rawSourceId || 
+          String(inv.portal_username || '').trim().toLowerCase() === rawSourceId ||
+          String(inv.email || '').trim().toLowerCase() === rawSourceId
+        ) || (state.data.investors[0] || {});
         const invSplit = sourceInv.split_pct !== undefined ? Number(sourceInv.split_pct) : 100;
         const commissionPool = 100 - invSplit;
 
-        const sourceAcc = (state.data.accounts || []).find(a => a.investor_id === sourceInv.id || a.investor_id === sourceInv.portal_username);
+        const sourceAcc = (state.data.accounts || []).find(a => 
+          String(a.investor_id || '').trim().toLowerCase() === String(sourceInv.id || '').trim().toLowerCase() ||
+          String(a.investor_id || '').trim().toLowerCase() === String(sourceInv.portal_username || '').trim().toLowerCase()
+        );
         const accOpenDate = (sourceAcc && sourceAcc.open_date) ? sourceAcc.open_date : (sourceInv.created_at ? sourceInv.created_at.split('T')[0] : '2026-05-01');
         const todayIsoStr = new Date().toISOString().split('T')[0];
 
         // Fetch all existing shares for this source investor
-        const existingShares = (state.data.commission_shares || []).filter(s => 
-          s.investor_id === sourceInv.id || s.investor_id === sourceInv.portal_username || s.investor_id === sourceInvId
-        );
+        const existingShares = (state.data.commission_shares || []).filter(s => {
+          const sSrc = String(s.investor_id || s.source_investor_id || '').trim().toLowerCase();
+          return sSrc === rawSourceId || 
+                 (sourceInv.id && sSrc === String(sourceInv.id).trim().toLowerCase()) ||
+                 (sourceInv.portal_username && sSrc === String(sourceInv.portal_username).trim().toLowerCase());
+        });
 
         // Alphabetically sorted investors for dropdowns
         const sortedInvestors = [...(state.data.investors || [])].sort((a,b) => {
@@ -1587,6 +1597,14 @@ let state = {
       const action = btn.dataset.action;
       const id = btn.dataset.id;
       if (!action) return;
+
+      if (action === 'toggle_details') {
+        const groupClass = btn.dataset.group;
+        if (groupClass) {
+          document.querySelectorAll('.' + groupClass).forEach(r => r.classList.toggle('hidden'));
+        }
+        return;
+      }
 
       if (action === 'add_share_for') {
         const targetInv = btn.dataset.investor;
