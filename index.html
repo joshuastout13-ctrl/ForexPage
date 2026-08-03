@@ -569,6 +569,23 @@
     </div>
   </div>
 
+  <!-- Commission Breakdown Modal -->
+  <div id="commissionModal" class="modal-overlay" onclick="if(event.target === this) this.classList.remove('active')">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0; font-size: 24px;">Commission Breakdown</h2>
+        <button class="modal-close" onclick="document.getElementById('commissionModal').classList.remove('active')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="table-container">
+        <table id="commissionTable">
+          <!-- Populated via JS -->
+        </table>
+      </div>
+    </div>
+  </div>
+
   <script>
     const ICONS = {
       capital: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
@@ -659,8 +676,13 @@
         { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
       ];
 
+      if (investor.hasCommissionAccount || (summary.commissionsEarnedYear || 0) > 0 || (summary.commissionsEarnedMonth || 0) > 0) {
+        metrics.push({ label: `Comm. ${summary.commMonthName || 'This Month'}`, value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
+        metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
+      }
+
       document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
-        <div class="metric ${m.class || ''}">
+        <div class="metric ${m.class || ''}" ${m.action ? `data-action="${m.action}"` : ''}>
           <div class="label-row">
             <div class="label">${m.label}</div>
             ${m.icon}
@@ -669,6 +691,42 @@
           ${m.subvalue ? `<div class="subvalue">${m.subvalue}</div>` : ''}
         </div>
       `).join("");
+    }
+
+    function showCommissionModal() {
+      const breakdown = window.currentCommissionBreakdown || [];
+      const table = document.getElementById("commissionTable");
+      
+      const head = `
+        <thead>
+          <tr>
+            <th>Source Account</th>
+            <th style="text-align:right;">This Month</th>
+            <th style="text-align:right;">This Year</th>
+          </tr>
+        </thead>
+      `;
+
+      if (breakdown.length === 0) {
+        table.innerHTML = head + `<tbody><tr><td colspan="3" style="text-align:center;" class="muted">No commissions generated yet.</td></tr></tbody>`;
+      } else {
+        const body = breakdown.map(r => `
+          <tr>
+            <td>
+              <div style="font-weight:700; color:var(--text);">${r.sourceName}</div>
+            </td>
+            <td>
+              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.monthAmount)}</div>
+            </td>
+            <td>
+              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.yearAmount)}</div>
+            </td>
+          </tr>
+        `).join("");
+        table.innerHTML = head + `<tbody>${body}</tbody>`;
+      }
+      
+      document.getElementById("commissionModal").classList.add("active");
     }
 
     function renderLive(data) {
@@ -720,6 +778,13 @@
       const body = rows.map((r, idx) => {
         let activityHtml = '';
         if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
+        
+        // Show commissions earned in the previous month as "Commission Added" in this month
+        const prevRow = idx > 0 ? rows[idx - 1] : null;
+        const commAdded = prevRow ? (parseFloat(prevRow.commissionsEarned) || 0) : 0;
+        if (commAdded > 0) {
+          activityHtml += `<div class="green">+${money(commAdded)} Commission Added</div>`;
+        }
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
         if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal Completed</div>`;
@@ -852,6 +917,13 @@
 
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    
+    document.getElementById("summaryGrid").addEventListener("click", (e) => {
+      const metricBox = e.target.closest('.metric');
+      if (metricBox && metricBox.dataset.action === 'showCommissionModal') {
+        showCommissionModal();
+      }
+    });
     
     // Auto-login check
     loadDashboard().catch(() => {});
