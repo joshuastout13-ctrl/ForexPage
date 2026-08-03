@@ -1211,7 +1211,9 @@ let state = {
           <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : 0}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
           <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" \${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" \${item       } else if (tab === 'returns') {
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" \${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" \${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+        \`;
+      } else if (tab === 'returns') {
         html = \`
           <div class="form-group"><label>Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
           <div class="form-group"><label>Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
