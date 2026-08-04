@@ -68,6 +68,7 @@ export default async function handler(req, res) {
         if (body.totalCashIn !== undefined) accUpdates.total_cash_in = Number(body.totalCashIn);
         if (body.isCommission !== undefined) accUpdates.is_commission = body.isCommission === true || body.isCommission === "true";
         if (body.splitPct !== undefined) accUpdates.split_pct = Number(body.splitPct);
+        if (body.startDate !== undefined) accUpdates.open_date = body.startDate;
         
         if (Object.keys(accUpdates).length > 0) {
           await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAccId);

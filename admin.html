@@ -1186,6 +1186,10 @@ let state = {
 
       let html = '';
       if (tab === 'investors') {
+        const primaryAcc = (state.data.accounts || []).find(a => a.investor_id === (item ? item.id : '')) || {};
+        const accStartCap = primaryAcc.starting_capital !== undefined ? primaryAcc.starting_capital : '';
+        const accTotalCashIn = primaryAcc.total_cash_in !== undefined ? primaryAcc.total_cash_in : '';
+        const accOpenDate = primaryAcc.open_date || item?.start_date || '';
         html = `
           <div class="form-group"><label>First Name</label><input id="field_first_name" value="${item ? escapeHtml(item.first_name || item.firstname || '') : ''}" required /></div>
           <div class="form-group"><label>Last Name</label><input id="field_last_name" value="${item ? escapeHtml(item.last_name || item.lastname || '') : ''}" required /></div>
@@ -1194,6 +1198,9 @@ let state = {
           <div class="form-group"><label>Password</label><input id="field_password" value="${item ? escapeHtml(item.temp_password || item.password || item.temppasswordprototypeonly || '') : ''}" placeholder="${action === 'add' ? 'Leave blank to auto-generate' : 'Enter new password or leave unchanged'}" /></div>
           <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
+          <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${accStartCap}" placeholder="Primary account starting capital" /></div>
+          <div class="form-group"><label>Total Cash In ($)</label><input id="field_total_cash_in" type="number" step="0.01" value="${accTotalCashIn}" placeholder="Total cash invested (deposits + capital)" /></div>
+          <div class="form-group"><label>Start Date (Open Date)</label><input id="field_start_date" type="date" value="${accOpenDate}" /></div>
         `;
       } else if (tab === 'accounts') {
         const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
@@ -1201,6 +1208,8 @@ let state = {
           <div class="form-group"><label>Investor</label><select id="field_investor_id" required>${invOptions}</select></div>
           <div class="form-group"><label>Account Name</label><input id="field_name" value="${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>
           <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${item ? (item.starting_capital || 0) : 0}" required /></div>
+          <div class="form-group"><label>Total Cash In ($)</label><input id="field_total_cash_in" type="number" step="0.01" value="${item ? (item.total_cash_in || '') : ''}" placeholder="Total cash invested" /></div>
+          <div class="form-group"><label>Open Date</label><input id="field_open_date" type="date" value="${item ? (item.open_date || '') : new Date().toISOString().split('T')[0]}" /></div>
           <div class="form-group"><label>Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct || 100) : 100}" required /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" ${!item || item.status === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" ${item && item.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
         `;
@@ -1500,13 +1509,19 @@ let state = {
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0)
           };
+          const startCapVal = document.getElementById('field_starting_capital')?.value;
+          if (startCapVal !== undefined && startCapVal !== '') body.startingCapital = Number(startCapVal);
+          const totalCashInVal = document.getElementById('field_total_cash_in')?.value;
+          if (totalCashInVal !== undefined && totalCashInVal !== '') body.totalCashIn = Number(totalCashInVal);
+          const startDateVal = document.getElementById('field_start_date')?.value;
+          if (startDateVal) body.startDate = startDateVal;
           if (passVal) {
             body.password = passVal;
             body.tempPassword = passVal;
           }
         } else if (tab === 'accounts') {
           endpoint = action === 'edit' ? `/api/admin/accounts/${id}` : '/api/admin/accounts';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             investorId: document.getElementById('field_investor_id')?.value,
             name: document.getElementById('field_name')?.value,
@@ -1514,11 +1529,18 @@ let state = {
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             status: document.getElementById('field_status')?.value || 'Active'
           };
+          const accTotalCashInVal = document.getElementById('field_total_cash_in')?.value;
+          if (accTotalCashInVal !== undefined && accTotalCashInVal !== '') body.totalCashIn = Number(accTotalCashInVal);
+          const accOpenDateVal = document.getElementById('field_open_date')?.value;
+          if (accOpenDateVal) body.openDate = accOpenDateVal;
         } else if (tab === 'deposits') {
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PUT' : 'POST';
+          const depAccId = document.getElementById('field_account_id')?.value;
+          const depAcc = (state.data.accounts || []).find(a => a.id === depAccId);
           body = {
-            accountId: document.getElementById('field_account_id')?.value,
+            investorId: depAcc ? depAcc.investor_id : '',
+            accountId: depAccId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             date: document.getElementById('field_date')?.value,
             type: document.getElementById('field_type')?.value || 'DEPOSIT'
@@ -1526,8 +1548,11 @@ let state = {
         } else if (tab === 'withdrawals') {
           endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
           method = action === 'edit' ? 'PUT' : 'POST';
+          const wdAccId = document.getElementById('field_account_id')?.value;
+          const wdAcc = (state.data.accounts || []).find(a => a.id === wdAccId);
           body = {
-            accountId: document.getElementById('field_account_id')?.value,
+            investorId: wdAcc ? wdAcc.investor_id : '',
+            accountId: wdAccId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             month: document.getElementById('field_month')?.value,
             year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
