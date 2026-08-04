@@ -1162,6 +1162,17 @@ let state = {
       const errorEl = document.getElementById('modalError');
       if (errorEl) errorEl.textContent = '';
       
+      const modalInner = modal.querySelector('.modal');
+      if (modalInner) {
+        if (tab === 'commission_shares') {
+          modalInner.style.maxWidth = '1100px';
+          modalInner.style.width = '95%';
+        } else {
+          modalInner.style.maxWidth = '600px';
+          modalInner.style.width = '100%';
+        }
+      }
+      
       formAction.value = action;
       formId.value = id || '';
       
@@ -1367,16 +1378,16 @@ let state = {
             </div>
           </div>
 
-          <div style="margin-bottom:12px; max-height:280px; overflow-y:auto;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <div style="margin-bottom:12px; max-height:400px; overflow-y:auto; overflow-x:auto;">
+            <table style="width:100%; min-width:850px; border-collapse:collapse; font-size:13px;">
               <thead>
                 <tr style="text-align:left; border-bottom:1px solid var(--border);">
-                  <th style="padding:6px;">Recipient</th>
-                  <th style="padding:6px;">Share %</th>
-                  <th style="padding:6px;">Start Date</th>
-                  <th style="padding:6px;">End Date</th>
-                  <th style="padding:6px;">Status</th>
-                  <th style="padding:6px; text-align:center;">Action</th>
+                  <th style="padding:8px 6px; min-width:240px;">Recipient</th>
+                  <th style="padding:8px 6px; width:110px;">Share %</th>
+                  <th style="padding:8px 6px; width:150px;">Start Date</th>
+                  <th style="padding:8px 6px; width:150px;">End Date</th>
+                  <th style="padding:8px 6px; width:140px;">Status</th>
+                  <th style="padding:8px 6px; width:60px; text-align:center;">Action</th>
                 </tr>
               </thead>
               <tbody id="bulkSharesTableBody">
