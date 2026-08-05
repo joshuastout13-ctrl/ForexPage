@@ -211,6 +211,7 @@
           <button class="nav-btn" data-tab="history">7. Historical Data</button>
           <button class="nav-btn" data-tab="commission_shares">8. Commission Shares</button>
           <button class="nav-btn" data-tab="email_center">9. Email Center</button>
+          <button class="nav-btn" data-tab="commission_audit">10. Commission Audit</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -310,11 +311,6 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div id="entityModal" class="modal-overlay hidden">
     <div class="modal">
       <div class="right" style="margin-bottom:20px;">
@@ -524,16 +520,19 @@ let state = {
           snapshots: 'Snapshots', 
           history: 'Historical Monthly Data',
           commission_shares: 'Commission Shares',
-          email_center: 'Admin Email Center'
+          email_center: 'Admin Email Center',
+          commission_audit: 'Commission Audit & Reconciliation'
         };
         document.getElementById('viewTitle').textContent = titles[state.tab] || 'Admin Portal';
         
         const isEmailTab = state.tab === 'email_center';
-        document.getElementById('viewActions').classList.toggle('hidden', isEmailTab);
-        document.getElementById('tableContainer').classList.toggle('hidden', isEmailTab);
+        const isAuditTab = state.tab === 'commission_audit';
+        document.getElementById('viewActions').classList.toggle('hidden', isEmailTab || isAuditTab);
+        document.getElementById('tableContainer').classList.toggle('hidden', isEmailTab || isAuditTab);
         document.getElementById('emailCenterView').classList.toggle('hidden', !isEmailTab);
+        document.getElementById('commissionAuditView').classList.toggle('hidden', !isAuditTab);
 
-        if (!isEmailTab) {
+        if (!isEmailTab && !isAuditTab) {
           document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
           document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         }
@@ -549,6 +548,8 @@ let state = {
       try {
         if (tab === 'email_center') {
           await loadEmailCenterData();
+        } else if (tab === 'commission_audit') {
+          await loadCommissionAuditTab();
         } else {
           const endpoints = { 
             investors: '/api/admin/investors', 
@@ -623,6 +624,91 @@ let state = {
       renderRecipientList();
       renderEmailLogs();
       renderAttachmentChips();
+    }
+
+    async function loadCommissionAuditTab() {
+      try {
+        if (!state.data.investors || state.data.investors.length === 0) {
+          const invRes = await api.request('/api/admin/investors');
+          state.data.investors = invRes.investors || [];
+        }
+        const select = document.getElementById('auditSourceSelect');
+        const currVal = select.value;
+        select.innerHTML = '<option value="">-- Select Source Investor --</option>' +
+          (state.data.investors || []).map(i => {
+            const name = [i.first_name, i.last_name].filter(Boolean).join(" ") || i.portal_username;
+            return `<option value="${i.id}" ${i.id === currVal ? 'selected' : ''}>${escapeHtml(name)} (${i.portal_username})</option>`;
+          }).join("");
+      } catch (err) {
+        showToast("Failed to load source investors for audit: " + err.message, true);
+      } finally {
+        document.body.classList.remove('loading-active');
+        document.getElementById('loadingIndicator').classList.add('hidden');
+      }
+    }
+
+    function renderAuditReport(report) {
+      const s = report.sourceSummary;
+      const r100 = report.reconciliation100Pct;
+
+      document.getElementById('auditResultsBox').classList.remove('hidden');
+
+      const badge = document.getElementById('auditStatusBadge');
+      badge.textContent = s.status;
+      badge.className = `badge ${s.isPass ? 'active' : 'inactive'}`;
+
+      document.getElementById('audSrcName').textContent = s.sourceName;
+      document.getElementById('audStartBal').textContent = money(s.startingBalance);
+      document.getElementById('audDeposits').textContent = money(s.deposits - s.withdrawals);
+      document.getElementById('audAdjBal').textContent = money(s.adjustedStartingBalance);
+      document.getElementById('audGrossPct').textContent = `+${s.grossReturnPct.toFixed(2)}%`;
+      document.getElementById('audGrossProfit').textContent = money(s.grossProfit);
+
+      document.getElementById('audSplitPct').textContent = `${s.sourceInvestorSplitPct}%`;
+      document.getElementById('audSourceKept').textContent = money(s.sourceInvestorKeptAmount);
+      document.getElementById('audTotalRecipients').textContent = money(s.totalRecipientAmount);
+      document.getElementById('audUnallocatedPool').textContent = money(s.unallocatedPoolAmount);
+      document.getElementById('audTotalDistributed').textContent = money(s.totalDistributedAmount);
+
+      const varEl = document.getElementById('audVariance');
+      varEl.textContent = money(s.varianceAmount);
+      varEl.style.color = s.isPass ? 'var(--text)' : 'var(--danger)';
+
+      const barSource = document.getElementById('barSourceKept');
+      const barRec = document.getElementById('barRecipients');
+      const barUn = document.getElementById('barUnallocated');
+
+      const srcPct = r100.sourceEffectivePct;
+      const recPct = r100.totalRecipientEffectivePct;
+      const unPct = r100.unallocatedEffectivePct;
+
+      barSource.style.width = `${srcPct.toFixed(2)}%`;
+      barSource.textContent = `Source Kept: ${srcPct.toFixed(1)}%`;
+
+      barRec.style.width = `${recPct.toFixed(2)}%`;
+      barRec.textContent = `Recipients: ${recPct.toFixed(1)}%`;
+
+      barUn.style.width = `${unPct.toFixed(2)}%`;
+      barUn.textContent = unPct > 1 ? `Unallocated: ${unPct.toFixed(1)}%` : '';
+
+      document.getElementById('audProofLabel').textContent = `${r100.sumEffectivePct.toFixed(2)}% Reconciled`;
+
+      const tbody = document.getElementById('audRecipientTableBody');
+      if (!report.recipientBreakdown || report.recipientBreakdown.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;" class="muted">No commission recipients for this source in ${s.monthName} ${s.year}.</td></tr>`;
+      } else {
+        tbody.innerHTML = report.recipientBreakdown.map(r => `
+          <tr>
+            <td style="font-weight:bold;">${escapeHtml(r.recipientName)}</td>
+            <td class="muted">${escapeHtml(r.recipientUsername)}</td>
+            <td style="text-align:right; font-weight:600; font-family:'Outfit';" class="red">${r.commissionPctOfPool.toFixed(1)}%</td>
+            <td style="text-align:right; font-weight:600; font-family:'Outfit';" class="green">${r.effectivePctOfGrossProfit.toFixed(2)}%</td>
+            <td style="text-align:right; font-weight:bold; font-family:'Outfit';" class="green">${money(r.amountReceived)}</td>
+            <td style="text-align:center;">${escapeHtml(r.earnedMonth)}</td>
+            <td style="text-align:center;">${escapeHtml(r.creditMonth)}</td>
+          </tr>
+        `).join("");
+      }
     }
 
     function renderRecipientList() {
@@ -1756,6 +1842,83 @@ let state = {
         loadTab('history');
       } catch(e) { alert('Import failed: ' + e.message); }
       finally { btn.disabled = false; btn.textContent = 'Start Import'; document.getElementById('importModal').classList.remove('saving-active'); }
+    });
+
+    document.getElementById('runAuditBtn')?.addEventListener('click', async () => {
+      const sourceInvestorId = document.getElementById('auditSourceSelect').value;
+      const year = document.getElementById('auditYearSelect').value;
+      const month = document.getElementById('auditMonthSelect').value;
+
+      if (!sourceInvestorId) {
+        showToast("Please select a source investor first.", true);
+        return;
+      }
+
+      document.body.classList.add('loading-active');
+      try {
+        const report = await api.request(`/api/admin/commission-audit?sourceInvestorId=${encodeURIComponent(sourceInvestorId)}&year=${year}&month=${month}`);
+        window.currentAuditReport = report;
+        renderAuditReport(report);
+        showToast("Audit report generated successfully!");
+      } catch (err) {
+        showToast(err.message, true);
+      } finally {
+        document.body.classList.remove('loading-active');
+      }
+    });
+
+    document.getElementById('exportAuditBtn')?.addEventListener('click', () => {
+      const r = window.currentAuditReport;
+      if (!r) {
+        showToast("No audit report generated yet. Generate an audit report first.", true);
+        return;
+      }
+      const s = r.sourceSummary;
+      let csv = [];
+      csv.push(["COMMISSION AUDIT & RECONCILIATION REPORT"]);
+      csv.push(["Generated At", r.auditTimestamp]);
+      csv.push([]);
+      csv.push(["SOURCE SUMMARY"]);
+      csv.push(["Source Account Holder", `"${s.sourceName}"`]);
+      csv.push(["Earned Year", s.year]);
+      csv.push(["Earned Month", `"${s.monthName}"`]);
+      csv.push(["Starting Balance", s.startingBalance]);
+      csv.push(["Net Deposits / Draw", s.deposits - s.withdrawals]);
+      csv.push(["Adjusted Capital Base", s.adjustedStartingBalance]);
+      csv.push(["Gross Return %", `${s.grossReturnPct}%`]);
+      csv.push(["Gross Profit $", s.grossProfit]);
+      csv.push(["Source Investor Split %", `${s.sourceInvestorSplitPct}%`]);
+      csv.push(["Source Investor Kept $", s.sourceInvestorKeptAmount]);
+      csv.push(["Commission Pool %", `${s.commissionPoolPct}%`]);
+      csv.push(["Total Distributed to Recipients $", s.totalRecipientAmount]);
+      csv.push(["Unallocated Pool $", s.unallocatedPoolAmount]);
+      csv.push(["Total Reconciled Amount $", s.totalDistributedAmount]);
+      csv.push(["Variance $", s.varianceAmount]);
+      csv.push(["Audit Status", s.status]);
+      csv.push([]);
+      csv.push(["RECIPIENT BREAKDOWN"]);
+      csv.push(["Recipient Name", "Username / ID", "Share % of Pool", "Effective % of Gross Profit", "Amount Received ($)", "Earned Month", "Credit Month"]);
+      
+      (r.recipientBreakdown || []).forEach(b => {
+        csv.push([
+          `"${b.recipientName}"`,
+          `"${b.recipientUsername}"`,
+          `${b.commissionPctOfPool}%`,
+          `${b.effectivePctOfGrossProfit.toFixed(2)}%`,
+          b.amountReceived,
+          `"${b.earnedMonth}"`,
+          `"${b.creditMonth}"`
+        ]);
+      });
+
+      const blob = new Blob([csv.map(e => e.join(",")).join("\n")], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Commission_Audit_${s.sourceUsername}_${s.year}_Month${s.monthNumber}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     });
 
     init();
