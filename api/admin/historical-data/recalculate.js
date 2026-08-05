@@ -212,7 +212,7 @@ export default async function handler(req, res) {
         const monthEnd = new Date(Date.UTC(targetYear, m, 0, 23, 59, 59));
         
         const activeShares = (unifiedCommRules || []).filter(share => {
-          if (share.status === 'cancelled' || share.status === 'inactive' || share.status === 'ended') return false;
+          if (share.status === 'cancelled' || share.status === 'void') return false;
           
           if (share.source_account_id) {
             const sAcc = String(share.source_account_id).trim().toLowerCase();
