@@ -700,26 +700,34 @@
       const head = `
         <thead>
           <tr>
-            <th>Source Account</th>
-            <th style="text-align:right;">This Month</th>
-            <th style="text-align:right;">This Year</th>
+            <th>Source Account Holder</th>
+            <th style="text-align:right;">Source Balance</th>
+            <th style="text-align:right;">Share %</th>
+            <th style="text-align:right;">Month Earned</th>
+            <th style="text-align:right;">2026 YTD</th>
           </tr>
         </thead>
       `;
 
       if (breakdown.length === 0) {
-        table.innerHTML = head + `<tbody><tr><td colspan="3" style="text-align:center;" class="muted">No commissions generated yet.</td></tr></tbody>`;
+        table.innerHTML = head + `<tbody><tr><td colspan="5" style="text-align:center;" class="muted">No commissions generated yet.</td></tr></tbody>`;
       } else {
         const body = breakdown.map(r => `
           <tr>
             <td>
               <div style="font-weight:700; color:var(--text);">${r.sourceName}</div>
             </td>
-            <td>
-              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.monthAmount)}</div>
+            <td style="text-align:right; font-family:'Outfit'; font-weight:600;">
+              ${r.sourceBalance ? money(r.sourceBalance) : '-'}
             </td>
-            <td>
-              <div style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(r.yearAmount)}</div>
+            <td style="text-align:right; font-family:'Outfit'; font-weight:600;">
+              ${typeof r.percent === 'number' ? r.percent.toFixed(1) + '%' : (r.percent || '-')}
+            </td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">
+              ${money(r.monthAmount)}
+            </td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">
+              ${money(r.yearAmount)}
             </td>
           </tr>
         `).join("");

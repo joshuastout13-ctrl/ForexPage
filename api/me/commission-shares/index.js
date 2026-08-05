@@ -22,7 +22,7 @@ export default async function handler(req, res) {
           source:investors!commission_shares_source_investor_id_fkey(portal_username, first_name, last_name, email),
           account:investor_accounts!commission_shares_source_account_id_fkey(name)
         `)
-        .or(`source_investor_id.ilike.${investorId},recipient_investor_id.ilike.${investorId}`)
+        .ilike("recipient_investor_id", investorId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
