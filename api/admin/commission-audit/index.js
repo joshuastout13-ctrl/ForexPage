@@ -86,11 +86,11 @@ export default async function handler(req, res) {
       ? num(monthlyReturns.gross_return_pct || monthlyReturns.gross_return || monthlyReturns.return)
       : (sourceHist ? num(sourceHist.gross_return_pct || sourceHist.return_pct) : 0);
 
-    let startingBalance = sourceHist ? num(sourceHist.starting_balance) : 0;
+    let startingBalance = sourceHist ? num(sourceHist.opening_balance || sourceHist.starting_balance) : 0;
     let deposits = sourceHist ? num(sourceHist.deposits || sourceHist.cash_in) : 0;
     let withdrawals = sourceHist ? num(sourceHist.withdrawals) : 0;
-    let adjustedStartingBalance = sourceHist
-      ? num(sourceHist.adjusted_starting_balance)
+    let adjustedStartingBalance = (sourceHist && num(sourceHist.adjusted_opening_balance || sourceHist.adjusted_starting_balance) > 0)
+      ? num(sourceHist.adjusted_opening_balance || sourceHist.adjusted_starting_balance)
       : (startingBalance + deposits - withdrawals);
 
     if (startingBalance === 0 && sourceAccounts.length > 0) {
@@ -99,8 +99,8 @@ export default async function handler(req, res) {
     }
 
     let grossProfit = new Decimal(adjustedStartingBalance).mul(grossReturnPct).div(100).toNumber();
-    if (sourceHist && num(sourceHist.gross_gain) > 0) {
-      grossProfit = num(sourceHist.gross_gain);
+    if (sourceHist && num(sourceHist.gross_gain || sourceHist.manual_gain_amount) > 0) {
+      grossProfit = num(sourceHist.gross_gain || sourceHist.manual_gain_amount);
     }
 
     // 4. Source Investor Split & Pool
