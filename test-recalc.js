@@ -26,7 +26,7 @@ export async function handler(req, res) {
       supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_rules").select("*"),
-      supabase.from("commission_earnings").select("*").eq("year", targetYear),
+      supabase.from("commission_earnings").select("*").in("year", [targetYear, targetYear - 1]),
       supabase.from("investor_accounts").select("*").eq("status", "Active"),
       supabase.from("investor_monthly_history").select("*").eq("year", targetYear)
     ]);
@@ -85,7 +85,8 @@ export async function handler(req, res) {
 
       const commEarningsByM = {};
       invCommEarnings.forEach(e => {
-        commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
+        const key = `${e.year}_${e.month_number}`;
+        commEarningsByM[key] = (commEarningsByM[key] || 0) + Number(e.amount || 0);
       });
 
       // Find this investor's history
@@ -99,7 +100,9 @@ export async function handler(req, res) {
                           (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
         
         const existing = history?.find(h => h.month_number === m);
-        const earnedPrevMonth = (m > 1) ? (commEarningsByM[m - 1] || 0) : 0;
+        const earnedPrevMonth = (m > 1) 
+          ? (commEarningsByM[`${targetYear}_${m - 1}`] || 0) 
+          : (commEarningsByM[`${targetYear - 1}_12`] || 0);
         
         const commAcc = accounts.find(a => a.is_commission) || accounts[0];
         if (commAcc && earnedPrevMonth > 0) {

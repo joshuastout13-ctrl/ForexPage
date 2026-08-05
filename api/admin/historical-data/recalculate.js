@@ -78,7 +78,7 @@ export default async function handler(req, res) {
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_shares").select("*").in("source_investor_id", Array.from(sourceIdSet)),
       supabase.from("commission_rules").select("*").in("investor_id", Array.from(sourceIdSet)),
-      supabase.from("commission_earnings").select("*").in("recipient_id", Array.from(sourceIdSet)).eq("year", targetYear)
+      supabase.from("commission_earnings").select("*").in("recipient_id", Array.from(sourceIdSet)).in("year", [targetYear, targetYear - 1])
     ]);
 
     // Build unified commission rules/shares list
@@ -151,7 +151,8 @@ export default async function handler(req, res) {
       fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
     });
     const commEarningsByM = {}; commEarnings?.forEach(e => {
-      commEarningsByM[e.month_number] = (commEarningsByM[e.month_number] || 0) + Number(e.amount || 0);
+      const key = `${e.year}_${e.month_number}`;
+      commEarningsByM[key] = (commEarningsByM[key] || 0) + Number(e.amount || 0);
     });
 
     // 5. Track balances per account using Decimal instances
@@ -168,7 +169,9 @@ export default async function handler(req, res) {
                         (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
 
       const existing = history.find(h => h.month_number === m);
-      const earnedPrevMonth = (m > 1) ? new Decimal(commEarningsByM[m - 1] || 0) : new Decimal(0);
+      const earnedPrevMonth = (m > 1)
+        ? new Decimal(commEarningsByM[`${targetYear}_${m - 1}`] || 0)
+        : new Decimal(commEarningsByM[`${targetYear - 1}_12`] || 0);
       
       // Add commissions to the FIRST commission account found, or just the first account
       const commAcc = accounts.find(a => a.is_commission) || accounts[0];
