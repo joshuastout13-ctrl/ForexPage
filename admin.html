@@ -2071,117 +2071,16 @@ let state = {
     });
 
     document.getElementById('exportAuditBtn')?.addEventListener('click', () => {
-      const r = window.currentAuditReport;
-      if (!r) {
-        showToast("No audit report generated yet. Generate an audit report first.", true);
+      const sourceInvestorId = document.getElementById('auditSourceSelect').value;
+      const year = document.getElementById('auditYearSelect').value;
+      const month = document.getElementById('auditMonthSelect').value;
+
+      if (!sourceInvestorId) {
+        showToast("Please select a source investor first.", true);
         return;
       }
-      const s = r.sourceSummary;
 
-      const formatCell = (val) => {
-        if (val === null || val === undefined) return '""';
-        const str = String(val).replace(/"/g, '""');
-        return `"${str}"`;
-      };
-
-      let csvRows = [];
-
-      // Standard Flat CSV Column Headers
-      const headers = [
-        "Account Holder",
-        "Username / ID",
-        "Earned Month",
-        "Earned Year",
-        "Starting Balance",
-        "Current Balance",
-        "Investor Share %",
-        "Net Deposits/Draw",
-        "Adjusted Capital Base",
-        "Gross Return %",
-        "Gross Profit",
-        "Source Kept ($)",
-        "Commission Pool ($)",
-        "Month Net",
-        "Net YTD",
-        "Variance",
-        "Audit Status",
-        "Recipient Name",
-        "Recipient Username",
-        "Share % of Pool",
-        "Effective % of Gross",
-        "Amount Received ($)",
-        "Earned Month Period",
-        "Credit Month Period"
-      ];
-
-      csvRows.push(headers.map(formatCell));
-
-      const baseRow = [
-        s.sourceName,
-        s.sourceUsername,
-        s.monthName,
-        s.year,
-        Number(s.startingBalance || 0).toFixed(2),
-        Number(s.currentBalance || 0).toFixed(2),
-        `${s.sourceInvestorSplitPct}%`,
-        Number(s.deposits - s.withdrawals).toFixed(2),
-        Number(s.adjustedStartingBalance || 0).toFixed(2),
-        `${Number(s.grossReturnPct || 0).toFixed(2)}%`,
-        Number(s.grossProfit || 0).toFixed(2),
-        Number(s.sourceInvestorKeptAmount || 0).toFixed(2),
-        Number(s.grossPoolAmount || 0).toFixed(2),
-        Number(s.monthNet || 0).toFixed(2),
-        Number(s.netYtd || 0).toFixed(2),
-        Number(s.varianceAmount || 0).toFixed(2),
-        s.status
-      ];
-
-      if (r.recipientBreakdown && r.recipientBreakdown.length > 0) {
-        r.recipientBreakdown.forEach(b => {
-          const row = [
-            ...baseRow,
-            b.recipientName,
-            b.recipientUsername,
-            `${Number(b.commissionPctOfPool || 0).toFixed(1)}%`,
-            `${Number(b.effectivePctOfGrossProfit || 0).toFixed(2)}%`,
-            Number(b.amountReceived || 0).toFixed(2),
-            b.earnedMonth,
-            b.creditMonth
-          ];
-          csvRows.push(row.map(formatCell));
-        });
-      } else {
-        const row = [
-          ...baseRow,
-          "N/A",
-          "N/A",
-          "0.0%",
-          "0.00%",
-          "0.00",
-          `${s.monthName} ${s.year}`,
-          "-"
-        ];
-        csvRows.push(row.map(formatCell));
-      }
-
-      // Build CSV with UTF-8 BOM (\uFEFF) for Excel auto-formatting
-      const csvContent = "\uFEFF" + csvRows.map(row => row.join(",")).join("\r\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      
-      const cleanUsername = String(s.sourceUsername || "account").replace(/[^a-z0-9_-]/gi, "_");
-      const filename = `Audit_Report_${cleanUsername}_${s.year}_Month${s.monthNumber}.csv`;
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
+      window.location.href = `/api/admin/commission-audit?sourceInvestorId=${encodeURIComponent(sourceInvestorId)}&year=${year}&month=${month}&format=csv`;
     });
 
     // Password Reset Modal Handlers

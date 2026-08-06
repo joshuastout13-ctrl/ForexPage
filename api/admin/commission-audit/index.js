@@ -275,6 +275,97 @@ export default async function handler(req, res) {
       recipientBreakdown: recipientBreakdown
     };
 
+    if (query.format === "csv") {
+      const formatCell = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      let csvRows = [];
+      const headers = [
+        "Account Holder",
+        "Username / ID",
+        "Earned Month",
+        "Earned Year",
+        "Starting Balance",
+        "Current Balance",
+        "Investor Share %",
+        "Net Deposits/Draw",
+        "Adjusted Capital Base",
+        "Gross Return %",
+        "Gross Profit",
+        "Source Kept ($)",
+        "Commission Pool ($)",
+        "Month Net",
+        "Net YTD",
+        "Variance",
+        "Audit Status",
+        "Recipient Name",
+        "Recipient Username",
+        "Share % of Pool",
+        "Effective % of Gross",
+        "Amount Received ($)",
+        "Earned Month Period",
+        "Credit Month Period"
+      ];
+      csvRows.push(headers.map(formatCell));
+
+      const baseRow = [
+        sourceName,
+        sourceInv.portal_username,
+        MONTH_NAMES[monthNumber],
+        year,
+        Number(startingBalance || 0).toFixed(2),
+        Number(currentBalance || 0).toFixed(2),
+        `${sourceSplitPct}%`,
+        Number(deposits - withdrawals).toFixed(2),
+        Number(adjustedStartingBalance || 0).toFixed(2),
+        `${Number(grossReturnPct || 0).toFixed(2)}%`,
+        Number(grossProfit || 0).toFixed(2),
+        Number(sourceKeptAmount || 0).toFixed(2),
+        Number(grossPoolAmount || 0).toFixed(2),
+        Number(monthNet || 0).toFixed(2),
+        Number(netYtd.toNumber() || 0).toFixed(2),
+        Number(varianceAmount || 0).toFixed(2),
+        status
+      ];
+
+      if (recipientBreakdown && recipientBreakdown.length > 0) {
+        recipientBreakdown.forEach(b => {
+          csvRows.push([
+            ...baseRow,
+            b.recipientName,
+            b.recipientUsername,
+            `${Number(b.commissionPctOfPool || 0).toFixed(1)}%`,
+            `${Number(b.effectivePctOfGrossProfit || 0).toFixed(2)}%`,
+            Number(b.amountReceived || 0).toFixed(2),
+            b.earnedMonth,
+            b.creditMonth
+          ].map(formatCell));
+        });
+      } else {
+        csvRows.push([
+          ...baseRow,
+          "N/A",
+          "N/A",
+          "0.0%",
+          "0.00%",
+          "0.00",
+          `${MONTH_NAMES[monthNumber]} ${year}`,
+          "-"
+        ].map(formatCell));
+      }
+
+      const csvContent = "\uFEFF" + csvRows.map(row => row.join(",")).join("\r\n");
+      const cleanUsername = String(sourceInv.portal_username || "account").replace(/[^a-z0-9_-]/gi, "_");
+      const filename = `Audit_Report_${cleanUsername}_${year}_Month${monthNumber}.csv`;
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.status(200).send(csvContent);
+    }
+
     return res.status(200).json(report);
   } catch (err) {
     console.error("[Audit Report API]", err);
