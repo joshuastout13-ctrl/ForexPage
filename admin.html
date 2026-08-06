@@ -2085,67 +2085,86 @@ let state = {
       };
 
       let csvRows = [];
-      // Title Header
-      csvRows.push([formatCell("STONE AND COMPANY FOREX FUND - AUDIT REPORT & RECONCILIATION")]);
-      csvRows.push([formatCell("Report Generated At"), formatCell(new Date(r.auditTimestamp).toLocaleString())]);
-      csvRows.push([]);
 
-      // Section 1: Source Account Summary
-      csvRows.push([formatCell("ACCOUNT SUMMARY")]);
-      csvRows.push([formatCell("Account Holder"), formatCell(s.sourceName)]);
-      csvRows.push([formatCell("Username / ID"), formatCell(s.sourceUsername)]);
-      csvRows.push([formatCell("Earned Period"), formatCell(`${s.monthName} ${s.year}`)]);
-      csvRows.push([formatCell("Starting Balance"), formatCell(`$${Number(s.startingBalance || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Current Balance"), formatCell(`$${Number(s.currentBalance || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Investor Share %"), formatCell(`${s.sourceInvestorSplitPct}%`)]);
-      csvRows.push([formatCell("Net Deposits / Draw"), formatCell(`$${Number(s.deposits - s.withdrawals).toFixed(2)}`)]);
-      csvRows.push([formatCell("Adjusted Capital Base"), formatCell(`$${Number(s.adjustedStartingBalance || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Gross Return %"), formatCell(`+${Number(s.grossReturnPct || 0).toFixed(2)}%`)]);
-      csvRows.push([formatCell("Gross Profit $"), formatCell(`$${Number(s.grossProfit || 0).toFixed(2)}`)]);
-      csvRows.push([]);
+      // Standard Flat CSV Column Headers
+      const headers = [
+        "Account Holder",
+        "Username / ID",
+        "Earned Month",
+        "Earned Year",
+        "Starting Balance",
+        "Current Balance",
+        "Investor Share %",
+        "Net Deposits/Draw",
+        "Adjusted Capital Base",
+        "Gross Return %",
+        "Gross Profit",
+        "Source Kept ($)",
+        "Commission Pool ($)",
+        "Month Net",
+        "Net YTD",
+        "Variance",
+        "Audit Status",
+        "Recipient Name",
+        "Recipient Username",
+        "Share % of Pool",
+        "Effective % of Gross",
+        "Amount Received ($)",
+        "Earned Month Period",
+        "Credit Month Period"
+      ];
 
-      // Section 2: Distribution & Reconciliation
-      csvRows.push([formatCell("DISTRIBUTION & RECONCILIATION SUMMARY")]);
-      csvRows.push([formatCell("Source Investor Split"), formatCell(`${s.sourceInvestorSplitPct}%`), formatCell(`$${Number(s.sourceInvestorKeptAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Commission Pool"), formatCell(`${s.commissionPoolPct}%`), formatCell(`$${Number(s.grossPoolAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Total Distributed to Recipients"), formatCell(""), formatCell(`$${Number(s.totalRecipientAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Unallocated Pool"), formatCell(""), formatCell(`$${Number(s.unallocatedPoolAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Total Reconciled Amount"), formatCell(""), formatCell(`$${Number(s.totalDistributedAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Month Net"), formatCell(""), formatCell(`$${Number(s.monthNet || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Net YTD"), formatCell(""), formatCell(`$${Number(s.netYtd || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Variance"), formatCell(""), formatCell(`$${Number(s.varianceAmount || 0).toFixed(2)}`)]);
-      csvRows.push([formatCell("Audit Status"), formatCell(""), formatCell(s.status)]);
-      csvRows.push([]);
+      csvRows.push(headers.map(formatCell));
 
-      // Section 3: Recipient Breakdown Table
-      csvRows.push([formatCell("COMMISSION RECIPIENT BREAKDOWN")]);
-      csvRows.push([
-        formatCell("Recipient Name"),
-        formatCell("Username / ID"),
-        formatCell("Share % of Pool"),
-        formatCell("Effective % of Gross Profit"),
-        formatCell("Amount Received ($)"),
-        formatCell("Earned Month"),
-        formatCell("Credit Month")
-      ]);
+      const baseRow = [
+        s.sourceName,
+        s.sourceUsername,
+        s.monthName,
+        s.year,
+        Number(s.startingBalance || 0).toFixed(2),
+        Number(s.currentBalance || 0).toFixed(2),
+        `${s.sourceInvestorSplitPct}%`,
+        Number(s.deposits - s.withdrawals).toFixed(2),
+        Number(s.adjustedStartingBalance || 0).toFixed(2),
+        `${Number(s.grossReturnPct || 0).toFixed(2)}%`,
+        Number(s.grossProfit || 0).toFixed(2),
+        Number(s.sourceInvestorKeptAmount || 0).toFixed(2),
+        Number(s.grossPoolAmount || 0).toFixed(2),
+        Number(s.monthNet || 0).toFixed(2),
+        Number(s.netYtd || 0).toFixed(2),
+        Number(s.varianceAmount || 0).toFixed(2),
+        s.status
+      ];
 
       if (r.recipientBreakdown && r.recipientBreakdown.length > 0) {
         r.recipientBreakdown.forEach(b => {
-          csvRows.push([
-            formatCell(b.recipientName),
-            formatCell(b.recipientUsername),
-            formatCell(`${Number(b.commissionPctOfPool || 0).toFixed(1)}%`),
-            formatCell(`${Number(b.effectivePctOfGrossProfit || 0).toFixed(2)}%`),
-            formatCell(`$${Number(b.amountReceived || 0).toFixed(2)}`),
-            formatCell(b.earnedMonth),
-            formatCell(b.creditMonth)
-          ]);
+          const row = [
+            ...baseRow,
+            b.recipientName,
+            b.recipientUsername,
+            `${Number(b.commissionPctOfPool || 0).toFixed(1)}%`,
+            `${Number(b.effectivePctOfGrossProfit || 0).toFixed(2)}%`,
+            Number(b.amountReceived || 0).toFixed(2),
+            b.earnedMonth,
+            b.creditMonth
+          ];
+          csvRows.push(row.map(formatCell));
         });
       } else {
-        csvRows.push([formatCell("No commission recipients for this source period"), formatCell(""), formatCell(""), formatCell(""), formatCell("$0.00"), formatCell(""), formatCell("")]);
+        const row = [
+          ...baseRow,
+          "N/A",
+          "N/A",
+          "0.0%",
+          "0.00%",
+          "0.00",
+          `${s.monthName} ${s.year}`,
+          "-"
+        ];
+        csvRows.push(row.map(formatCell));
       }
 
-      // Build CSV with UTF-8 BOM (\uFEFF) for Excel compatibility
+      // Build CSV with UTF-8 BOM (\uFEFF) for Excel auto-formatting
       const csvContent = "\uFEFF" + csvRows.map(row => row.join(",")).join("\r\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
