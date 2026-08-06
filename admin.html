@@ -435,9 +435,9 @@
                 <!-- Reconciliation Bar -->
                 <div class="muted" style="font-size:11px; margin-bottom:6px;">100% Reconciliation: <span id="audProofLabel">100.00% Reconciled</span></div>
                 <div style="height:28px; border-radius:8px; overflow:hidden; display:flex; background:rgba(255,255,255,0.04); border:1px solid var(--line);">
-                  <div id="barSourceKept" style="background:var(--accent); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;">Source</div>
-                  <div id="barRecipients" style="background:var(--success); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;">Recipients</div>
-                  <div id="barUnallocated" style="background:var(--warning); color:#000; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;"></div>
+                  <div id="barSourceKept" style="background:var(--accent); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0; overflow:hidden; white-space:nowrap;">Source</div>
+                  <div id="barRecipients" style="background:var(--success); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0; overflow:hidden; white-space:nowrap;">Recipients</div>
+                  <div id="barUnallocated" style="background:var(--warning); color:#000; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0; overflow:hidden; white-space:nowrap;"></div>
                 </div>
               </div>
 
@@ -880,13 +880,13 @@ let state = {
       const unPct = r100.unallocatedEffectivePct;
 
       barSource.style.width = `${srcPct.toFixed(2)}%`;
-      barSource.textContent = `Source Kept: ${srcPct.toFixed(1)}%`;
+      barSource.textContent = srcPct >= 10 ? `Source Kept: ${srcPct.toFixed(1)}%` : (srcPct > 2 ? `${srcPct.toFixed(1)}%` : '');
 
       barRec.style.width = `${recPct.toFixed(2)}%`;
-      barRec.textContent = `Recipients: ${recPct.toFixed(1)}%`;
+      barRec.textContent = recPct >= 10 ? `Recipients: ${recPct.toFixed(1)}%` : (recPct > 2 ? `${recPct.toFixed(1)}%` : '');
 
       barUn.style.width = `${unPct.toFixed(2)}%`;
-      barUn.textContent = unPct > 1 ? `Unallocated: ${unPct.toFixed(1)}%` : '';
+      barUn.textContent = unPct >= 10 ? `Unallocated: ${unPct.toFixed(1)}%` : (unPct > 2 ? `${unPct.toFixed(1)}%` : '');
 
       document.getElementById('audProofLabel').textContent = `${r100.sumEffectivePct.toFixed(2)}% Reconciled`;
 
