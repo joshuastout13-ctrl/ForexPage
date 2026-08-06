@@ -2077,55 +2077,92 @@ let state = {
         return;
       }
       const s = r.sourceSummary;
-      let csv = [];
-      csv.push(["AUDIT REPORT & RECONCILIATION"]);
-      csv.push(["Generated At", r.auditTimestamp]);
-      csv.push([]);
-      csv.push(["ACCOUNT SUMMARY"]);
-      csv.push(["Account Holder", `"${s.sourceName}"`]);
-      csv.push(["Earned Year", s.year]);
-      csv.push(["Earned Month", `"${s.monthName}"`]);
-      csv.push(["Starting Balance", s.startingBalance]);
-      csv.push(["Current Balance", s.currentBalance || '']);
-      csv.push(["Investor Share %", `${s.sourceInvestorSplitPct}%`]);
-      csv.push(["Net Deposits / Draw", s.deposits - s.withdrawals]);
-      csv.push(["Adjusted Capital Base", s.adjustedStartingBalance]);
-      csv.push(["Gross Return %", `${s.grossReturnPct}%`]);
-      csv.push(["Gross Profit $", s.grossProfit]);
-      csv.push(["Source Investor Split %", `${s.sourceInvestorSplitPct}%`]);
-      csv.push(["Source Investor Kept $", s.sourceInvestorKeptAmount]);
-      csv.push(["Commission Pool %", `${s.commissionPoolPct}%`]);
-      csv.push(["Total Distributed to Recipients $", s.totalRecipientAmount]);
-      csv.push(["Unallocated Pool $", s.unallocatedPoolAmount]);
-      csv.push(["Total Reconciled Amount $", s.totalDistributedAmount]);
-      csv.push(["Month Net $", s.monthNet || 0]);
-      csv.push(["Net YTD $", s.netYtd || 0]);
-      csv.push(["Variance $", s.varianceAmount]);
-      csv.push(["Audit Status", s.status]);
-      csv.push([]);
-      csv.push(["RECIPIENT BREAKDOWN"]);
-      csv.push(["Recipient Name", "Username / ID", "Share % of Pool", "Effective % of Gross Profit", "Amount Received ($)", "Earned Month", "Credit Month"]);
-      
-      (r.recipientBreakdown || []).forEach(b => {
-        csv.push([
-          `"${b.recipientName}"`,
-          `"${b.recipientUsername}"`,
-          `${b.commissionPctOfPool}%`,
-          `${b.effectivePctOfGrossProfit.toFixed(2)}%`,
-          b.amountReceived,
-          `"${b.earnedMonth}"`,
-          `"${b.creditMonth}"`
-        ]);
-      });
 
-      const blob = new Blob([csv.map(e => e.join(",")).join("\n")], { type: 'text/csv;charset=utf-8;' });
+      const formatCell = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      let csvRows = [];
+      // Title Header
+      csvRows.push([formatCell("STONE AND COMPANY FOREX FUND - AUDIT REPORT & RECONCILIATION")]);
+      csvRows.push([formatCell("Report Generated At"), formatCell(new Date(r.auditTimestamp).toLocaleString())]);
+      csvRows.push([]);
+
+      // Section 1: Source Account Summary
+      csvRows.push([formatCell("ACCOUNT SUMMARY")]);
+      csvRows.push([formatCell("Account Holder"), formatCell(s.sourceName)]);
+      csvRows.push([formatCell("Username / ID"), formatCell(s.sourceUsername)]);
+      csvRows.push([formatCell("Earned Period"), formatCell(`${s.monthName} ${s.year}`)]);
+      csvRows.push([formatCell("Starting Balance"), formatCell(`$${Number(s.startingBalance || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Current Balance"), formatCell(`$${Number(s.currentBalance || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Investor Share %"), formatCell(`${s.sourceInvestorSplitPct}%`)]);
+      csvRows.push([formatCell("Net Deposits / Draw"), formatCell(`$${Number(s.deposits - s.withdrawals).toFixed(2)}`)]);
+      csvRows.push([formatCell("Adjusted Capital Base"), formatCell(`$${Number(s.adjustedStartingBalance || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Gross Return %"), formatCell(`+${Number(s.grossReturnPct || 0).toFixed(2)}%`)]);
+      csvRows.push([formatCell("Gross Profit $"), formatCell(`$${Number(s.grossProfit || 0).toFixed(2)}`)]);
+      csvRows.push([]);
+
+      // Section 2: Distribution & Reconciliation
+      csvRows.push([formatCell("DISTRIBUTION & RECONCILIATION SUMMARY")]);
+      csvRows.push([formatCell("Source Investor Split"), formatCell(`${s.sourceInvestorSplitPct}%`), formatCell(`$${Number(s.sourceInvestorKeptAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Commission Pool"), formatCell(`${s.commissionPoolPct}%`), formatCell(`$${Number(s.grossPoolAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Total Distributed to Recipients"), formatCell(""), formatCell(`$${Number(s.totalRecipientAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Unallocated Pool"), formatCell(""), formatCell(`$${Number(s.unallocatedPoolAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Total Reconciled Amount"), formatCell(""), formatCell(`$${Number(s.totalDistributedAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Month Net"), formatCell(""), formatCell(`$${Number(s.monthNet || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Net YTD"), formatCell(""), formatCell(`$${Number(s.netYtd || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Variance"), formatCell(""), formatCell(`$${Number(s.varianceAmount || 0).toFixed(2)}`)]);
+      csvRows.push([formatCell("Audit Status"), formatCell(""), formatCell(s.status)]);
+      csvRows.push([]);
+
+      // Section 3: Recipient Breakdown Table
+      csvRows.push([formatCell("COMMISSION RECIPIENT BREAKDOWN")]);
+      csvRows.push([
+        formatCell("Recipient Name"),
+        formatCell("Username / ID"),
+        formatCell("Share % of Pool"),
+        formatCell("Effective % of Gross Profit"),
+        formatCell("Amount Received ($)"),
+        formatCell("Earned Month"),
+        formatCell("Credit Month")
+      ]);
+
+      if (r.recipientBreakdown && r.recipientBreakdown.length > 0) {
+        r.recipientBreakdown.forEach(b => {
+          csvRows.push([
+            formatCell(b.recipientName),
+            formatCell(b.recipientUsername),
+            formatCell(`${Number(b.commissionPctOfPool || 0).toFixed(1)}%`),
+            formatCell(`${Number(b.effectivePctOfGrossProfit || 0).toFixed(2)}%`),
+            formatCell(`$${Number(b.amountReceived || 0).toFixed(2)}`),
+            formatCell(b.earnedMonth),
+            formatCell(b.creditMonth)
+          ]);
+        });
+      } else {
+        csvRows.push([formatCell("No commission recipients for this source period"), formatCell(""), formatCell(""), formatCell(""), formatCell("$0.00"), formatCell(""), formatCell("")]);
+      }
+
+      // Build CSV with UTF-8 BOM (\uFEFF) for Excel compatibility
+      const csvContent = "\uFEFF" + csvRows.map(row => row.join(",")).join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
+      
+      const cleanUsername = String(s.sourceUsername || "account").replace(/[^a-z0-9_-]/gi, "_");
+      const filename = `Audit_Report_${cleanUsername}_${s.year}_Month${s.monthNumber}.csv`;
+
       const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `Audit_Report_${s.sourceUsername}_${s.year}_Month${s.monthNumber}.csv`);
+      link.href = url;
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
     });
 
     // Password Reset Modal Handlers
