@@ -62,9 +62,16 @@ export default async function handler(req, res) {
       ""
     ).trim();
 
-    const token = createSession({ investorId });
+    // Check if investor must change password on first login
+    const forcePasswordChange = Boolean(
+      investor.force_password_change ?? 
+      investor.forcepasswordchange ?? 
+      false
+    );
+
+    const token = createSession({ investorId, forcePasswordChange });
     res.setHeader("Set-Cookie", sessionCookie(token));
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, forcePasswordChange });
   } catch (err) {
     return res.status(500).json({ error: err.message || "Login failed" });
   }

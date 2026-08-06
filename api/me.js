@@ -11,7 +11,18 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (session.forcePasswordChange) {
+      res.status(200).json({ forcePasswordChange: true });
+      return;
+    }
+
     const data = await buildInvestorDashboard(session.investorId);
+
+    if (data.investor && (data.investor.force_password_change || data.investor.forcePasswordChange)) {
+      res.status(200).json({ forcePasswordChange: true });
+      return;
+    }
+
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to load dashboard" });

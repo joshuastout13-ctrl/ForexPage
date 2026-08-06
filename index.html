@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
   <style>
     :root {
       --bg: #030712;
@@ -488,9 +488,33 @@
         <button id="loginBtn" style="width:100%; margin-top:12px;">Sign In</button>
         <div id="loginError" style="color:var(--danger); font-size:14px; text-align:center; min-height:20px;"></div>
       </div>
+    <!-- First-Login Password Setup -->
+    <div id="changePasswordCard" class="card hidden">
+      <div class="login-header">
+        <div class="kicker" style="background:rgba(245,158,11,0.15); color:var(--warning); border-color:rgba(245,158,11,0.3);">Security Update</div>
+        <h1>Set New Password</h1>
+        <p class="muted">You are logging in with a temporary password. Please set a new secure password to access your dashboard.</p>
+      </div>
+      <div class="login-form">
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Current (Temporary) Password</label>
+          <input id="currentPassword" type="password" placeholder="••••••••" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">New Password</label>
+          <input id="newPassword" type="password" placeholder="Minimum 4 characters" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Confirm New Password</label>
+          <input id="confirmPassword" type="password" placeholder="Re-enter new password" />
+        </div>
+        <button id="changePassBtn" style="width:100%; margin-top:12px; background:linear-gradient(135deg,var(--accent),#2563eb);">Save & Continue to Dashboard</button>
+        <div id="changePassError" style="color:var(--danger); font-size:14px; text-align:center; min-height:20px;"></div>
+      </div>
     </div>
 
     <!-- Dashboard -->
+
     <div id="dashboard" class="hidden">
       <!-- Header -->
       <div class="hero-layout">
@@ -638,6 +662,13 @@
           return;
         }
 
+        if (data.forcePasswordChange) {
+          document.getElementById("loginCard").classList.add("hidden");
+          document.getElementById("changePasswordCard").classList.remove("hidden");
+          document.getElementById("currentPassword").value = password;
+          return;
+        }
+
         btn.textContent = "Loading Dashboard...";
         await loadDashboard();
       } catch (err) {
@@ -648,9 +679,59 @@
       }
     }
 
+    async function changePassword() {
+      const btn = document.getElementById("changePassBtn");
+      const currentPassword = document.getElementById("currentPassword").value.trim();
+      const newPassword = document.getElementById("newPassword").value.trim();
+      const confirmPassword = document.getElementById("confirmPassword").value.trim();
+      const errorEl = document.getElementById("changePassError");
+
+      errorEl.textContent = "";
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        errorEl.textContent = "Please fill out all password fields.";
+        return;
+      }
+
+      if (newPassword.length < 4) {
+        errorEl.textContent = "New password must be at least 4 characters.";
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        errorEl.textContent = "New passwords do not match.";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Updating Password...";
+
+      try {
+        const res = await fetch("/api/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || "Failed to update password.";
+          return;
+        }
+
+        await loadDashboard();
+      } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save & Continue to Dashboard";
+      }
+    }
+
     async function logout() {
       await fetch("/api/logout", { method: "POST" });
       document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("changePasswordCard").classList.add("hidden");
       document.getElementById("loginCard").classList.remove("hidden");
       document.getElementById("statusText").textContent = "Signed out";
     }
@@ -838,17 +919,41 @@
       document.getElementById("breakdownTable").innerHTML = head + `<tbody>${body}</tbody>`;
     }
 
-    async function loadDashboard() {
-      const res = await fetch("/api/me");
-      const data = await res.json();
+    let cachedDashboardData = null;
+    let cachedAt = 0;
 
-      if (!res.ok) {
-        document.getElementById("loginCard").classList.remove("hidden");
-        document.getElementById("dashboard").classList.add("hidden");
-        return;
+    async function loadDashboard(forceRefresh = false) {
+      const now = Date.now();
+      let data = null;
+
+      if (!forceRefresh && cachedDashboardData && (now - cachedAt < 60000)) {
+        data = cachedDashboardData;
+      } else {
+        const res = await fetch("/api/me");
+        data = await res.json();
+
+        if (!res.ok) {
+          cachedDashboardData = null;
+          document.getElementById("loginCard").classList.remove("hidden");
+          document.getElementById("changePasswordCard").classList.add("hidden");
+          document.getElementById("dashboard").classList.add("hidden");
+          return;
+        }
+
+        if (data.forcePasswordChange) {
+          cachedDashboardData = null;
+          document.getElementById("loginCard").classList.add("hidden");
+          document.getElementById("changePasswordCard").classList.remove("hidden");
+          document.getElementById("dashboard").classList.add("hidden");
+          return;
+        }
+
+        cachedDashboardData = data;
+        cachedAt = now;
       }
 
       document.getElementById("loginCard").classList.add("hidden");
+      document.getElementById("changePasswordCard").classList.add("hidden");
       document.getElementById("dashboard").classList.remove("hidden");
       
       const firstName = (data.investor.name || "").split(' ')[0];
@@ -932,6 +1037,7 @@
     }
 
     document.getElementById("loginBtn").addEventListener("click", login);
+    document.getElementById("changePassBtn").addEventListener("click", changePassword);
     document.getElementById("logoutBtn").addEventListener("click", logout);
     
     document.getElementById("summaryGrid").addEventListener("click", (e) => {

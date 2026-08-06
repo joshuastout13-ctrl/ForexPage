@@ -211,7 +211,7 @@
           <button class="nav-btn" data-tab="history">7. Historical Data</button>
           <button class="nav-btn" data-tab="commission_shares">8. Commission Shares</button>
           <button class="nav-btn" data-tab="email_center">9. Email Center</button>
-          <button class="nav-btn" data-tab="commission_audit">10. Commission Audit</button>
+          <button class="nav-btn" data-tab="commission_audit">10. Audit Report</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -311,6 +311,190 @@
               </div>
             </div>
           </div>
+
+          <!-- Dedicated Audit Report View -->
+          <div id="commissionAuditView" class="hidden">
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:20px; align-items:flex-end;">
+              <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+                <label>Source Account</label>
+                <select id="auditSourceSelect">
+                  <option value="">-- Select Source Investor --</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0; min-width:140px;">
+                <label>Month</label>
+                <select id="auditMonthSelect">
+                  <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                  <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                  <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                  <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0; min-width:100px;">
+                <label>Year</label>
+                <select id="auditYearSelect">
+                  <option value="2025">2025</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2027">2027</option>
+                </select>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button id="runAuditBtn" style="white-space:nowrap;">📊 Generate Report</button>
+                <button id="exportAuditBtn" class="secondary" style="white-space:nowrap;">📥 Export CSV</button>
+              </div>
+            </div>
+
+            <div id="auditResultsBox" class="hidden">
+              <!-- Status Badge -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <span class="muted" style="font-size:13px; text-transform:uppercase; letter-spacing:0.05em;">Audit Status</span>
+                  <span id="auditStatusBadge" class="badge active" style="margin-left:10px; font-size:13px; padding:6px 14px;">PASS</span>
+                </div>
+                <div class="muted" style="font-size:12px;">
+                  Generated: <span id="audTimestamp"></span>
+                </div>
+              </div>
+
+              <!-- Account Summary Cards -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Account Holder</div>
+                  <div id="audSrcName" style="font-weight:700; font-size:15px; color:#fff;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Starting Balance</div>
+                  <div id="audStartBal" style="font-weight:700; font-size:15px; font-family:'Outfit',sans-serif;">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Current Balance</div>
+                  <div id="audCurrentBal" style="font-weight:700; font-size:15px; font-family:'Outfit',sans-serif; color:var(--success);">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Investor Share</div>
+                  <div id="audInvestorShare" style="font-weight:700; font-size:15px; font-family:'Outfit',sans-serif;">—%</div>
+                </div>
+              </div>
+
+              <!-- Profit & Commission Summary -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px; margin-bottom:20px;">
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Net Deposits/Draw</div>
+                  <div id="audDeposits" style="font-weight:600; font-size:14px; font-family:'Outfit',sans-serif;">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Adj. Capital Base</div>
+                  <div id="audAdjBal" style="font-weight:600; font-size:14px; font-family:'Outfit',sans-serif;">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Gross Return</div>
+                  <div id="audGrossPct" style="font-weight:700; font-size:14px; color:var(--accent2); font-family:'Outfit',sans-serif;">+0.00%</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Gross Profit</div>
+                  <div id="audGrossProfit" style="font-weight:700; font-size:14px; color:var(--success); font-family:'Outfit',sans-serif;">$0.00</div>
+                </div>
+              </div>
+
+              <!-- Distribution Summary -->
+              <div style="background:rgba(15,23,42,0.6); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:20px;">
+                <h3 style="font-size:14px; margin:0 0 14px 0; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);">Distribution Summary</h3>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;">
+                  <div>
+                    <div class="muted" style="font-size:11px;">Source Investor Split</div>
+                    <div style="font-weight:700; font-size:14px;"><span id="audSplitPct">75%</span> = <span id="audSourceKept">$0.00</span></div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-size:11px;">Total to Recipients</div>
+                    <div id="audTotalRecipients" style="font-weight:700; font-size:14px;">$0.00</div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-size:11px;">Unallocated Pool</div>
+                    <div id="audUnallocatedPool" style="font-weight:700; font-size:14px; color:var(--warning);">$0.00</div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-size:11px;">Total Distributed</div>
+                    <div id="audTotalDistributed" style="font-weight:700; font-size:14px;">$0.00</div>
+                  </div>
+                </div>
+                <!-- Net & YTD -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:16px; border-top:1px solid var(--line); padding-top:14px;">
+                  <div>
+                    <div class="muted" style="font-size:11px;">Month Net</div>
+                    <div id="audMonthNet" style="font-weight:700; font-size:15px; color:var(--success); font-family:'Outfit',sans-serif;">$0.00</div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-size:11px;">Net YTD</div>
+                    <div id="audNetYtd" style="font-weight:700; font-size:15px; color:var(--accent2); font-family:'Outfit',sans-serif;">$0.00</div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-size:11px;">Variance</div>
+                    <div id="audVariance" style="font-weight:700; font-size:15px; font-family:'Outfit',sans-serif;">$0.00</div>
+                  </div>
+                </div>
+                <!-- Reconciliation Bar -->
+                <div class="muted" style="font-size:11px; margin-bottom:6px;">100% Reconciliation: <span id="audProofLabel">100.00% Reconciled</span></div>
+                <div style="height:28px; border-radius:8px; overflow:hidden; display:flex; background:rgba(255,255,255,0.04); border:1px solid var(--line);">
+                  <div id="barSourceKept" style="background:var(--accent); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;">Source</div>
+                  <div id="barRecipients" style="background:var(--success); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;">Recipients</div>
+                  <div id="barUnallocated" style="background:var(--warning); color:#000; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:width 0.4s; min-width:0;"></div>
+                </div>
+              </div>
+
+              <!-- Recipient Breakdown Table -->
+              <div style="background:rgba(15,23,42,0.6); border:1px solid var(--line); border-radius:16px; padding:18px;">
+                <h3 style="font-size:14px; margin:0 0 14px 0; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);">Commission Recipient Breakdown</h3>
+                <div style="overflow-x:auto;">
+                  <table style="min-width:700px;">
+                    <thead>
+                      <tr>
+                        <th>Recipient Name</th>
+                        <th>Username / ID</th>
+                        <th style="text-align:right;">Share % of Pool</th>
+                        <th style="text-align:right;">Effective % of Gross</th>
+                        <th style="text-align:right;">Amount Received</th>
+                        <th style="text-align:center;">Earned Month</th>
+                        <th style="text-align:center;">Credit Month</th>
+                      </tr>
+                    </thead>
+                    <tbody id="audRecipientTableBody">
+                      <tr><td colspan="7" class="muted" style="text-align:center;">Generate an audit report to see recipient breakdown.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+  <!-- Password Reset Modal -->
+  <div id="passwordResetModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:450px;">
+      <div class="right" style="margin-bottom:16px;">
+        <h3 style="margin:0;">Reset Investor Password</h3>
+        <button class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
+      </div>
+      <p class="muted" style="font-size:13px; margin-bottom:16px;">Set a new temporary password for <strong id="resetPasswordName">this investor</strong>.</p>
+      <div class="form-group">
+        <label>New Temporary Password</label>
+        <div style="display:flex; gap:8px;">
+          <input id="resetPasswordInput" type="text" placeholder="Enter new password" />
+          <button id="generateTempPassBtn" class="secondary" style="white-space:nowrap; padding:8px 14px; font-size:13px;">🎲 Generate</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="forceChangeCheckbox" checked style="width:auto;" />
+          <span>Force password change on next login</span>
+        </label>
+      </div>
+      <div id="resetPasswordError" class="muted" style="color:var(--danger); margin-bottom:12px;"></div>
+      <div style="margin-top:20px; text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmResetPasswordBtn">Reset Password</button>
+      </div>
+    </div>
+  </div>
+
   <div id="entityModal" class="modal-overlay hidden">
     <div class="modal">
       <div class="right" style="margin-bottom:20px;">
@@ -521,7 +705,7 @@ let state = {
           history: 'Historical Monthly Data',
           commission_shares: 'Commission Shares',
           email_center: 'Admin Email Center',
-          commission_audit: 'Commission Audit & Reconciliation'
+          commission_audit: 'Audit Report & Reconciliation'
         };
         document.getElementById('viewTitle').textContent = titles[state.tab] || 'Admin Portal';
         
@@ -657,18 +841,31 @@ let state = {
       badge.textContent = s.status;
       badge.className = `badge ${s.isPass ? 'active' : 'inactive'}`;
 
+      // Timestamp
+      document.getElementById('audTimestamp').textContent = new Date(report.auditTimestamp).toLocaleString();
+
+      // Account summary cards
       document.getElementById('audSrcName').textContent = s.sourceName;
       document.getElementById('audStartBal').textContent = money(s.startingBalance);
+      document.getElementById('audCurrentBal').textContent = money(s.currentBalance || s.adjustedStartingBalance);
+      document.getElementById('audInvestorShare').textContent = `${s.sourceInvestorSplitPct}%`;
+
+      // Profit & commission summary
       document.getElementById('audDeposits').textContent = money(s.deposits - s.withdrawals);
       document.getElementById('audAdjBal').textContent = money(s.adjustedStartingBalance);
       document.getElementById('audGrossPct').textContent = `+${s.grossReturnPct.toFixed(2)}%`;
       document.getElementById('audGrossProfit').textContent = money(s.grossProfit);
 
+      // Distribution summary
       document.getElementById('audSplitPct').textContent = `${s.sourceInvestorSplitPct}%`;
       document.getElementById('audSourceKept').textContent = money(s.sourceInvestorKeptAmount);
       document.getElementById('audTotalRecipients').textContent = money(s.totalRecipientAmount);
       document.getElementById('audUnallocatedPool').textContent = money(s.unallocatedPoolAmount);
       document.getElementById('audTotalDistributed').textContent = money(s.totalDistributedAmount);
+
+      // Month Net & YTD
+      document.getElementById('audMonthNet').textContent = money(s.monthNet || 0);
+      document.getElementById('audNetYtd').textContent = money(s.netYtd || 0);
 
       const varEl = document.getElementById('audVariance');
       varEl.textContent = money(s.varianceAmount);
@@ -701,9 +898,9 @@ let state = {
           <tr>
             <td style="font-weight:bold;">${escapeHtml(r.recipientName)}</td>
             <td class="muted">${escapeHtml(r.recipientUsername)}</td>
-            <td style="text-align:right; font-weight:600; font-family:'Outfit';" class="red">${r.commissionPctOfPool.toFixed(1)}%</td>
-            <td style="text-align:right; font-weight:600; font-family:'Outfit';" class="green">${r.effectivePctOfGrossProfit.toFixed(2)}%</td>
-            <td style="text-align:right; font-weight:bold; font-family:'Outfit';" class="green">${money(r.amountReceived)}</td>
+            <td style="text-align:right; font-weight:600; font-family:'Outfit';">${r.commissionPctOfPool.toFixed(1)}%</td>
+            <td style="text-align:right; font-weight:600; font-family:'Outfit'; color:var(--accent2);">${r.effectivePctOfGrossProfit.toFixed(2)}%</td>
+            <td style="text-align:right; font-weight:bold; font-family:'Outfit'; color:var(--success);">${money(r.amountReceived)}</td>
             <td style="text-align:center;">${escapeHtml(r.earnedMonth)}</td>
             <td style="text-align:center;">${escapeHtml(r.creditMonth)}</td>
           </tr>
@@ -1041,6 +1238,7 @@ let state = {
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
+                <button class="btn-action btn-action-edit action-btn" data-action="reset_password" data-id="${i.id}" data-name="${escapeHtml([i.first_name,i.last_name].filter(Boolean).join(' ') || i.portal_username)}">🔑 Reset PW</button>
                 <button class="btn-action ${i.active?'btn-action-deactivate':'btn-action-reactivate'} action-btn" data-action="${i.active?'deactivate':'reactivate'}" data-id="${i.id}">${i.active?'Deactivate':'Reactivate'}</button>
                 <button class="btn-action btn-action-delete action-btn" data-action="delete_user" data-id="${i.id}">Delete</button>
               </div>
@@ -1795,7 +1993,12 @@ let state = {
     });
 
     document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
-    document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
+    let searchDebounceTimer = null;
+    document.getElementById('searchBar').addEventListener('input', (e) => {
+      state.search = e.target.value;
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => renderTable(), 250);
+    });
     document.getElementById('loginBtn').addEventListener('click', async () => {
       const lb = document.getElementById('loginBtn');
       lb.disabled = true; lb.textContent = 'Authenticating...';
@@ -1875,14 +2078,16 @@ let state = {
       }
       const s = r.sourceSummary;
       let csv = [];
-      csv.push(["COMMISSION AUDIT & RECONCILIATION REPORT"]);
+      csv.push(["AUDIT REPORT & RECONCILIATION"]);
       csv.push(["Generated At", r.auditTimestamp]);
       csv.push([]);
-      csv.push(["SOURCE SUMMARY"]);
-      csv.push(["Source Account Holder", `"${s.sourceName}"`]);
+      csv.push(["ACCOUNT SUMMARY"]);
+      csv.push(["Account Holder", `"${s.sourceName}"`]);
       csv.push(["Earned Year", s.year]);
       csv.push(["Earned Month", `"${s.monthName}"`]);
       csv.push(["Starting Balance", s.startingBalance]);
+      csv.push(["Current Balance", s.currentBalance || '']);
+      csv.push(["Investor Share %", `${s.sourceInvestorSplitPct}%`]);
       csv.push(["Net Deposits / Draw", s.deposits - s.withdrawals]);
       csv.push(["Adjusted Capital Base", s.adjustedStartingBalance]);
       csv.push(["Gross Return %", `${s.grossReturnPct}%`]);
@@ -1893,6 +2098,8 @@ let state = {
       csv.push(["Total Distributed to Recipients $", s.totalRecipientAmount]);
       csv.push(["Unallocated Pool $", s.unallocatedPoolAmount]);
       csv.push(["Total Reconciled Amount $", s.totalDistributedAmount]);
+      csv.push(["Month Net $", s.monthNet || 0]);
+      csv.push(["Net YTD $", s.netYtd || 0]);
       csv.push(["Variance $", s.varianceAmount]);
       csv.push(["Audit Status", s.status]);
       csv.push([]);
@@ -1915,10 +2122,62 @@ let state = {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `Commission_Audit_${s.sourceUsername}_${s.year}_Month${s.monthNumber}.csv`);
+      link.setAttribute("download", `Audit_Report_${s.sourceUsername}_${s.year}_Month${s.monthNumber}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    });
+
+    // Password Reset Modal Handlers
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="reset_password"]');
+      if (!btn) return;
+      const investorId = btn.dataset.id;
+      const investorName = btn.dataset.name || investorId;
+      document.getElementById('resetPasswordName').textContent = investorName;
+      document.getElementById('resetPasswordInput').value = '';
+      document.getElementById('forceChangeCheckbox').checked = true;
+      document.getElementById('resetPasswordError').textContent = '';
+      document.getElementById('passwordResetModal').dataset.investorId = investorId;
+      document.getElementById('passwordResetModal').classList.remove('hidden');
+    });
+
+    document.getElementById('generateTempPassBtn')?.addEventListener('click', () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let pass = '';
+      for (let i = 0; i < 10; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      document.getElementById('resetPasswordInput').value = pass;
+    });
+
+    document.getElementById('confirmResetPasswordBtn')?.addEventListener('click', async () => {
+      const modal = document.getElementById('passwordResetModal');
+      const investorId = modal.dataset.investorId;
+      const newPassword = document.getElementById('resetPasswordInput').value.trim();
+      const forceChange = document.getElementById('forceChangeCheckbox').checked;
+      const errorEl = document.getElementById('resetPasswordError');
+
+      if (!newPassword || newPassword.length < 4) {
+        errorEl.textContent = 'Password must be at least 4 characters.';
+        return;
+      }
+
+      const btn = document.getElementById('confirmResetPasswordBtn');
+      btn.disabled = true; btn.textContent = 'Resetting...';
+      errorEl.textContent = '';
+
+      try {
+        await api.request('/api/admin/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ investorId, newPassword, forceChange })
+        });
+        showToast('Password reset successfully!');
+        modal.classList.add('hidden');
+        loadTab('investors');
+      } catch (err) {
+        errorEl.textContent = err.message || 'Failed to reset password.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Reset Password';
+      }
     });
 
     init();
