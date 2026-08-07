@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../lib/adminAuth.js";
 import { supabase } from "../../lib/supabase.js";
+import { hashPassword } from "../../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Admin-only
+    // Admin-only authorization check
     const session = verifyAdminSession(req);
     if (!session) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -37,11 +38,15 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Investor not found" });
     }
 
-    // Update password and set force_password_change flag
+    // Hash password with bcrypt or store plaintext if force change flag requested
+    // If forceChange is true, store as temporary plaintext so user can enter it as temporary password,
+    // otherwise hash with bcrypt.
+    const passwordToStore = forceChange ? newPassword : hashPassword(newPassword);
+
     const { error: updateErr } = await supabase
       .from("investors")
       .update({
-        temp_password: newPassword,
+        temp_password: passwordToStore,
         force_password_change: forceChange,
         updated_at: new Date().toISOString()
       })
@@ -52,7 +57,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Failed to reset password" });
     }
 
-    console.log(`[Admin Reset Password] Password reset for investor ${investor.id} (${investor.portal_username}), forceChange=${forceChange}`);
     return res.status(200).json({
       success: true,
       investorId: investor.id,

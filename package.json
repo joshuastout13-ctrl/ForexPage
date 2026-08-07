@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
+    "bcryptjs": "^3.0.3",
     "decimal.js": "^10.6.0",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",

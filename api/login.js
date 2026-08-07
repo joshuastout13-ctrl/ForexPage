@@ -2,6 +2,7 @@ import { readSheet, bool, filterInvestors } from "../lib/sheets.js";
 import { readSupabaseTable } from "../lib/supabase.js";
 import { CONFIG } from "../lib/config.js";
 import { createSession, sessionCookie } from "../lib/auth.js";
+import { verifyPassword } from "../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -21,10 +22,8 @@ export default async function handler(req, res) {
     let investors;
 
     if (useSupabase) {
-      console.log(`[Login] Checking credentials in Supabase for: "${username}"`);
       investors = await readSupabaseTable("investors");
     } else {
-      console.log(`[Login] Checking credentials in Google Sheets for: "${username}"`);
       investors = await readSheet(CONFIG.tabs.investors);
     }
     
@@ -35,8 +34,14 @@ export default async function handler(req, res) {
       // Skip inactive investors
       if (!bool(row.active ?? row.Active)) return false;
 
-      const rowUser = String(row.portal_username ?? row.portalusername ?? row.username ?? "").trim().toLowerCase();
-      const rowPass = String(
+      const rowUser = String(
+        row.portal_username ?? 
+        row.portalusername ?? 
+        row.username ?? 
+        ""
+      ).trim().toLowerCase();
+
+      const storedPass = String(
         row.temp_password ?? 
         row.temppassword ?? 
         row.password ?? 
@@ -44,15 +49,15 @@ export default async function handler(req, res) {
         ""
       ).trim();
 
-      return rowUser === targetUser && rowPass === password;
+      if (rowUser !== targetUser) return false;
+
+      // Verify password via bcrypt or legacy plaintext
+      return verifyPassword(password, storedPass);
     });
 
     if (!investor) {
-      console.log(`[Login] Failed login attempt for user: "${username}"`);
       return res.status(401).json({ error: "Invalid credentials" });
     }
-
-    console.log(`[Login] Successful login for: "${username}"`);
 
     const investorId = String(
       investor.id ?? 
@@ -62,7 +67,6 @@ export default async function handler(req, res) {
       ""
     ).trim();
 
-    // Check if investor must change password on first login
     const forcePasswordChange = Boolean(
       investor.force_password_change ?? 
       investor.forcepasswordchange ?? 
@@ -70,9 +74,15 @@ export default async function handler(req, res) {
     );
 
     const token = createSession({ investorId, forcePasswordChange });
-    res.setHeader("Set-Cookie", sessionCookie(token));
-    return res.status(200).json({ success: true, forcePasswordChange });
+    res.setHeader("Set-Cookie", sessionCookie(token, req));
+    return res.status(200).json({
+      success: true,
+      investorId: investorId,
+      username: investor.portal_username || username,
+      forcePasswordChange: forcePasswordChange
+    });
   } catch (err) {
+    console.error("[Login API Error]", err);
     return res.status(500).json({ error: err.message || "Login failed" });
   }
 }

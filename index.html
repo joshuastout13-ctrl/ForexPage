@@ -590,6 +590,15 @@
           </div>
         </div>
       </div>
+    <!-- User-Friendly Error State Container (Task 8) -->
+    <div id="errorCard" class="card login-card hidden" style="text-align:center; padding:36px 24px; max-width:480px; margin:40px auto;">
+      <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+      <h2 style="font-size:22px; margin-bottom:12px;">Unable to Load Dashboard</h2>
+      <p class="muted" style="margin-bottom:24px; line-height:1.5;">We couldn't load your dashboard. Please sign in again or contact support if the issue persists.</p>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <button id="retryBtn" style="padding:10px 20px; background:linear-gradient(135deg,var(--accent),#2563eb);">Try Again</button>
+        <button id="errorLogoutBtn" class="secondary" style="padding:10px 20px;">Sign Out</button>
+      </div>
     </div>
   </div>
 
@@ -922,51 +931,92 @@
     let cachedDashboardData = null;
     let cachedAt = 0;
 
+    function showErrorState(message) {
+      cachedDashboardData = null;
+      document.getElementById("loginCard").classList.add("hidden");
+      document.getElementById("changePasswordCard").classList.add("hidden");
+      document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("errorCard").classList.remove("hidden");
+      document.getElementById("statusText").textContent = message || "Dashboard error";
+    }
+
+    function hideErrorState() {
+      document.getElementById("errorCard")?.classList.add("hidden");
+    }
+
     async function loadDashboard(forceRefresh = false) {
+      hideErrorState();
       const now = Date.now();
       let data = null;
 
-      if (!forceRefresh && cachedDashboardData && (now - cachedAt < 60000)) {
-        data = cachedDashboardData;
-      } else {
-        const res = await fetch("/api/me");
-        data = await res.json();
+      try {
+        if (!forceRefresh && cachedDashboardData && (now - cachedAt < 60000)) {
+          data = cachedDashboardData;
+        } else {
+          const res = await fetch("/api/me");
+          
+          if (res.status === 401) {
+            cachedDashboardData = null;
+            document.getElementById("loginCard").classList.remove("hidden");
+            document.getElementById("changePasswordCard").classList.add("hidden");
+            document.getElementById("dashboard").classList.add("hidden");
+            document.getElementById("errorCard").classList.add("hidden");
+            return;
+          }
 
-        if (!res.ok) {
-          cachedDashboardData = null;
-          document.getElementById("loginCard").classList.remove("hidden");
-          document.getElementById("changePasswordCard").classList.add("hidden");
-          document.getElementById("dashboard").classList.add("hidden");
+          data = await res.json();
+
+          if (!res.ok) {
+            showErrorState("We couldn't load your dashboard. Please sign in again.");
+            return;
+          }
+
+          if (data.forcePasswordChange) {
+            cachedDashboardData = null;
+            document.getElementById("loginCard").classList.add("hidden");
+            document.getElementById("changePasswordCard").classList.remove("hidden");
+            document.getElementById("dashboard").classList.add("hidden");
+            document.getElementById("errorCard").classList.add("hidden");
+            return;
+          }
+
+          cachedDashboardData = data;
+          cachedAt = now;
+        }
+
+        // Validate payload keys defensively
+        if (!data || !data.investor) {
+          showErrorState("Invalid dashboard payload received.");
           return;
         }
 
-        if (data.forcePasswordChange) {
-          cachedDashboardData = null;
-          document.getElementById("loginCard").classList.add("hidden");
-          document.getElementById("changePasswordCard").classList.remove("hidden");
-          document.getElementById("dashboard").classList.add("hidden");
-          return;
-        }
+        // Ensure array/object defaults
+        data.monthlyHistory = data.monthlyHistory || [];
+        data.breakdown = data.breakdown || [];
+        data.live = data.live || {};
+        data.liveDollarGains = data.liveDollarGains || {};
+        data.summary = data.summary || {};
 
-        cachedDashboardData = data;
-        cachedAt = now;
+        document.getElementById("loginCard").classList.add("hidden");
+        document.getElementById("changePasswordCard").classList.add("hidden");
+        document.getElementById("errorCard").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        
+        const firstName = (data.investor.name || "").split(' ')[0] || "Investor";
+        document.getElementById("statusText").textContent = `Welcome back, ${firstName}`;
+        document.getElementById("investorName").textContent = `Active since ${data.investor.startDate || "N/A"}`;
+
+        renderSummary(data);
+        renderLive(data);
+        renderMonths(data.monthlyHistory);
+        renderChart(data);
+        
+        const splitPct = data.investor.splitPct || data.investor.split_pct || 100;
+        renderBreakdown(data.breakdown, splitPct);
+      } catch (err) {
+        console.error("[Dashboard Load Error]", err);
+        showErrorState("An unexpected error occurred while rendering the dashboard.");
       }
-
-      document.getElementById("loginCard").classList.add("hidden");
-      document.getElementById("changePasswordCard").classList.add("hidden");
-      document.getElementById("dashboard").classList.remove("hidden");
-      
-      const firstName = (data.investor.name || "").split(' ')[0];
-      document.getElementById("statusText").textContent = `Welcome back, ${firstName}`;
-      document.getElementById("investorName").textContent = `Active since ${data.investor.startDate || "N/A"}`;
-
-      renderSummary(data);
-      renderLive(data);
-      renderMonths(data.monthlyHistory);
-      renderChart(data);
-      
-      const splitPct = data.investor.splitPct || data.investor.split_pct || 100;
-      renderBreakdown(data.breakdown, splitPct);
     }
     
     let perfChart = null;
@@ -1039,6 +1089,8 @@
     document.getElementById("loginBtn").addEventListener("click", login);
     document.getElementById("changePassBtn").addEventListener("click", changePassword);
     document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("retryBtn")?.addEventListener("click", () => loadDashboard(true));
+    document.getElementById("errorLogoutBtn")?.addEventListener("click", logout);
     
     document.getElementById("summaryGrid").addEventListener("click", (e) => {
       const metricBox = e.target.closest('.metric');

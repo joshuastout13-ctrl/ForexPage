@@ -1,5 +1,6 @@
 import { parseCookies, verifySession, createSession, sessionCookie } from "../lib/auth.js";
 import { supabase } from "../lib/supabase.js";
+import { verifyPassword, hashPassword } from "../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -38,17 +39,20 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Investor record not found" });
     }
 
-    // 3. Verify current password matches
+    // 3. Verify current password matches using bcrypt/plaintext support
     const storedPass = String(investor.temp_password || "").trim();
-    if (storedPass !== currentPassword) {
+    if (!verifyPassword(currentPassword, storedPass)) {
       return res.status(401).json({ error: "Current password is incorrect" });
     }
 
-    // 4. Update password and clear force_password_change flag
+    // 4. Hash new password securely using bcrypt
+    const newHash = hashPassword(newPassword);
+
+    // 5. Update password hash in DB and clear force_password_change flag
     const { error: updateErr } = await supabase
       .from("investors")
       .update({
-        temp_password: newPassword,
+        temp_password: newHash,
         force_password_change: false,
         updated_at: new Date().toISOString()
       })
@@ -59,14 +63,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Failed to update password" });
     }
 
-    // 5. Reissue session cookie without forcePasswordChange flag
+    // 6. Reissue session cookie without forcePasswordChange flag
     const newToken = createSession({
       investorId: session.investorId,
       forcePasswordChange: false
     });
-    res.setHeader("Set-Cookie", sessionCookie(newToken));
+    res.setHeader("Set-Cookie", sessionCookie(newToken, req));
 
-    console.log(`[Change Password] Password updated for investor: ${investor.id}`);
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("[Change Password] Error:", err);
