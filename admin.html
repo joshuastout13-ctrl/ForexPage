@@ -338,10 +338,85 @@
                   <option value="2027">2027</option>
                 </select>
               </div>
-              <div style="display:flex; gap:8px;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button id="runAuditBtn" style="white-space:nowrap;">📊 Generate Report</button>
+                <button id="runAllAuditBtn" style="white-space:nowrap; background:linear-gradient(135deg,#6366f1,#3b82f6); color:#fff; border:none; font-weight:600;">🚀 Run All Audit</button>
                 <button id="exportAuditBtn" class="secondary" style="white-space:nowrap; background:rgba(34,197,94,0.15); color:var(--success); border-color:rgba(34,197,94,0.3);">📊 Export Excel (.xlsx)</button>
                 <button id="exportCsvBtn" class="secondary" style="white-space:nowrap;">📥 Export CSV</button>
+              </div>
+            </div>
+
+            <!-- Run All Audit Results View -->
+            <div id="runAllResultsBox" class="hidden" style="margin-top:20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <h2 style="font-size:20px; font-family:'Outfit',sans-serif; margin:0 0 4px 0;">All Accounts Consolidated Audit</h2>
+                  <p class="muted" style="font-size:13px; margin:0;">Full fund reconciliation for <span id="runAllPeriodLabel" style="color:#fff; font-weight:600;">—</span></p>
+                </div>
+                <div>
+                  <button id="exportRunAllExcelBtn" class="secondary" style="background:rgba(34,197,94,0.15); color:var(--success); border-color:rgba(34,197,94,0.3); font-weight:600;">📊 Export Run All Excel (.xlsx)</button>
+                </div>
+              </div>
+
+              <!-- Consolidated Summary Cards -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px; margin-bottom:24px;">
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Accounts Audited</div>
+                  <div id="runAllAccountsAudited" style="font-weight:700; font-size:18px; font-family:'Outfit',sans-serif; color:#fff;">0</div>
+                </div>
+                <div style="background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; color:var(--success);">PASS</div>
+                  <div id="runAllPassCount" style="font-weight:700; font-size:18px; font-family:'Outfit',sans-serif; color:var(--success);">0</div>
+                </div>
+                <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; color:var(--danger);">FLAGGED</div>
+                  <div id="runAllFlaggedCount" style="font-weight:700; font-size:18px; font-family:'Outfit',sans-serif; color:var(--danger);">0</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Total Gross Profit</div>
+                  <div id="runAllTotalGross" style="font-weight:700; font-size:16px; font-family:'Outfit',sans-serif; color:var(--success);">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Total Commission Pool</div>
+                  <div id="runAllTotalPool" style="font-weight:700; font-size:16px; font-family:'Outfit',sans-serif;">$0.00</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Total Recipient Allocations</div>
+                  <div id="runAllTotalRecipients" style="font-weight:700; font-size:16px; font-family:'Outfit',sans-serif; color:var(--accent2);">$0.00</div>
+                </div>
+                <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:14px; padding:14px; text-align:center;">
+                  <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; color:var(--warning);">Total Unallocated Pool</div>
+                  <div id="runAllTotalUnallocated" style="font-weight:700; font-size:16px; font-family:'Outfit',sans-serif; color:var(--warning);">$0.00</div>
+                </div>
+              </div>
+
+              <!-- All Accounts Table -->
+              <div style="background:rgba(15,23,42,0.6); border:1px solid var(--line); border-radius:16px; padding:18px;">
+                <h3 style="font-size:14px; margin:0 0 14px 0; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted);">All Accounts Audit Summary</h3>
+                <div style="overflow-x:auto;">
+                  <table style="min-width:1100px;">
+                    <thead>
+                      <tr>
+                        <th>Account Holder</th>
+                        <th>Username</th>
+                        <th>Gross Profit</th>
+                        <th>Source Split</th>
+                        <th>Source Kept</th>
+                        <th>Comm. Pool</th>
+                        <th>Recipients</th>
+                        <th>Pool Allocated %</th>
+                        <th>Unallocated Pool</th>
+                        <th>Total Distributed</th>
+                        <th>Variance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="runAllTableBody">
+                      <!-- Rendered by JS -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -836,11 +911,29 @@ let state = {
       const s = report.sourceSummary;
       const r100 = report.reconciliation100Pct;
 
+      document.getElementById('runAllResultsBox').classList.add('hidden');
       document.getElementById('auditResultsBox').classList.remove('hidden');
 
       const badge = document.getElementById('auditStatusBadge');
       badge.textContent = s.status;
       badge.className = `badge ${s.isPass ? 'active' : 'inactive'}`;
+
+      let flagBanner = document.getElementById('audFlagReasonBanner');
+      if (!flagBanner) {
+        flagBanner = document.createElement('div');
+        flagBanner.id = 'audFlagReasonBanner';
+        flagBanner.style.cssText = "margin-top:10px; width:100%; padding:10px 14px; border-radius:10px; font-weight:600; font-size:13px;";
+        badge.parentNode.appendChild(flagBanner);
+      }
+      if (!s.isPass) {
+        flagBanner.style.display = 'block';
+        flagBanner.style.background = 'rgba(239,68,68,0.12)';
+        flagBanner.style.border = '1px solid rgba(239,68,68,0.3)';
+        flagBanner.style.color = '#f87171';
+        flagBanner.innerHTML = `⚠️ <strong>FLAGGED:</strong> ${escapeHtml(s.flagReason || 'Commission pool is not fully allocated.')}`;
+      } else {
+        flagBanner.style.display = 'none';
+      }
 
       // Timestamp
       document.getElementById('audTimestamp').textContent = new Date(report.auditTimestamp).toLocaleString();
@@ -888,8 +981,13 @@ let state = {
 
       barUn.style.width = `${unPct.toFixed(2)}%`;
       barUn.textContent = unPct >= 10 ? `Unallocated: ${unPct.toFixed(1)}%` : (unPct > 2 ? `${unPct.toFixed(1)}%` : '');
+      if (unPct > 0.05) {
+        barUn.style.background = 'var(--danger)';
+      } else {
+        barUn.style.background = 'var(--warning)';
+      }
 
-      document.getElementById('audProofLabel').textContent = `${r100.sumEffectivePct.toFixed(2)}% Reconciled`;
+      document.getElementById('audProofLabel').textContent = `Commission Pool Allocated: ${s.commissionPoolAllocationPct.toFixed(2)}% | Overall Allocation: ${s.grossAllocationPct.toFixed(2)}%`;
 
       const tbody = document.getElementById('audRecipientTableBody');
       if (!report.recipientBreakdown || report.recipientBreakdown.length === 0) {
@@ -897,17 +995,89 @@ let state = {
       } else {
         tbody.innerHTML = report.recipientBreakdown.map(r => `
           <tr>
-            <td style="font-weight:bold;">${escapeHtml(r.recipientName)}</td>
-            <td class="muted">${escapeHtml(r.recipientUsername)}</td>
-            <td style="text-align:right; font-weight:600; font-family:'Outfit';">${r.commissionPctOfPool.toFixed(1)}%</td>
-            <td style="text-align:right; font-weight:600; font-family:'Outfit'; color:var(--accent2);">${r.effectivePctOfGrossProfit.toFixed(2)}%</td>
-            <td style="text-align:right; font-weight:bold; font-family:'Outfit'; color:var(--success);">${money(r.amountReceived)}</td>
-            <td style="text-align:center;">${escapeHtml(r.earnedMonth)}</td>
-            <td style="text-align:center;">${escapeHtml(r.creditMonth)}</td>
+            <td><strong>${escapeHtml(r.recipientName)}</strong></td>
+            <td>${escapeHtml(r.recipientUsername)}</td>
+            <td>${r.commissionPctOfPool.toFixed(1)}%</td>
+            <td>${r.effectivePctOfGrossProfit.toFixed(2)}%</td>
+            <td style="font-weight:600; color:var(--success);">${money(r.amountReceived)}</td>
+            <td>${escapeHtml(r.earnedMonth)}</td>
+            <td>${escapeHtml(r.creditMonth)}</td>
           </tr>
         `).join("");
       }
     }
+
+    function renderRunAllAudit(data) {
+      document.getElementById('auditResultsBox').classList.add('hidden');
+      document.getElementById('runAllResultsBox').classList.remove('hidden');
+
+      document.getElementById('runAllPeriodLabel').textContent = `${data.monthName} ${data.year}`;
+      const sum = data.summary;
+      document.getElementById('runAllAccountsAudited').textContent = sum.accountsAudited;
+      document.getElementById('runAllPassCount').textContent = sum.passCount;
+      document.getElementById('runAllFlaggedCount').textContent = sum.flaggedCount;
+      document.getElementById('runAllTotalGross').textContent = money(sum.totalGrossProfit);
+      document.getElementById('runAllTotalPool').textContent = money(sum.totalCommissionPool);
+      document.getElementById('runAllTotalRecipients').textContent = money(sum.totalRecipients);
+      document.getElementById('runAllTotalUnallocated').textContent = money(sum.totalUnallocated);
+
+      const tbody = document.getElementById('runAllTableBody');
+      if (!data.accounts || data.accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;" class="muted">No accounts audited for this period.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.accounts.map((acc, idx) => {
+        const s = acc.sourceSummary;
+        const isPass = s.isPass;
+        const bgStyle = isPass ? '' : 'background:rgba(239,68,68,0.06);';
+        const recs = acc.recipientBreakdown || [];
+
+        let recDetailHtml = '';
+        if (recs.length > 0) {
+          recDetailHtml = recs.map(r => `
+            <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:12px;">
+              <span>👤 <strong>${escapeHtml(r.recipientName)}</strong> (@${escapeHtml(r.recipientUsername)})</span>
+              <span>Share of Pool: ${r.commissionPctOfPool.toFixed(1)}% | Amount: <strong>${money(r.amountReceived)}</strong></span>
+            </div>
+          `).join("");
+        } else {
+          recDetailHtml = '<div class="muted" style="font-size:12px;">No active recipient allocations.</div>';
+        }
+
+        return `
+          <tr style="${bgStyle}">
+            <td><strong>${escapeHtml(s.sourceName)}</strong></td>
+            <td class="muted">${escapeHtml(s.sourceUsername)}</td>
+            <td style="font-weight:600; color:var(--success);">${money(s.grossProfit)}</td>
+            <td>${s.sourceInvestorSplitPct}%</td>
+            <td>${money(s.sourceInvestorKeptAmount)}</td>
+            <td>${money(s.grossPoolAmount)}</td>
+            <td style="font-weight:600; color:var(--accent2);">${money(s.totalRecipientAmount)}</td>
+            <td><strong>${s.commissionPoolAllocationPct.toFixed(1)}%</strong></td>
+            <td style="color:${s.unallocatedPoolAmount > 0.05 ? 'var(--warning)' : 'inherit'}; font-weight:600;">${money(s.unallocatedPoolAmount)}</td>
+            <td>${money(s.totalDistributedAmount)}</td>
+            <td style="color:${isPass ? 'inherit' : 'var(--danger)'};">${money(s.varianceAmount)}</td>
+            <td><span class="badge ${isPass ? 'active' : 'inactive'}">${s.status}</span></td>
+            <td>
+              <button class="secondary btn-xs" onclick="toggleRunAllBreakdown(${idx})">▶ Breakdown (${recs.length})</button>
+            </td>
+          </tr>
+          <tr id="runAllBreakdownRow_${idx}" class="hidden" style="background:rgba(15,23,42,0.8);">
+            <td colspan="13" style="padding:14px 20px;">
+              <div style="font-weight:600; font-size:12px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;">Recipient Breakdown for ${escapeHtml(s.sourceName)}</div>
+              ${recDetailHtml}
+              ${!isPass ? `<div style="margin-top:8px; color:var(--danger); font-size:12px;">⚠️ <strong>Reason:</strong> ${escapeHtml(s.flagReason)}</div>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    window.toggleRunAllBreakdown = function(idx) {
+      const row = document.getElementById(`runAllBreakdownRow_${idx}`);
+      if (row) row.classList.toggle('hidden');
+    };
 
     function renderRecipientList() {
       const list = document.getElementById('recipientList');
@@ -2069,6 +2239,29 @@ let state = {
       } finally {
         document.body.classList.remove('loading-active');
       }
+    });
+
+    document.getElementById('runAllAuditBtn')?.addEventListener('click', async () => {
+      const year = document.getElementById('auditYearSelect').value;
+      const month = document.getElementById('auditMonthSelect').value;
+
+      document.body.classList.add('loading-active');
+      try {
+        const data = await api.request(`/api/admin/commission-audit?year=${year}&month=${month}&all=true`);
+        window.currentRunAllAuditData = data;
+        renderRunAllAudit(data);
+        showToast("Run All audit completed successfully!");
+      } catch (err) {
+        showToast(err.message, true);
+      } finally {
+        document.body.classList.remove('loading-active');
+      }
+    });
+
+    document.getElementById('exportRunAllExcelBtn')?.addEventListener('click', () => {
+      const year = document.getElementById('auditYearSelect').value;
+      const month = document.getElementById('auditMonthSelect').value;
+      window.location.href = `/api/admin/commission-audit?year=${year}&month=${month}&all=true&format=xlsx`;
     });
 
     document.getElementById('exportAuditBtn')?.addEventListener('click', () => {
