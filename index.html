@@ -676,8 +676,7 @@
         }
 
         if (data.forcePasswordChange) {
-          document.getElementById("loginCard").classList.add("hidden");
-          document.getElementById("changePasswordCard").classList.remove("hidden");
+          showView("changePassword");
           document.getElementById("currentPassword").value = password;
           return;
         }
@@ -743,9 +742,8 @@
 
     async function logout() {
       await fetch("/api/logout", { method: "POST" });
-      document.getElementById("dashboard").classList.add("hidden");
-      document.getElementById("changePasswordCard").classList.add("hidden");
-      document.getElementById("loginCard").classList.remove("hidden");
+      cachedDashboardData = null;
+      showView("login");
       document.getElementById("statusText").textContent = "Signed out";
     }
 
@@ -935,21 +933,45 @@
     let cachedDashboardData = null;
     let cachedAt = 0;
 
+    // ── Centralized view visibility ──────────────────────────
+    // Guarantees exactly one application state is visible at all times.
+    // Valid views: "login", "changePassword", "dashboard", "error"
+    const VIEW_IDS = {
+      login: "loginCard",
+      changePassword: "changePasswordCard",
+      dashboard: "dashboard",
+      error: "errorCard"
+    };
+
+    function showView(view) {
+      for (const [key, id] of Object.entries(VIEW_IDS)) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (key === view) {
+          el.classList.remove("hidden");
+        } else {
+          el.classList.add("hidden");
+        }
+      }
+    }
+
     function showErrorState(message) {
       cachedDashboardData = null;
-      document.getElementById("loginCard").classList.add("hidden");
-      document.getElementById("changePasswordCard").classList.add("hidden");
-      document.getElementById("dashboard").classList.add("hidden");
-      document.getElementById("errorCard").classList.remove("hidden");
-      document.getElementById("statusText").textContent = message || "Dashboard error";
+      showView("error");
+      const statusEl = document.getElementById("statusText");
+      if (statusEl) statusEl.textContent = message || "Dashboard error";
     }
 
-    function hideErrorState() {
-      document.getElementById("errorCard")?.classList.add("hidden");
-    }
+    // ── Global error handlers ────────────────────────────────
+    window.addEventListener("error", function(event) {
+      console.error("[GLOBAL ERROR]", event.error || event.message);
+    });
+    window.addEventListener("unhandledrejection", function(event) {
+      console.error("[UNHANDLED PROMISE]", event.reason);
+    });
 
+    // ── Dashboard loader with safe state transitions ─────────
     async function loadDashboard(forceRefresh = false) {
-      hideErrorState();
       const now = Date.now();
       let data = null;
 
@@ -958,29 +980,30 @@
           data = cachedDashboardData;
         } else {
           const res = await fetch("/api/me");
-          
+
           if (res.status === 401) {
             cachedDashboardData = null;
-            document.getElementById("loginCard").classList.remove("hidden");
-            document.getElementById("changePasswordCard").classList.add("hidden");
-            document.getElementById("dashboard").classList.add("hidden");
-            document.getElementById("errorCard").classList.add("hidden");
+            showView("login");
             return;
           }
 
-          data = await res.json();
+          // Try to parse JSON — if it fails, show error
+          try {
+            data = await res.json();
+          } catch (parseErr) {
+            console.error("[Dashboard] Failed to parse /api/me response:", parseErr);
+            showErrorState("We couldn't load your dashboard. Please sign in again.");
+            return;
+          }
 
           if (!res.ok) {
-            showErrorState("We couldn't load your dashboard. Please sign in again.");
+            showErrorState(data?.error || "We couldn't load your dashboard. Please sign in again.");
             return;
           }
 
           if (data.forcePasswordChange) {
             cachedDashboardData = null;
-            document.getElementById("loginCard").classList.add("hidden");
-            document.getElementById("changePasswordCard").classList.remove("hidden");
-            document.getElementById("dashboard").classList.add("hidden");
-            document.getElementById("errorCard").classList.add("hidden");
+            showView("changePassword");
             return;
           }
 
@@ -1001,11 +1024,9 @@
         data.liveDollarGains = data.liveDollarGains || {};
         data.summary = data.summary || {};
 
-        document.getElementById("loginCard").classList.add("hidden");
-        document.getElementById("changePasswordCard").classList.add("hidden");
-        document.getElementById("errorCard").classList.add("hidden");
-        document.getElementById("dashboard").classList.remove("hidden");
-        
+        // Show dashboard BEFORE rendering content
+        showView("dashboard");
+
         const firstName = (data.investor.name || "").split(' ')[0] || "Investor";
         document.getElementById("statusText").textContent = `Welcome back, ${firstName}`;
         document.getElementById("investorName").textContent = `Active since ${data.investor.startDate || "N/A"}`;
@@ -1014,12 +1035,12 @@
         renderLive(data);
         renderMonths(data.monthlyHistory);
         renderChart(data);
-        
+
         const splitPct = data.investor.splitPct || data.investor.split_pct || 100;
         renderBreakdown(data.breakdown, splitPct);
       } catch (err) {
         console.error("[Dashboard Load Error]", err);
-        showErrorState("An unexpected error occurred while rendering the dashboard.");
+        showErrorState("An unexpected error occurred while loading the dashboard.");
       }
     }
     
@@ -1103,8 +1124,19 @@
       }
     });
     
-    // Auto-login check
-    loadDashboard().catch(() => {});
+    // ── Safe startup ─────────────────────────────────────────
+    // Always show login first, then attempt session restoration.
+    // Login is only hidden AFTER dashboard data loads successfully.
+    (async function initializeApp() {
+      try {
+        // Start with login visible — safe default
+        showView("login");
+        await loadDashboard();
+      } catch (err) {
+        console.error("[App Init Error]", err);
+        showErrorState("We couldn't start the application. Please try again.");
+      }
+    })();
   </script>
 </body>
 </html>
