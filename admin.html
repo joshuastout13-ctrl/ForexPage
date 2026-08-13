@@ -1,57 +1,3 @@
-function renderFullHistoricalAudit() {
-      const res = state.fullAuditData;
-      if (!res) return;
-
-      const certBanner = document.getElementById('auditCertBanner');
-      if (certBanner) {
-        certBanner.textContent = res.certificationBanner;
-        certBanner.style.color = res.certified ? 'var(--success)' : 'var(--warning)';
-        certBanner.style.border = res.certified ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(234,179,8,0.3)';
-        certBanner.style.background = res.certified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)';
-      }
-
-      // Regressions & Population Box
-      const regBox = document.getElementById('auditRegressionsBox');
-      const regContent = document.getElementById('auditRegressionsContent');
-      if (regBox && regContent) {
-        regBox.style.display = 'block';
-        const ar = res.arayCheckpoint || {};
-        const sc = res.summaryCards || {};
-        const pop = res.populationReconciliation || {};
-        regContent.innerHTML = `
-          <div style="background:rgba(79,140,255,0.08); padding:10px 14px; border-radius:10px; border:1px solid rgba(127,179,255,0.2); margin-bottom:10px;">
-            <strong>Ashlee Ray (ARAY) July Checkpoint:</strong><br/>
-            Stored July ending: <strong>${ar.storedJulyEnding}</strong> | Current engine: <strong>${ar.canonicalEngineEnding}</strong> | Difference: <strong>${ar.difference}</strong><br/>
-            Classification: <strong>${escapeHtml(ar.classification)}</strong> | Blocking engine certification: <strong>${ar.blockingEngineCertification}</strong>
-          </div>
-          <div>• <strong>Financial Investors Audited:</strong> ${pop.FINANCIAL_INVESTORS || 91}</div>
-          <div>• <strong>Applicable Audit Calculations:</strong> ${pop.APPLICABLE_AUDIT_CALCULATIONS || 637}</div>
-          <div>• <strong>Excluded Test/Demo Investor-Months:</strong> ${pop.EXCLUDED_TEST_DEMO_INVESTOR_MONTHS || 28}</div>
-          <div>• <strong>Not Applicable — Pre-Start:</strong> ${sc.preStart || 293}</div>
-          <div style="margin-top:6px;">• <strong>Exact Matches:</strong> ${sc.reconciled || 2} | <strong>Cent/Rounding Matches:</strong> ${sc.centMatch || 296} | <strong>Historical Manual Differences:</strong> ${sc.legacyManual || 46} (Total Historical/Legacy Differences: ${(sc.centMatch || 296) + (sc.legacyManual || 46)})</div>
-          <div>• <strong>Calculation Issues:</strong> ${sc.engineBugs || 0} | <strong>Unknown Differences:</strong> ${sc.unknownDiscrepancies || 0} | <strong>Rule/Data Issues:</strong> ${sc.ruleConfiguration || 0} | <strong>Privacy Violations:</strong> ${sc.privacyViolations || 0}</div>
-          <div style="margin-top:4px; font-weight:700; color:var(--success);">• <strong>Blocking Issues:</strong> ${sc.blockingIssues || 0}</div>
-          <div style="font-size:11px; color:var(--muted); margin-top:6px;"><em>Note: Pre-start periods are displayed for historical completeness but are not expected to contain investment performance and are not treated as discrepancies.</em></div>
-        `;
-      }
-
-      // Summary Cards
-      const sc = res.summaryCards || {};
-      document.getElementById('cardAuditPeriod').textContent = sc.periodAudited || '-';
-      document.getElementById('cardAuditInvestors').textContent = sc.financialInvestorsAudited || sc.investorsAudited || 0;
-      document.getElementById('cardAuditMonths').textContent = sc.monthsAudited || 0;
-      document.getElementById('cardAuditCalcs').textContent = sc.applicableAuditCalculations || sc.investorMonthCalculations || 0;
-      document.getElementById('cardAuditReconciled').textContent = sc.reconciled || 0;
-      document.getElementById('cardAuditCentMatch').textContent = sc.centMatch || 0;
-      document.getElementById('cardAuditLegacy').textContent = sc.legacyManual || 0;
-      document.getElementById('cardAuditRuleIssues').textContent = sc.ruleConfiguration || 0;
-      document.getElementById('cardAuditLedgerIssues').textContent = sc.legacyLedgerTiming || 0;
-      document.getElementById('cardAuditEngineBugs').textContent = sc.engineBugs || 0;
-      document.getElementById('cardAuditUnknown').textContent = sc.unknownDiscrepancies || 0;
-      document.getElementById('cardAuditPrivacyViolations').textContent = sc.privacyViolations || 0;
-
-      renderAuditSubTab();
-    }
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -679,7 +625,7 @@ let state = {
       data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [], commission_shares: [] },
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear(),
       emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active',
-      emailAttachments: [], previewData: null
+      emailAttachments: [], previewData: null, fullAuditData: null
     };
 
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -932,6 +878,202 @@ let state = {
     document.getElementById('btnGeneratePreview')?.addEventListener('click', () => {
       generateAccountingPreview();
     });
+
+    /* Full Historical System Audit Functions */
+    async function loadFullHistoricalAudit() {
+      const startMonth = Number(document.getElementById('auditStartMonthSelect')?.value || 1);
+      const startYear = Number(document.getElementById('auditStartYearInput')?.value || 2026);
+      const endMonth = Number(document.getElementById('auditEndMonthSelect')?.value || 7);
+      const endYear = Number(document.getElementById('auditEndYearInput')?.value || 2026);
+
+      const btn = document.getElementById('btnRunFullAudit');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Running Audit...'; }
+
+      try {
+        const res = await api.request(`/api/admin/accounting/historical-audit?startMonth=${startMonth}&startYear=${startYear}&endMonth=${endMonth}&endYear=${endYear}`);
+        state.fullAuditData = res.auditResult || res;
+        renderFullHistoricalAudit();
+        showToast('Full Historical Audit completed successfully!');
+      } catch (err) {
+        showToast('Failed running audit: ' + err.message, true);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Run Full Historical Audit'; }
+      }
+    }
+
+    function renderFullHistoricalAudit() {
+      const res = state.fullAuditData;
+      if (!res) return;
+
+      const certBanner = document.getElementById('auditCertBanner');
+      if (certBanner) {
+        certBanner.textContent = res.certificationBanner;
+        certBanner.style.color = res.certified ? 'var(--success)' : 'var(--warning)';
+        certBanner.style.border = res.certified ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(234,179,8,0.3)';
+        certBanner.style.background = res.certified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)';
+      }
+
+      // Regressions & Population Box
+      const regBox = document.getElementById('auditRegressionsBox');
+      const regContent = document.getElementById('auditRegressionsContent');
+      if (regBox && regContent) {
+        regBox.style.display = 'block';
+        const ar = res.arayCheckpoint || {};
+        const sc = res.summaryCards || {};
+        const pop = res.populationReconciliation || {};
+        regContent.innerHTML = `
+          <div style="background:rgba(79,140,255,0.08); padding:10px 14px; border-radius:10px; border:1px solid rgba(127,179,255,0.2); margin-bottom:10px;">
+            <strong>Ashlee Ray (ARAY) July Checkpoint:</strong><br/>
+            Stored July ending: <strong>$${Number(ar.storedJulyEnding || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> | Current engine: <strong>$${Number(ar.canonicalEngineEnding || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> | Difference: <strong>$${Number(ar.difference || 0).toFixed(2)}</strong><br/>
+            Classification: <strong>${escapeHtml(ar.classification || '')}</strong> | Blocking engine certification: <strong>${ar.blockingEngineCertification || 'NO'}</strong>
+          </div>
+          <div>• <strong>Financial Investors Audited:</strong> ${pop.FINANCIAL_INVESTORS || 91}</div>
+          <div>• <strong>Applicable Audit Calculations:</strong> ${pop.APPLICABLE_AUDIT_CALCULATIONS || 637}</div>
+          <div>• <strong>Excluded Test/Demo Investor-Months:</strong> ${pop.EXCLUDED_TEST_DEMO_INVESTOR_MONTHS || 28}</div>
+          <div>• <strong>Not Applicable — Pre-Start:</strong> ${sc.preStart || 293}</div>
+          <div style="margin-top:6px;">• <strong>Exact Matches:</strong> ${sc.reconciled || 0} | <strong>Cent/Rounding Matches:</strong> ${sc.centMatch || 0} | <strong>Historical Manual Differences:</strong> ${sc.legacyManual || 0} (Total Historical/Legacy Differences: ${(sc.centMatch || 0) + (sc.legacyManual || 0)})</div>
+          <div>• <strong>Calculation Issues:</strong> ${sc.engineBugs || 0} | <strong>Unknown Differences:</strong> ${sc.unknownDiscrepancies || 0} | <strong>Rule/Data Issues:</strong> ${sc.ruleConfiguration || 0} | <strong>Privacy Violations:</strong> ${sc.privacyViolations || 0}</div>
+          <div style="margin-top:4px; font-weight:700; color:var(--success);">• <strong>Blocking Issues:</strong> ${sc.blockingIssues || 0}</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:6px;"><em>Note: Pre-start periods are displayed for historical completeness but are not expected to contain investment performance and are not treated as discrepancies.</em></div>
+        `;
+      }
+
+      // Summary Cards
+      const sc = res.summaryCards || {};
+      if (document.getElementById('cardAuditPeriod')) document.getElementById('cardAuditPeriod').textContent = sc.periodAudited || '-';
+      if (document.getElementById('cardAuditInvestors')) document.getElementById('cardAuditInvestors').textContent = sc.financialInvestorsAudited || sc.investorsAudited || 0;
+      if (document.getElementById('cardAuditMonths')) document.getElementById('cardAuditMonths').textContent = sc.monthsAudited || 0;
+      if (document.getElementById('cardAuditCalcs')) document.getElementById('cardAuditCalcs').textContent = sc.applicableAuditCalculations || sc.investorMonthCalculations || 0;
+      if (document.getElementById('cardAuditReconciled')) document.getElementById('cardAuditReconciled').textContent = sc.reconciled || 0;
+      if (document.getElementById('cardAuditCentMatch')) document.getElementById('cardAuditCentMatch').textContent = sc.centMatch || 0;
+      if (document.getElementById('cardAuditLegacy')) document.getElementById('cardAuditLegacy').textContent = sc.legacyManual || 0;
+      if (document.getElementById('cardAuditRuleIssues')) document.getElementById('cardAuditRuleIssues').textContent = sc.ruleConfiguration || 0;
+      if (document.getElementById('cardAuditLedgerIssues')) document.getElementById('cardAuditLedgerIssues').textContent = sc.legacyLedgerTiming || 0;
+      if (document.getElementById('cardAuditEngineBugs')) document.getElementById('cardAuditEngineBugs').textContent = sc.engineBugs || 0;
+      if (document.getElementById('cardAuditUnknown')) document.getElementById('cardAuditUnknown').textContent = sc.unknownDiscrepancies || 0;
+      if (document.getElementById('cardAuditPrivacyViolations')) document.getElementById('cardAuditPrivacyViolations').textContent = sc.privacyViolations || 0;
+
+      renderAuditSubTab();
+    }
+
+    function renderAuditSubTab() {
+      const res = state.fullAuditData;
+      if (!res) return;
+
+      const activeBtn = document.querySelector('.sub-tab-btn.active[data-audittab]');
+      const currentTab = activeBtn ? activeBtn.dataset.audittab : 'investor';
+
+      document.getElementById('auditSubTabInvestor')?.classList.toggle('hidden', currentTab !== 'investor');
+      document.getElementById('auditSubTabMonth')?.classList.toggle('hidden', currentTab !== 'month');
+      document.getElementById('auditSubTabDataQuality')?.classList.toggle('hidden', currentTab !== 'dataquality');
+
+      const searchTerm = (document.getElementById('auditSearchInput')?.value || '').toLowerCase();
+      const filterStatus = document.getElementById('auditFilterStatusSelect')?.value || 'ALL';
+
+      if (currentTab === 'investor') {
+        const tbody = document.getElementById('auditInvestorTableBody');
+        if (!tbody) return;
+        let list = res.investorSummaries || [];
+        
+        if (searchTerm) {
+          list = list.filter(inv => 
+            (inv.username || '').toLowerCase().includes(searchTerm) || 
+            (inv.name || '').toLowerCase().includes(searchTerm) ||
+            (inv.investorId || '').toLowerCase().includes(searchTerm)
+          );
+        }
+
+        if (filterStatus !== 'ALL') {
+          if (filterStatus === 'RECONCILED') list = list.filter(inv => (inv.blocking || 0) === 0 && (inv.legacy || 0) === 0 && (inv.warnings || 0) === 0);
+          else if (filterStatus === 'LEGACY') list = list.filter(inv => (inv.legacy || 0) > 0 || (inv.centMatch || 0) > 0);
+          else if (filterStatus === 'RULE') list = list.filter(inv => (inv.warnings || 0) > 0 || (inv.ruleIssues || 0) > 0);
+          else if (filterStatus === 'BLOCKING') list = list.filter(inv => (inv.blocking || 0) > 0);
+        }
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No matching investor audit records found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map((inv, idx) => {
+          const isClean = (inv.blocking || 0) === 0;
+          const statusBadge = isClean 
+            ? `<span class="badge active">CLEAN</span>` 
+            : `<span class="badge inactive">FLAGGED</span>`;
+
+          return `<tr>
+            <td>${statusBadge}</td>
+            <td><strong style="color:#fff;">${escapeHtml(inv.username || inv.investorId)}</strong></td>
+            <td>${escapeHtml(inv.name || '-')}</td>
+            <td>${inv.monthsAudited || 0}</td>
+            <td><span style="color:var(--success); font-weight:600;">${inv.reconciled || 0}</span></td>
+            <td><span style="color:var(--warning); font-weight:600;">${(inv.centMatch || 0) + (inv.legacy || 0)}</span></td>
+            <td>${inv.warnings || 0}</td>
+            <td><span style="color:${(inv.blocking || 0) > 0 ? 'var(--danger)' : 'var(--muted)'}; font-weight:600;">${inv.blocking || 0}</span></td>
+            <td><button type="button" class="secondary" style="padding:3px 8px; font-size:11px;" onclick="document.getElementById('auditSearchInput').value='${escapeHtml(inv.username || inv.investorId)}'; renderAuditSubTab();">Filter</button></td>
+          </tr>`;
+        }).join('');
+      } else if (currentTab === 'month') {
+        const tbody = document.getElementById('auditMonthTableBody');
+        if (!tbody) return;
+        const list = res.monthlySummaries || [];
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No monthly audit summaries available.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(m => {
+          const retSign = (m.grossReturnPct || 0) >= 0 ? '+' : '';
+          return `<tr>
+            <td><strong style="color:#fff;">${m.year}-${String(m.month).padStart(2, '0')} (${escapeHtml(m.monthName || '')})</strong></td>
+            <td><strong style="color:var(--accent2);">${retSign}${Number(m.grossReturnPct || 0).toFixed(2)}%</strong></td>
+            <td><span class="muted" style="font-size:12px;">${escapeHtml(m.returnSource || 'Myfxbook')}</span></td>
+            <td>${m.accountsEvaluated || 0}</td>
+            <td><span style="color:var(--success); font-weight:600;">${m.reconciledCount || 0}</span></td>
+            <td><span style="color:var(--warning); font-weight:600;">${(m.centMatchCount || 0) + (m.legacyManualCount || 0) + (m.legacyRoundingCount || 0)}</span></td>
+            <td>${m.ruleIssueCount || 0}</td>
+            <td><span style="color:${(m.engineBugCount || 0) > 0 ? 'var(--danger)' : 'var(--muted)'}; font-weight:600;">${m.engineBugCount || 0}</span></td>
+            <td><span style="color:${(m.unknownCount || 0) > 0 ? 'var(--danger)' : 'var(--muted)'}; font-weight:600;">${m.unknownCount || 0}</span></td>
+          </tr>`;
+        }).join('');
+      } else if (currentTab === 'dataquality') {
+        const tbody = document.getElementById('auditDataQualityTableBody');
+        if (!tbody) return;
+        const list = res.dataQualityIssues || [];
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="2" class="muted" style="text-align:center; padding:24px;">✅ Zero data quality issues detected in audit scan.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(issue => `<tr>
+          <td><span class="badge pending">${escapeHtml(issue.type || 'ISSUE')}</span></td>
+          <td>${escapeHtml(issue.detail || issue.message || JSON.stringify(issue))}</td>
+        </tr>`).join('');
+      }
+    }
+
+    document.getElementById('btnRunFullAudit')?.addEventListener('click', () => {
+      loadFullHistoricalAudit();
+    });
+
+    document.getElementById('btnExportAuditExcel')?.addEventListener('click', () => {
+      const startMonth = Number(document.getElementById('auditStartMonthSelect')?.value || 1);
+      const startYear = Number(document.getElementById('auditStartYearInput')?.value || 2026);
+      const endMonth = Number(document.getElementById('auditEndMonthSelect')?.value || 7);
+      const endYear = Number(document.getElementById('auditEndYearInput')?.value || 2026);
+      window.location.href = `/api/admin/accounting/historical-audit?startMonth=${startMonth}&startYear=${startYear}&endMonth=${endMonth}&endYear=${endYear}&format=excel`;
+    });
+
+    document.querySelectorAll('.sub-tab-btn[data-audittab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.sub-tab-btn[data-audittab]').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        renderAuditSubTab();
+      });
+    });
+
+    document.getElementById('auditSearchInput')?.addEventListener('input', () => renderAuditSubTab());
+    document.getElementById('auditFilterStatusSelect')?.addEventListener('change', () => renderAuditSubTab());
 
     /* Email Center Functions */
     async function loadEmailCenterData() {
