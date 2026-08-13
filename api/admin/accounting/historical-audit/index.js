@@ -71,7 +71,7 @@ export default async function handler(req, res) {
     // 4. Return Excel file if format=excel or export=excel
     if (format === "excel" || exportType === "excel") {
       const buffer = await generateFullHistoricalAuditExcel(auditResult);
-      const filename = `Full_Historical_Accounting_Audit_${startYear}_M${startMonth}_to_${endYear}_M${endMonth}.xlsx`;
+      const filename = "Stone_and_Company_Accounting_Comparison_Jan-Jul_2026.xlsx";
       
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
