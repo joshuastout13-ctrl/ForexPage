@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { calculateCommissionAllocation } from "../../../lib/commission-engine.js";
 import Decimal from "decimal.js";
 import ExcelJS from "exceljs";
 
@@ -160,11 +161,8 @@ export function calculateSingleAudit({
     grossProfit = num(sourceHist.gross_gain || sourceHist.manual_gain_amount);
   }
 
-  // 4. Source Split & Pool Calculations
-  const sourceSplitPct = num(sourceInv.split_pct || 75);
-  const sourceKeptAmount = new Decimal(grossProfit).mul(sourceSplitPct).div(100).toNumber();
-  const commissionPoolPct = 100 - sourceSplitPct;
-  const grossPoolAmount = new Decimal(grossProfit).mul(commissionPoolPct).div(100).toNumber();
+  // 4. Source Split & Active Shares
+  const sourceSplitPct = sourceInv.split_pct !== null && sourceInv.split_pct !== undefined ? num(sourceInv.split_pct) : 75;
 
   // 5. Recipient Allocation Rows (Excluding Voided/Cancelled)
   const sourceEarningsThisMonth = (allEarnings || []).filter(e =>
@@ -173,47 +171,41 @@ export function calculateSingleAudit({
     e.status !== 'void' && e.status !== 'cancelled'
   );
 
-  let recipientBreakdown = [];
   let recipientDataSource = "ledger";
   const creditMonthNumber = (monthNumber % 12) + 1;
   const creditYear = monthNumber === 12 ? year + 1 : year;
+  let activeShares = [];
 
   if (sourceEarningsThisMonth.length > 0) {
-    recipientBreakdown = sourceEarningsThisMonth.map(e => {
+    activeShares = sourceEarningsThisMonth.map(e => {
       const recId = String(e.recipient_id || e.recipient_investor_id || "").trim().toLowerCase();
       const recInv = (allInvestors || []).find(i =>
         String(i.id || "").toLowerCase() === recId ||
         String(i.portal_username || "").toLowerCase() === recId ||
         String(i.email || "").toLowerCase() === recId
       );
-
       const recName = recInv
         ? [String(recInv.first_name || "").trim(), String(recInv.last_name || "").trim()].filter(Boolean).join(" ") || recInv.portal_username
         : String(e.recipient_id || "Unknown");
 
-      const amt = num(e.amount);
-      const effectivePct = grossProfit > 0 ? (amt / grossProfit) * 100 : 0;
       const share = (allShares || []).find(s =>
         sourceIdSet.has(String(s.source_investor_id || "").toLowerCase()) &&
         (String(s.recipient_investor_id || "").toLowerCase() === recId ||
          (recInv && String(s.recipient_investor_id || "").toLowerCase() === String(recInv.id || "").toLowerCase()))
       );
-      const commPctOfPool = share ? num(share.commission_percent) : (commissionPoolPct > 0 ? (amt / grossPoolAmount) * 100 : 0);
+      const commPct = share ? num(share.commission_percent) : (grossProfit > 0 ? (num(e.amount) / grossProfit) * 100 : 0);
 
       return {
-        recipientId: recInv ? recInv.id : e.recipient_id,
-        recipientName: recName,
-        recipientUsername: recInv ? recInv.portal_username : recId,
-        commissionPctOfPool: commPctOfPool,
-        effectivePctOfGrossProfit: effectivePct,
-        amountReceived: amt,
-        earnedMonth: `${MONTH_NAMES[monthNumber]} ${year}`,
-        creditMonth: `${MONTH_NAMES[creditMonthNumber]} ${creditYear}`
+        id: e.id,
+        recipient_investor_id: recInv ? recInv.id : e.recipient_id,
+        recipient_name: recName,
+        recipient_username: recInv ? recInv.portal_username : recId,
+        commission_percent: commPct
       };
     });
-  } else if (commissionPoolPct > 0) {
+  } else {
     recipientDataSource = "calculated_from_rules";
-    const activeShares = (allShares || []).filter(s => {
+    activeShares = (allShares || []).filter(s => {
       const isSrc = sourceIdSet.has(String(s.source_investor_id || "").trim().toLowerCase());
       if (!isSrc) return false;
       if (s.status === 'cancelled') return false;
@@ -227,69 +219,84 @@ export function calculateSingleAudit({
       if (end && end < monthStartStr) return false;
 
       return true;
-    });
-
-    recipientBreakdown = activeShares.map(s => {
+    }).map(s => {
       const recId = String(s.recipient_investor_id || "").trim().toLowerCase();
       const recInv = (allInvestors || []).find(i =>
         String(i.id || "").toLowerCase() === recId ||
         String(i.portal_username || "").toLowerCase() === recId ||
         String(i.email || "").toLowerCase() === recId
       );
-
       const recName = recInv
         ? [String(recInv.first_name || "").trim(), String(recInv.last_name || "").trim()].filter(Boolean).join(" ") || recInv.portal_username
         : String(s.recipient_investor_id || "Unknown");
 
-      const commPctOfPool = num(s.commission_percent);
-      const amt = new Decimal(grossPoolAmount).mul(commPctOfPool).div(100).toNumber();
-      const effectivePct = grossProfit > 0 ? (amt / grossProfit) * 100 : 0;
-
       return {
-        recipientId: recInv ? recInv.id : s.recipient_investor_id,
-        recipientName: recName,
-        recipientUsername: recInv ? recInv.portal_username : recId,
-        commissionPctOfPool: commPctOfPool,
-        effectivePctOfGrossProfit: effectivePct,
-        amountReceived: amt,
-        earnedMonth: `${MONTH_NAMES[monthNumber]} ${year}`,
-        creditMonth: `${MONTH_NAMES[creditMonthNumber]} ${creditYear}`
+        id: s.id,
+        recipient_investor_id: recInv ? recInv.id : s.recipient_investor_id,
+        recipient_name: recName,
+        recipient_username: recInv ? recInv.portal_username : recId,
+        commission_percent: num(s.commission_percent)
       };
     });
   }
 
-  // 6. Strict Accounting & Reconciliation Logic
-  const totalRecipientAmount = recipientBreakdown.reduce((sum, r) => sum + r.amountReceived, 0);
-  const unallocatedPoolAmount = new Decimal(grossPoolAmount).sub(totalRecipientAmount).toNumber();
-  const totalDistributedAmount = new Decimal(sourceKeptAmount).add(totalRecipientAmount).toNumber();
-  const varianceAmount = new Decimal(grossProfit).sub(totalDistributedAmount).toNumber(); // equals unallocatedPoolAmount
+  // 6. Invoke Centralized Commission Engine (Model B)
+  //    The engine now handles PROFIT/ZERO/LOSS result types and applies
+  //    authoritative client business rules for each.
+  const engineResult = calculateCommissionAllocation({
+    grossProfit,
+    sourceSplitPct,
+    commissionShares: activeShares
+  });
 
-  // Allocation metrics
-  const commissionPoolAllocationPct = grossPoolAmount > 0 ? (totalRecipientAmount / grossPoolAmount) * 100 : 100;
-  const grossAllocationPct = grossProfit !== 0 ? (totalDistributedAmount / grossProfit) * 100 : 100;
+  const resultType = engineResult.resultType; // "PROFIT" | "ZERO" | "LOSS"
+  const sourceKeptAmount = engineResult.sourceAmount;
+  const totalRecipientAmount = engineResult.totalRecipientAmount;
+  const totalDistributedAmount = engineResult.totalDistributedAmount;
+  const unallocatedPoolAmount = engineResult.unallocatedAmount;
+  const varianceAmount = engineResult.varianceAmount;
+  const roundingAdjustment = engineResult.roundingAdjustment || 0;
+  const isPass = engineResult.isPass;
+  const status = engineResult.status;
+  const flagReason = engineResult.flagReason;
 
-  // Strict PASS/FLAGGED Tolerance Rule ($0.05)
-  const allocationTolerance = 0.05;
-  const isFullyAllocated = Math.abs(unallocatedPoolAmount) <= allocationTolerance;
-  const hasNoAccountingVariance = Math.abs(varianceAmount) <= allocationTolerance;
-  const isPass = isFullyAllocated && hasNoAccountingVariance && unallocatedPoolAmount >= -allocationTolerance;
-  const status = isPass ? "PASS" : "FLAGGED";
-
-  // Flag Reason explanation
-  let flagReason = "";
-  if (!isPass) {
-    if (unallocatedPoolAmount > allocationTolerance) {
-      flagReason = `Commission pool is not fully allocated. $${unallocatedPoolAmount.toFixed(2)} remains unallocated.`;
-    } else if (unallocatedPoolAmount < -allocationTolerance) {
-      flagReason = `Recipient allocations exceed commission pool by $${Math.abs(unallocatedPoolAmount).toFixed(2)}.`;
-    } else {
-      flagReason = `Accounting variance of $${varianceAmount.toFixed(2)} detected.`;
-    }
+  // For LOSS and ZERO months, the commission pool concept doesn't apply.
+  // Only compute pool metrics for PROFIT months.
+  const commissionPoolPct = 100 - sourceSplitPct;
+  let grossPoolAmount = 0;
+  let commissionPoolAllocationPct = 100;
+  if (resultType === "PROFIT") {
+    grossPoolAmount = new Decimal(grossProfit).mul(commissionPoolPct).div(100).toNumber();
+    commissionPoolAllocationPct = grossPoolAmount > 0 ? (totalRecipientAmount / grossPoolAmount) * 100 : 100;
   }
+  const grossAllocationPct = engineResult.totalConfiguredPct;
 
-  const sourceEffectivePct = grossProfit > 0 ? (sourceKeptAmount / grossProfit) * 100 : sourceSplitPct;
-  const totalRecipientEffectivePct = grossProfit > 0 ? (totalRecipientAmount / grossProfit) * 100 : 0;
-  const unallocatedEffectivePct = Math.max(0, 100 - (sourceEffectivePct + totalRecipientEffectivePct));
+  const recipientBreakdown = engineResult.recipientBreakdown.map(r => ({
+    recipientId: r.recipientId,
+    recipientName: r.recipientName,
+    recipientUsername: r.recipientUsername,
+    commissionPctOfPool: r.commissionPercent,
+    effectivePctOfGrossProfit: r.effectivePctOfGrossProfit,
+    amountReceived: r.amountReceived,
+    earnedMonth: `${MONTH_NAMES[monthNumber]} ${year}`,
+    creditMonth: `${MONTH_NAMES[creditMonthNumber]} ${creditYear}`
+  }));
+
+  // Effective percentage breakdown
+  let sourceEffectivePct, totalRecipientEffectivePct, unallocatedEffectivePct;
+  if (resultType === "PROFIT" && grossProfit > 0) {
+    sourceEffectivePct = (sourceKeptAmount / grossProfit) * 100;
+    totalRecipientEffectivePct = (totalRecipientAmount / grossProfit) * 100;
+    unallocatedEffectivePct = Math.max(0, 100 - (sourceEffectivePct + totalRecipientEffectivePct));
+  } else if (resultType === "LOSS") {
+    sourceEffectivePct = sourceSplitPct;
+    totalRecipientEffectivePct = 0;
+    unallocatedEffectivePct = 0;
+  } else {
+    sourceEffectivePct = sourceSplitPct;
+    totalRecipientEffectivePct = 0;
+    unallocatedEffectivePct = 0;
+  }
 
   // 7. Month Net & YTD Detail
   const monthNet = new Decimal(grossProfit).sub(totalRecipientAmount).toNumber();
@@ -343,6 +350,7 @@ export function calculateSingleAudit({
       sourceInvestorId: sourceInv.id,
       sourceUsername: sourceInv.portal_username,
       sourceName: sourceName,
+      resultType: resultType,
       year: year,
       monthNumber: monthNumber,
       monthName: MONTH_NAMES[monthNumber],
@@ -355,12 +363,14 @@ export function calculateSingleAudit({
       grossProfit: grossProfit,
       sourceInvestorSplitPct: sourceSplitPct,
       sourceInvestorKeptAmount: sourceKeptAmount,
+      sourceEffectiveReturnPct: engineResult.sourceEffectiveReturnPct || 0,
       commissionPoolPct: commissionPoolPct,
       grossPoolAmount: grossPoolAmount,
       totalRecipientAmount: totalRecipientAmount,
       totalDistributedAmount: totalDistributedAmount,
       unallocatedPoolAmount: unallocatedPoolAmount,
       varianceAmount: varianceAmount,
+      roundingAdjustment: roundingAdjustment,
       commissionPoolAllocationPct: commissionPoolAllocationPct,
       grossAllocationPct: grossAllocationPct,
       monthNet: monthNet,

@@ -124,7 +124,7 @@
       display: flex;
       flex-direction: column;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .metric::before {
@@ -136,6 +136,8 @@
       height: 100%;
       background: var(--accent);
       opacity: 0.5;
+      border-top-left-radius: var(--radius-md);
+      border-bottom-left-radius: var(--radius-md);
     }
 
     .metric.success::before { background: var(--success); }
@@ -154,6 +156,82 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    /* Information Tooltip Styles */
+    .tooltip-container {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .info-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 10px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      margin-left: 2px;
+      padding: 0;
+      transition: all 0.2s ease;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .info-btn:hover, .info-btn:focus {
+      background: rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+      border-color: #60a5fa;
+      outline: none;
+    }
+    .tooltip-popup {
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 230px;
+      max-width: calc(100vw - 40px);
+      padding: 10px 12px;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.4;
+      border-radius: 10px;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+      z-index: 999;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+    .tooltip-container.active .tooltip-popup,
+    .tooltip-container:hover .tooltip-popup,
+    .info-btn:focus + .tooltip-popup {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    @media (max-width: 480px) {
+      .tooltip-popup {
+        left: 0;
+        transform: none;
+        width: 210px;
+      }
     }
 
     .metric .icon {
@@ -747,16 +825,28 @@
       document.getElementById("statusText").textContent = "Signed out";
     }
 
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".tooltip-container")) {
+        document.querySelectorAll(".tooltip-container.active").forEach(el => el.classList.remove("active"));
+      }
+    });
+
     function renderSummary(data) {
       window.currentCommissionBreakdown = data.commissionBreakdown || [];
 
       const summary = data.summary || {};
       const investor = data.investor || {};
       const metrics = [
-        { label: "Starting Capital", value: money(summary.startingCapital ?? summary.starting_capital), icon: ICONS.capital },
+        { 
+          label: "Starting Active Capital", 
+          value: money(summary.startingCapital ?? summary.starting_capital), 
+          icon: ICONS.capital,
+          hasTooltip: true,
+          tooltipText: "This is the starting balance from when your account went live in this tracking tool."
+        },
         { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
         { label: "Total Gain YTD", value: money(summary.totalGain ?? summary.total_gain), icon: ICONS.gain, class: 'success' },
-        { label: "Total Cash In", value: money(summary.totalCashIn), icon: ICONS.cashin },
+        { label: "Total Deposits", value: money(summary.totalCashIn), icon: ICONS.cashin },
         { 
           label: "Total Performance", 
           value: pct(summary.totalPerformancePct), 
@@ -776,7 +866,15 @@
       document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
         <div class="metric ${m.class || ''}" ${m.action ? `data-action="${m.action}"` : ''}>
           <div class="label-row">
-            <div class="label">${m.label}</div>
+            <div class="label">
+              ${m.label}
+              ${m.hasTooltip ? `
+                <span class="tooltip-container">
+                  <button type="button" class="info-btn" aria-label="Information about ${m.label}" onclick="event.stopPropagation(); this.parentElement.classList.toggle('active')">ⓘ</button>
+                  <span class="tooltip-popup" role="tooltip">${m.tooltipText}</span>
+                </span>
+              ` : ''}
+            </div>
             ${m.icon}
           </div>
           <div class="value">${m.value}</div>

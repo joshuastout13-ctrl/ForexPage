@@ -206,6 +206,7 @@ const htmlBody = `
           <button class="nav-btn" data-tab="history">7. Historical Data</button>
           <button class="nav-btn" data-tab="commission_shares">8. Commission Shares</button>
           <button class="nav-btn" data-tab="email_center">9. Email Center</button>
+          <button class="nav-btn" data-tab="accounting_preview">10. Monthly Accounting Preview</button>
         </div>
         <div class="main-content card">
           <div class="right" style="margin-bottom:20px;">
@@ -221,6 +222,100 @@ const htmlBody = `
           <div id="loadingIndicator" class="muted hidden" style="padding:20px;text-align:center;">Loading data...</div>
           <div id="tableContainer" style="overflow-x:auto;">
             <table id="dataTable"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
+          </div>
+
+          <!-- Dedicated Monthly Accounting Preview View -->
+          <div id="accountingPreviewView" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; background:rgba(15,23,42,0.6); padding:16px; border-radius:16px; border:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div>
+                  <label class="muted" style="font-size:12px; display:block; margin-bottom:4px;">Month</label>
+                  <select id="previewMonthSelect" style="width:140px; padding:8px 12px; font-size:14px;">
+                    <option value="1">1 - January</option>
+                    <option value="2">2 - February</option>
+                    <option value="3">3 - March</option>
+                    <option value="4">4 - April</option>
+                    <option value="5">5 - May</option>
+                    <option value="6">6 - June</option>
+                    <option value="7">7 - July</option>
+                    <option value="8" selected>8 - August</option>
+                    <option value="9">9 - September</option>
+                    <option value="10">10 - October</option>
+                    <option value="11">11 - November</option>
+                    <option value="12">12 - December</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="muted" style="font-size:12px; display:block; margin-bottom:4px;">Year</label>
+                  <input id="previewYearInput" type="number" value="2026" style="width:100px; padding:8px 12px; font-size:14px;" />
+                </div>
+                <div style="align-self:flex-end;">
+                  <button id="btnGeneratePreview" style="padding:9px 18px; font-size:14px;">⚡ Generate Preview</button>
+                </div>
+              </div>
+              <div style="font-size:12px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); padding:8px 14px; border-radius:10px; color:#fde047;">
+                🛡️ <strong>SHADOW PREVIEW MODE</strong> — Calculations performed in memory. Zero database writes.
+              </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div id="previewSummaryCards" class="grid2" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:20px;">
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Fund Return %</div>
+                <div id="cardFundReturnPct" style="font-size:22px; font-weight:700; color:var(--accent2); margin-top:4px;">0.00%</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Investors</div>
+                <div id="cardInvestorsCount" style="font-size:22px; font-weight:700; color:#fff; margin-top:4px;">0</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Eligible Capital</div>
+                <div id="cardEligibleCapital" style="font-size:22px; font-weight:700; color:var(--success); margin-top:4px;">$0.00</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Gross Result</div>
+                <div id="cardGrossResult" style="font-size:22px; font-weight:700; color:#fff; margin-top:4px;">$0.00</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Gain / Loss</div>
+                <div id="cardSourceGainLoss" style="font-size:22px; font-weight:700; color:#fff; margin-top:4px;">$0.00</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Recip Commissions</div>
+                <div id="cardRecipientCommissions" style="font-size:22px; font-weight:700; color:var(--warning); margin-top:4px;">$0.00</div>
+              </div>
+              <div class="card" style="margin:0; padding:16px; text-align:center;">
+                <div class="muted" style="font-size:11px; text-transform:uppercase;">Audit Status</div>
+                <div id="cardAuditPassBadge" style="margin-top:6px;"><span class="badge active" style="font-size:12px; padding:4px 8px;">0 PASS</span> <span class="badge inactive" style="font-size:12px; padding:4px 8px; margin-left:2px;">0 FLAGGED</span></div>
+              </div>
+            </div>
+
+            <!-- Preview Data Table -->
+            <div style="overflow-x:auto;">
+              <table id="previewTable" style="width:100%; border-collapse:collapse;">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Investor</th>
+                    <th>Opening</th>
+                    <th>Deposits</th>
+                    <th>Withdrawals</th>
+                    <th>Comm Credit</th>
+                    <th>Eligible Cap</th>
+                    <th>Return %</th>
+                    <th>Split %</th>
+                    <th>Gross Result</th>
+                    <th>Gain/Loss</th>
+                    <th>Recip Comm</th>
+                    <th>Ending Bal</th>
+                    <th>Reason / Details</th>
+                  </tr>
+                </thead>
+                <tbody id="previewTableBody">
+                  <tr><td colspan="14" class="muted" style="text-align:center; padding:30px;">Select Month/Year and click "Generate Preview" to calculate.</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Dedicated Email Center View -->
@@ -305,136 +400,11 @@ const htmlBody = `
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
-  </div>
-
-  <div id="entityModal" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="right" style="margin-bottom:20px;">
-        <h2 id="modalTitle" style="margin:0">Add Item</h2>
-        <button class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
-      </div>
-      <form id="entityForm">
-        <input type="hidden" id="formAction" />
-        <input type="hidden" id="formId" />
-        <div id="dynamicFormFields"></div>
-        <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;margin-top:16px;"></div>
-        <div style="margin-top:24px;text-align:right;">
-          <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
-          <button type="submit" id="saveEntityBtn">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="importModal" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="right" style="margin-bottom:20px;">
-        <h2 style="margin:0">Bulk Import History</h2>
-        <button class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
-      </div>
-      <div class="muted" style="margin-bottom:20px;">Upload a CSV file with columns: month_number, year, opening_balance, deposits, withdrawals, gross_return_pct, manual_gain_amount, notes.</div>
-      <div class="form-group">
-        <label>Select CSV File</label>
-        <input type="file" id="csvFileInput" accept=".csv" />
-      </div>
-      <div id="importPreview" class="muted" style="margin-top:16px;max-height:200px;overflow:auto;font-size:12px;"></div>
-      <div style="margin-top:24px;text-align:right;">
-        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
-        <button id="processImportBtn">Start Import</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="statusModal" class="modal-overlay hidden">
-    <div class="modal" style="max-width:400px;text-align:center">
-      <h2 id="statusModalTitle">Confirm Action</h2>
-      <p id="statusModalText" class="muted" style="margin-bottom:24px;">Are you sure?</p>
-      <div class="right" style="justify-content:center">
-        <button class="secondary closeModalBtn">Cancel</button>
-        <button id="confirmStatusBtn" class="danger">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="myfxbookPreviewModal" class="modal-overlay hidden">
-    <div class="modal" style="max-width:600px;">
-      <h2 style="margin:0 0 16px 0">Myfxbook Live Preview</h2>
-      <p class="muted" style="margin-bottom:20px;">Review the latest data pulled from Myfxbook. Clicking Accept will update the database and make it live for users.</p>
-      
-      <table style="min-width:auto; margin-bottom:24px; background:rgba(255,255,255,0.02); border-radius:12px;">
-        <thead>
-          <tr>
-            <th>Metric</th>
-            <th>Current Value</th>
-            <th>New Value (Scrape.do)</th>
-          </tr>
-        </thead>
-        <tbody id="previewModalBody">
-          <!-- Rows injected via JS -->
-        </tbody>
-      </table>
-      
-      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:10px;">
-        <button class="secondary closeModalBtn">Reject</button>
-        <button id="acceptMyfxbookBtn" style="background:linear-gradient(135deg,#22c55e,#16a34a);">Accept & Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Email Test Modal -->
-  <div id="emailTestModal" class="modal-overlay hidden">
-    <div class="modal" style="max-width:450px;">
-      <div class="right" style="margin-bottom:16px;">
-        <h3 style="margin:0;">Send Test Email</h3>
-        <button class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
-      </div>
-      <p class="muted" style="margin-bottom:16px; font-size:13px;">Send a single test email via Resend to verify formatting and inbox delivery.</p>
-      <div class="form-group">
-        <label>Recipient Email Address</label>
-        <input id="testEmailAddressInput" type="email" placeholder="admin@example.com" />
-      </div>
-      <div style="margin-top:20px; text-align:right;">
-        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
-        <button id="confirmTestSendBtn" type="button">Send Test Email</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Email HTML Preview Modal -->
-  <div id="emailPreviewModal" class="modal-overlay hidden">
-    <div class="modal" style="max-width:700px; width:95%;">
-      <div class="right" style="margin-bottom:16px;">
-        <h3 style="margin:0;">Email HTML Preview</h3>
-        <button class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
-      </div>
-      <div id="emailPreviewContent" style="background:#08101d; border:1px solid var(--line); border-radius:12px; padding:16px; max-height:500px; overflow-y:auto;">
-        <!-- HTML Preview Injected -->
-      </div>
-      <div style="margin-top:20px; text-align:right;">
-        <button type="button" class="secondary closeModalBtn">Close Preview</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Email Confirm Broadcast Modal -->
-  <div id="emailConfirmModal" class="modal-overlay hidden">
-    <div class="modal" style="max-width:500px;">
-      <h3 style="margin:0 0 12px 0;">Confirm Mass Email Broadcast</h3>
-      <p class="muted" style="margin-bottom:16px; font-size:14px;">You are about to send an email broadcast via Resend to <strong id="confirmRecipientCount">0</strong> selected recipients.</p>
-      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px;">
-        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Subject</div>
-        <div id="confirmSubjectText" style="font-weight:600; color:#fff;"></div>
-      </div>
-      <div id="confirmAttachmentsNotice" style="font-size:13px; color:var(--accent2); margin-bottom:20px;"></div>
-      <div class="right" style="justify-content:flex-end;">
-        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
-        <button id="confirmBroadcastSendBtn" type="button" style="background:linear-gradient(135deg,var(--success),#16a34a);">Confirm & Send Now</button>
-      </div>
-    </div>
-  </div>
+</div>
 `;
 
 const jsBody = `
@@ -443,7 +413,7 @@ let state = {
       data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [], commission_shares: [] },
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear(),
       emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active',
-      emailAttachments: []
+      emailAttachments: [], previewData: null
     };
 
     const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -520,16 +490,20 @@ let state = {
           snapshots: 'Snapshots', 
           history: 'Historical Monthly Data',
           commission_shares: 'Commission Shares',
-          email_center: 'Admin Email Center'
+          email_center: 'Admin Email Center',
+          accounting_preview: 'Monthly Accounting Preview (Shadow Mode)'
         };
         document.getElementById('viewTitle').textContent = titles[state.tab] || 'Admin Portal';
         
         const isEmailTab = state.tab === 'email_center';
-        document.getElementById('viewActions').classList.toggle('hidden', isEmailTab);
-        document.getElementById('tableContainer').classList.toggle('hidden', isEmailTab);
-        document.getElementById('emailCenterView').classList.toggle('hidden', !isEmailTab);
+        const isPreviewTab = state.tab === 'accounting_preview';
 
-        if (!isEmailTab) {
+        document.getElementById('viewActions').classList.toggle('hidden', isEmailTab || isPreviewTab);
+        document.getElementById('tableContainer').classList.toggle('hidden', isEmailTab || isPreviewTab);
+        document.getElementById('emailCenterView').classList.toggle('hidden', !isEmailTab);
+        document.getElementById('accountingPreviewView').classList.toggle('hidden', !isPreviewTab);
+
+        if (!isEmailTab && !isPreviewTab) {
           document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
           document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
         }
@@ -545,6 +519,8 @@ let state = {
       try {
         if (tab === 'email_center') {
           await loadEmailCenterData();
+        } else if (tab === 'accounting_preview') {
+          await generateAccountingPreview();
         } else {
           const endpoints = { 
             investors: '/api/admin/investors', 
@@ -592,6 +568,99 @@ let state = {
         document.body.classList.remove('loading-active');
       }
     }
+
+    /* Accounting Preview Functions */
+    async function generateAccountingPreview() {
+      const month = Number(document.getElementById('previewMonthSelect')?.value || 8);
+      const year = Number(document.getElementById('previewYearInput')?.value || 2026);
+
+      try {
+        const data = await api.request('/api/admin/accounting/preview', {
+          method: 'POST',
+          body: JSON.stringify({ month, year })
+        });
+        state.previewData = data;
+        renderAccountingPreview();
+      } catch (err) {
+        showToast('Failed generating preview: ' + err.message, true);
+      }
+    }
+
+    function renderAccountingPreview() {
+      const data = state.previewData;
+      if (!data) return;
+
+      const summary = data.summary || {};
+      document.getElementById('cardFundReturnPct').textContent = (data.fundReturnPct >= 0 ? '+' : '') + Number(data.fundReturnPct || 0).toFixed(2) + '%';
+      document.getElementById('cardInvestorsCount').textContent = summary.investorsCalculated || 0;
+      document.getElementById('cardEligibleCapital').textContent = money(summary.grossEligibleCapital || 0);
+      document.getElementById('cardGrossResult').textContent = money(summary.totalGrossFundResult || 0);
+      document.getElementById('cardSourceGainLoss').textContent = money(summary.totalSourceGainLoss || 0);
+      document.getElementById('cardRecipientCommissions').textContent = money(summary.totalRecipientCommissions || 0);
+
+      document.getElementById('cardAuditPassBadge').innerHTML = \`<span class="badge active" style="font-size:12px; padding:4px 8px;">\${summary.passCount || 0} PASS</span> <span class="badge \${summary.flaggedCount > 0 ? 'inactive' : 'active'}" style="font-size:12px; padding:4px 8px; margin-left:2px;">\${summary.flaggedCount || 0} FLAGGED</span>\`;
+
+      const tbody = document.getElementById('previewTableBody');
+      if (!tbody) return;
+
+      const investors = data.investors || [];
+      if (investors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">No active investors found for this period.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = investors.map((inv, idx) => {
+        const isPass = inv.status === 'PASS';
+        const stClass = isPass ? 'active' : 'inactive';
+        const retSign = inv.fundReturnPct >= 0 ? '+' : '';
+        const recAlloc = inv.recipientAllocations || [];
+        const hasAlloc = recAlloc.length > 0;
+
+        let allocDrawerHtml = '';
+        if (hasAlloc) {
+          const allocItems = recAlloc.map(a => 
+            \`<div style="font-size:12px; padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px; margin-top:2px;">
+              ↳ <strong>\${escapeHtml(a.recipientName)}</strong> (\${a.recipientUsername}) — \${a.commissionPercent}% = <strong>\${money(a.amount)}</strong>
+            </div>\`
+          ).join('');
+
+          allocDrawerHtml = \`<tr class="preview-drawer-\${idx} hidden" style="background:rgba(15,23,42,0.8);">
+            <td colspan="14" style="padding:10px 16px;">
+              <div style="font-size:12px; font-weight:600; color:var(--accent2); margin-bottom:6px;">Recipient Commission Allocations:</div>
+              \${allocItems}
+            </td>
+          </tr>\`;
+        }
+
+        return \`<tr>
+          <td><span class="badge \${stClass}">\${inv.status}</span></td>
+          <td>
+            <div style="font-weight:600; color:#fff;">\${escapeHtml(inv.name)}</div>
+            <div class="muted" style="font-size:11px;">ID: \${inv.investorId}</div>
+          </td>
+          <td>\${money(inv.priorEndingBalance)}</td>
+          <td>\${money(inv.deposits)}</td>
+          <td>\${money(inv.withdrawals)}</td>
+          <td>\${money(inv.incomingCommissionCredit)}</td>
+          <td><strong style="color:var(--text)">\${money(inv.eligibleCapital)}</strong></td>
+          <td>\${retSign}\${Number(inv.fundReturnPct).toFixed(2)}%</td>
+          <td>\${inv.splitPct !== null ? inv.splitPct + '%' : '<span style="color:var(--danger)">Missing</span>'}</td>
+          <td>\${money(inv.grossFundResult)}</td>
+          <td><strong style="color:\${inv.sourceGainLoss >= 0 ? 'var(--success)' : 'var(--danger)'}">\${money(inv.sourceGainLoss)}</strong></td>
+          <td>
+            \${money(inv.totalRecipientCommissions)}
+            \${hasAlloc ? \`<button type="button" class="secondary" style="padding:2px 6px; font-size:10px; margin-left:4px;" onclick="document.querySelector('.preview-drawer-\${idx}').classList.toggle('hidden')">Recipients ▼</button>\` : ''}
+          </td>
+          <td><strong style="font-size:15px; color:#fff;">\${money(inv.endingBalance)}</strong></td>
+          <td style="font-size:12px; max-width:180px;">\${inv.flagReason ? \`<span style="color:\${isPass?'var(--muted)':'var(--danger)'}">\${escapeHtml(inv.flagReason)}</span>\` : 'Reconciled'}</td>
+        </tr>
+        \${allocDrawerHtml}\`;
+      }).join('');
+    }
+
+    document.getElementById('btnGeneratePreview')?.addEventListener('click', () => {
+      generateAccountingPreview();
+    });
 
     /* Email Center Functions */
     async function loadEmailCenterData() {
@@ -784,7 +853,7 @@ let state = {
       e.target.value = '';
     });
 
-    // HTML Preview Button (Includes Subject Line & Attachments Banner)
+    // HTML Preview Button
     document.getElementById('btnEmailPreview')?.addEventListener('click', () => {
       const subject = document.getElementById('emailSubjectInput').value || 'Subject Line Preview';
       const body = document.getElementById('emailBodyInput').value || 'Your email text will appear here.';
@@ -1198,182 +1267,100 @@ let state = {
           <div class="form-group"><label>Account Name</label><input id="field_name" value="\${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>
           <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="\${item ? (item.starting_capital || 0) : 0}" required /></div>
           <div class="form-group"><label>Split %</label><input id="field_split_pct" type="number" step="0.1" value="\${item ? (item.split_pct || 100) : 100}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" \${!item || item.status === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" \${item && item.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" \${item && item.status==='Active'?'selected':''}>Active</option><option value="Inactive" \${item && item.status==='Inactive'?'selected':''}>Inactive</option></select></div>
         \`;
       } else if (tab === 'deposits') {
-        const accOptions = (state.data.accounts || []).map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${acc.id} (\${acc.investor_id})</option>\`).join('');
+        const accOptions = (state.data.accounts || []).map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${escapeHtml(acc.name)} (\${acc.id})</option>\`).join('');
         html = \`
           <div class="form-group"><label>Account</label><select id="field_account_id" required>\${accOptions}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : 0}" required /></div>
-          <div class="form-group"><label>Date</label><input id="field_date" type="date" value="\${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
-          <div class="form-group"><label>Type</label><select id="field_type"><option value="DEPOSIT" \${!item || item.type === 'DEPOSIT' ? 'selected' : ''}>DEPOSIT</option><option value="VOID" \${item && item.type === 'VOID' ? 'selected' : ''}>VOID</option></select></div>
+          <div class="form-group"><label>Deposit Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : ''}" required /></div>
+          <div class="form-group"><label>Effective Date</label><input id="field_date" type="date" value="\${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
+          <div class="form-group"><label>Type</label><select id="field_type"><option value="Wire">Wire</option><option value="Check">Check</option><option value="Internal Transfer">Internal Transfer</option></select></div>
         \`;
       } else if (tab === 'withdrawals') {
-        const accOptions = (state.data.accounts || []).map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${acc.id} (\${acc.investor_id})</option>\`).join('');
+        const accOptions = (state.data.accounts || []).map(acc => \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${escapeHtml(acc.name)} (\${acc.id})</option>\`).join('');
+        const monthOptions = MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('');
         html = \`
           <div class="form-group"><label>Account</label><select id="field_account_id" required>\${accOptions}</select></div>
-          <div class="form-group"><label>Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : 0}" required /></div>
-          <div class="form-group"><label>Effective Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
+          <div class="form-group"><label>Withdrawal Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : ''}" required /></div>
+          <div class="form-group"><label>Effective Month</label><select id="field_month" required>\${monthOptions}</select></div>
           <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${!item || item.status === 'Pending' ? 'selected' : ''}>Pending</option><option value="Approved" \${item && item.status === 'Approved' ? 'selected' : ''}>Approved</option><option value="Cancelled" \${item && item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></div>
+          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${item && item.status==='Pending'?'selected':''}>Pending</option><option value="Approved" \${item && item.status==='Approved'?'selected':''}>Approved</option><option value="Completed" \${item && item.status==='Completed'?'selected':''}>Completed</option><option value="Cancelled" \${item && item.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
         \`;
       } else if (tab === 'returns') {
+        const monthOptions = MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('');
         html = \`
-          <div class="form-group"><label>Month</label><select id="field_month">\${MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('')}</select></div>
+          <div class="form-group"><label>Month</label><select id="field_month" required>\${monthOptions}</select></div>
           <div class="form-group"><label>Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
-          <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="text" inputmode="decimal" value="\${item ? item.gross_return_pct : 0}" required /></div>
+          <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="number" step="0.01" value="\${item ? item.gross_return_pct : ''}" placeholder="e.g. 2.81" required /></div>
         \`;
       } else if (tab === 'commission_shares') {
-        const rawSourceId = String((extraData && extraData.sourceInvestorId) || (item ? item.investor_id : (state.data.investors[0] ? state.data.investors[0].id : ''))).trim().toLowerCase();
-        const sourceInv = state.data.investors.find(inv => 
-          String(inv.id || '').trim().toLowerCase() === rawSourceId || 
-          String(inv.portal_username || '').trim().toLowerCase() === rawSourceId ||
-          String(inv.email || '').trim().toLowerCase() === rawSourceId
-        ) || (state.data.investors[0] || {});
-        const invSplit = sourceInv.split_pct !== undefined ? Number(sourceInv.split_pct) : 100;
-        const commissionPool = 100 - invSplit;
-
-        const sourceAcc = (state.data.accounts || []).find(a => 
-          String(a.investor_id || '').trim().toLowerCase() === String(sourceInv.id || '').trim().toLowerCase() ||
-          String(a.investor_id || '').trim().toLowerCase() === String(sourceInv.portal_username || '').trim().toLowerCase()
+        const sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id : '');
+        const sourceInv = (state.data.investors || []).find(i => 
+          String(i.id).toLowerCase() === String(sourceInvId).toLowerCase() ||
+          String(i.portal_username).toLowerCase() === String(sourceInvId).toLowerCase()
         );
-        const accOpenDate = (sourceAcc && sourceAcc.open_date) ? sourceAcc.open_date : (sourceInv.created_at ? sourceInv.created_at.split('T')[0] : '2026-05-01');
-        const todayIsoStr = new Date().toISOString().split('T')[0];
+        const sourceUsername = sourceInv ? (sourceInv.portal_username || sourceInv.id) : sourceInvId;
+        const sourceName = sourceInv ? \`\${sourceInv.first_name || ''} \${sourceInv.last_name || ''}\`.trim() || sourceUsername : sourceUsername;
 
-        // Fetch all existing shares for this source investor
-        const existingShares = (state.data.commission_shares || []).filter(s => {
-          const sSrc = String(s.investor_id || s.source_investor_id || '').trim().toLowerCase();
-          return sSrc === rawSourceId || 
-                 (sourceInv.id && sSrc === String(sourceInv.id).trim().toLowerCase()) ||
-                 (sourceInv.portal_username && sSrc === String(sourceInv.portal_username).trim().toLowerCase());
-        });
+        const currentShares = (state.data.commission_shares || []).filter(s => 
+          String(s.source_investor_id || '').toLowerCase() === String(sourceInvId).toLowerCase() ||
+          String(s.source_investor_id || '').toLowerCase() === String(sourceUsername).toLowerCase()
+        );
 
-        // Alphabetically sorted investors for dropdowns
-        const sortedInvestors = [...(state.data.investors || [])].sort((a,b) => {
-          const nameA = \`\${a.first_name || ''} \${a.last_name || ''}\`.trim() || a.portal_username || a.id;
-          const nameB = \`\${b.first_name || ''} \${b.last_name || ''}\`.trim() || b.portal_username || b.id;
-          return nameA.localeCompare(nameB);
-        });
+        const recOptions = (state.data.investors || [])
+          .filter(i => String(i.id).toLowerCase() !== String(sourceInvId).toLowerCase() && String(i.portal_username || '').toLowerCase() !== String(sourceUsername).toLowerCase())
+          .map(i => \`<option value="\${i.portal_username || i.id}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('');
 
-        const getRecOptionsHtml = (selectedId) => sortedInvestors.map(inv => \`
-          <option value="\${inv.id}" \${selectedId && (selectedId === inv.id || selectedId === inv.portal_username) ? 'selected' : ''}>
-            \${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})
-          </option>
-        \`).join('');
-
-        const sourceInvOptions = sortedInvestors.map(inv => \`
-          <option value="\${inv.id}" \${sourceInv.id === inv.id || sourceInv.portal_username === inv.portal_username ? 'selected' : ''}>
-            \${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})
-          </option>
-        \`).join('');
-
-        // Build list of rows
-        let rowsHtml = '';
-        if (existingShares.length > 0) {
-          rowsHtml = existingShares.map(s => {
-            const isEnded = (s.effective_end_date && s.effective_end_date < todayIsoStr) || s.status === 'ended';
-            const curStatus = isEnded ? 'ended' : (s.status || 'active');
-            const rowStyle = isEnded ? 'background: rgba(255,255,255,0.01); opacity: 0.75;' : '';
-
+        let sharesRowsHtml = '';
+        if (currentShares.length > 0) {
+          sharesRowsHtml = currentShares.map((s, idx) => {
+            const isInactive = s.status === 'cancelled' || s.status === 'ended';
             return \`
-              <tr class="bulk-share-row" data-share-id="\${s.id || ''}" style="\${rowStyle}">
-                <td style="padding:6px;">
-                  <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                    \${getRecOptionsHtml(s.recipient_id || s.recipient_name)}
+              <div class="bulk-share-row" data-share-id="\${s.id}" style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 40px; gap:8px; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px;">
+                <div>
+                  <select class="bulk-rec-id" style="font-size:13px; padding:6px;">
+                    \${(state.data.investors || []).map(i => \`<option value="\${i.portal_username || i.id}" \${(s.recipient_investor_id === i.id || s.recipient_investor_id === i.portal_username) ? 'selected' : ''}>\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('')}
                   </select>
-                </td>
-                <td style="padding:6px; width:90px;">
-                  <input type="number" step="0.1" class="bulk-pct-input form-control" value="\${s.percent}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-                </td>
-                <td style="padding:6px; width:130px;">
-                  <input type="date" class="bulk-start-date form-control" value="\${s.effective_start_date || accOpenDate}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-                </td>
-                <td style="padding:6px; width:130px;">
-                  <input type="date" class="bulk-end-date form-control" value="\${s.effective_end_date || ''}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
-                </td>
-                <td style="padding:6px; width:110px;">
-                  <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                    <option value="active" \${curStatus === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="ended" \${curStatus === 'ended' ? 'selected' : ''}>Ended (Historical)</option>
-                    <option value="cancelled" \${curStatus === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                </div>
+                <div>
+                  <input class="bulk-pct-input" type="number" step="0.1" value="\${s.commission_percent || s.percent || 0}" style="font-size:13px; padding:6px;" placeholder="%" />
+                </div>
+                <div>
+                  <input class="bulk-start-date" type="date" value="\${s.effective_start_date || '2000-01-01'}" style="font-size:12px; padding:6px;" />
+                </div>
+                <div>
+                  <input class="bulk-end-date" type="date" value="\${s.effective_end_date || ''}" style="font-size:12px; padding:6px;" placeholder="No end date" />
+                </div>
+                <div>
+                  <select class="bulk-status" style="font-size:12px; padding:6px;">
+                    <option value="active" \${s.status === 'active' ? 'selected' : ''}>Active</option>
+                    <option value="ended" \${s.status === 'ended' ? 'selected' : ''}>Ended</option>
+                    <option value="cancelled" \${s.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
                   </select>
-                </td>
-                <td style="padding:6px; width:40px; text-align:center;">
-                  <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
-                </td>
-              </tr>
+                </div>
+                <div style="text-align:center;">
+                  <button type="button" class="secondary" onclick="this.closest('.bulk-share-row').remove()" style="padding:4px 8px; color:var(--danger); border:none;">✕</button>
+                </div>
+              </div>
             \`;
           }).join('');
-        } else {
-          const defaultRec = sortedInvestors.find(inv => inv.id !== sourceInv.id) || sortedInvestors[0];
-          const initialPct = (extraData && extraData.defaultPercent !== undefined) ? extraData.defaultPercent : (commissionPool > 0 ? commissionPool : 10);
-          rowsHtml = \`
-            <tr class="bulk-share-row" data-share-id="">
-              <td style="padding:6px;">
-                <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                  \${getRecOptionsHtml(defaultRec ? defaultRec.id : '')}
-                </select>
-              </td>
-              <td style="padding:6px; width:90px;">
-                <input type="number" step="0.1" class="bulk-pct-input form-control" value="\${initialPct}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-              </td>
-              <td style="padding:6px; width:130px;">
-                <input type="date" class="bulk-start-date form-control" value="\${accOpenDate}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-              </td>
-              <td style="padding:6px; width:130px;">
-                <input type="date" class="bulk-end-date form-control" value="" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
-              </td>
-              <td style="padding:6px; width:110px;">
-                <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                  <option value="active" selected>Active</option>
-                  <option value="ended">Ended (Historical)</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </td>
-              <td style="padding:6px; width:40px; text-align:center;">
-                <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
-              </td>
-            </tr>
-          \`;
         }
 
         html = \`
-          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:16px;">
-            <div class="form-group" style="margin-bottom:8px;">
-              <label>Source Investor</label>
-              <select id="bulk_source_investor_id" class="form-control" onchange="openModal('commission_shares', 'edit', null, { sourceInvestorId: this.value })" required>
-                \${sourceInvOptions}
-              </select>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:13px; margin-top:8px; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px; flex-wrap:wrap; gap:8px;">
-              <div>Account Start Date: <strong style="color:var(--accent2);">\${accOpenDate}</strong></div>
-              <div>Investor Keeps: <strong>\${invSplit}%</strong></div>
-              <div>Commission Pool: <strong>\${commissionPool.toFixed(2)}%</strong></div>
-              <div>Total Active Assigned: <strong id="bulkAssignedVal">0%</strong></div>
-              <div>Remaining: <strong id="bulkRemainingVal" style="color:var(--success)">\${commissionPool.toFixed(2)}%</strong></div>
-            </div>
+          <input type="hidden" id="bulk_source_investor_id" value="\${sourceUsername}" />
+          <div style="background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
+            <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">Source Investor</div>
+            <div style="font-size:16px; font-weight:700; color:#fff;">\${escapeHtml(sourceName)}</div>
           </div>
 
-          <div style="margin-bottom:12px; max-height:280px; overflow-y:auto;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
-              <thead>
-                <tr style="text-align:left; border-bottom:1px solid var(--border);">
-                  <th style="padding:6px;">Recipient</th>
-                  <th style="padding:6px;">Share %</th>
-                  <th style="padding:6px;">Start Date</th>
-                  <th style="padding:6px;">End Date</th>
-                  <th style="padding:6px;">Status</th>
-                  <th style="padding:6px; text-align:center;">Action</th>
-                </tr>
-              </thead>
-              <tbody id="bulkSharesTableBody">
-                \${rowsHtml}
-              </tbody>
-            </table>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h4 style="margin:0; font-size:14px;">Commission Recipients & Rules</h4>
+            <button type="button" id="btnAddShareRow" class="secondary" style="padding:6px 12px; font-size:12px;">+ Add Recipient</button>
           </div>
 
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <button type="button" id="addBulkRowBtn" class="btn-action" style="background:var(--accent); color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">+ Add Recipient Line</button>
+          <div id="bulkSharesContainer" style="max-height:300px; overflow-y:auto; margin-bottom:16px;">
+            \${sharesRowsHtml}
           </div>
         \`;
       }
@@ -1381,89 +1368,23 @@ let state = {
       fields.innerHTML = html;
 
       if (tab === 'commission_shares') {
-        const selectedSrcId = document.getElementById('bulk_source_investor_id')?.value;
-        const currentSrcInv = state.data.investors.find(i => i.id === selectedSrcId || i.portal_username === selectedSrcId) || {};
-        const poolVal = 100 - (currentSrcInv.split_pct !== undefined ? Number(currentSrcInv.split_pct) : 100);
+        document.getElementById('btnAddShareRow')?.addEventListener('click', () => {
+          const container = document.getElementById('bulkSharesContainer');
+          const recOptions = (state.data.investors || []).map(i => \`<option value="\${i.portal_username || i.id}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('');
+          const todayStr = new Date().toISOString().split('T')[0];
 
-        const todayIsoStr = new Date().toISOString().split('T')[0];
-        const updateCalculations = () => {
-          let total = 0;
-          document.querySelectorAll('.bulk-share-row').forEach(row => {
-            const st = row.querySelector('.bulk-status')?.value;
-            const pct = parseFloat(row.querySelector('.bulk-pct-input')?.value || '0');
-            const endDate = row.querySelector('.bulk-end-date')?.value;
-            const isPastEnd = endDate && endDate < todayIsoStr;
-            if (st !== 'cancelled' && st !== 'ended' && !isPastEnd) total += pct;
-          });
-          const rem = poolVal - total;
-          const assEl = document.getElementById('bulkAssignedVal');
-          const remEl = document.getElementById('bulkRemainingVal');
-          if (assEl) assEl.textContent = total.toFixed(2) + '%';
-          if (remEl) {
-            remEl.textContent = rem.toFixed(2) + '%';
-            remEl.style.color = rem < 0 ? 'var(--danger)' : (rem === 0 ? 'var(--muted)' : 'var(--success)');
-          }
-        };
-
-        updateCalculations();
-
-        document.getElementById('bulkSharesTableBody')?.addEventListener('input', updateCalculations);
-        document.getElementById('bulkSharesTableBody')?.addEventListener('change', updateCalculations);
-
-        document.getElementById('bulkSharesTableBody')?.addEventListener('click', (e) => {
-          if (e.target.classList.contains('remove-bulk-row-btn')) {
-            const row = e.target.closest('.bulk-share-row');
-            if (row) {
-              row.remove();
-              updateCalculations();
-            }
-          }
-        });
-
-        document.getElementById('addBulkRowBtn')?.addEventListener('click', () => {
-          const bodyEl = document.getElementById('bulkSharesTableBody');
-          if (!bodyEl) return;
-          const sortedInvestors = [...(state.data.investors || [])].sort((a,b) => {
-            const nameA = \`\${a.first_name || ''} \${a.last_name || ''}\`.trim() || a.portal_username || a.id;
-            const nameB = \`\${b.first_name || ''} \${b.last_name || ''}\`.trim() || b.portal_username || b.id;
-            return nameA.localeCompare(nameB);
-          });
-          const recOpts = sortedInvestors.map(inv => \`
-            <option value="\${inv.id}">
-              \${escapeHtml(inv.first_name || '')} \${escapeHtml(inv.last_name || '')} (\${inv.portal_username || inv.id})
-            </option>
-          \`).join('');
-
-          const tr = document.createElement('tr');
-          tr.className = 'bulk-share-row';
-          tr.dataset.shareId = '';
-          tr.innerHTML = \`
-            <td style="padding:6px;">
-              <select class="bulk-rec-id form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                \${recOpts}
-              </select>
-            </td>
-            <td style="padding:6px; width:90px;">
-              <input type="number" step="0.1" class="bulk-pct-input form-control" value="10" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-            </td>
-            <td style="padding:6px; width:130px;">
-              <input type="date" class="bulk-start-date form-control" value="\${new Date().toISOString().split('T')[0]}" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" required />
-            </td>
-            <td style="padding:6px; width:130px;">
-              <input type="date" class="bulk-end-date form-control" value="" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;" />
-            </td>
-            <td style="padding:6px; width:90px;">
-              <select class="bulk-status form-control" style="width:100%; padding:6px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-                <option value="active" selected>Active</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </td>
-            <td style="padding:6px; width:40px; text-align:center;">
-              <button type="button" class="btn-action btn-action-delete remove-bulk-row-btn" style="padding:4px 8px;">✕</button>
-            </td>
+          const newRow = document.createElement('div');
+          newRow.className = 'bulk-share-row';
+          newRow.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 40px; gap:8px; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px;';
+          newRow.innerHTML = \`
+            <div><select class="bulk-rec-id" style="font-size:13px; padding:6px;">\${recOptions}</select></div>
+            <div><input class="bulk-pct-input" type="number" step="0.1" value="\${extraData?.defaultPercent || 10}" style="font-size:13px; padding:6px;" placeholder="%" /></div>
+            <div><input class="bulk-start-date" type="date" value="\${todayStr}" style="font-size:12px; padding:6px;" /></div>
+            <div><input class="bulk-end-date" type="date" style="font-size:12px; padding:6px;" placeholder="No end date" /></div>
+            <div><select class="bulk-status" style="font-size:12px; padding:6px;"><option value="active">Active</option><option value="ended">Ended</option><option value="cancelled">Cancelled</option></select></div>
+            <div style="text-align:center;"><button type="button" class="secondary" onclick="this.closest('.bulk-share-row').remove()" style="padding:4px 8px; color:var(--danger); border:none;">✕</button></div>
           \`;
-          bodyEl.appendChild(tr);
-          updateCalculations();
+          container.appendChild(newRow);
         });
       }
 
@@ -1472,22 +1393,20 @@ let state = {
 
     document.getElementById('entityForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const btn = document.getElementById('saveEntityBtn');
-      const errorEl = document.getElementById('modalError');
-      btn.disabled = true; btn.textContent = 'Saving...';
-      if (errorEl) errorEl.textContent = '';
-      document.getElementById('entityModal').classList.add('saving-active');
-
       const action = document.getElementById('formAction').value;
       const id = document.getElementById('formId').value;
       const tab = state.tab;
+      const errorEl = document.getElementById('modalError');
+      
+      const btn = document.getElementById('saveEntityBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      document.getElementById('entityModal').classList.add('saving-active');
 
       try {
         let endpoint = '', method = 'POST', body = {};
         if (tab === 'investors') {
           endpoint = action === 'edit' ? \`/api/admin/investors/\${id}\` : '/api/admin/investors';
           method = action === 'edit' ? 'PUT' : 'POST';
-          const passVal = document.getElementById('field_password')?.value;
           body = {
             firstName: document.getElementById('field_first_name')?.value,
             lastName: document.getElementById('field_last_name')?.value,
@@ -1496,6 +1415,7 @@ let state = {
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0)
           };
+          const passVal = document.getElementById('field_password')?.value;
           if (passVal) {
             body.password = passVal;
             body.tempPassword = passVal;
@@ -1736,4 +1656,4 @@ const out = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync('admin.html', out);
-console.log('Successfully wrote dynamic admin.html');
+console.log('Successfully wrote dynamic admin.html with Monthly Accounting Preview UI');

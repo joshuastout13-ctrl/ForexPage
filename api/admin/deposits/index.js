@@ -19,12 +19,26 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       const body = req.body || {};
+      const entryDate = body.date || new Date().toISOString().split('T')[0];
+      let effDate = body.effectiveAccountingDate || body.effective_accounting_date;
       
+      if (!effDate) {
+        const dt = new Date(entryDate);
+        const y = dt.getUTCFullYear();
+        const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        effDate = `${y}-${m}-01`;
+      }
+
+      if (!effDate.endsWith("-01")) {
+        throw new Error("INVALID_EFFECTIVE_DATE: Effective accounting date must be the 1st day of the month (e.g. YYYY-MM-01).");
+      }
+
       const payload = {
         id: `dep_${crypto.randomBytes(4).toString("hex")}`,
         investor_id: body.investorId,
         account_id: body.accountId,
-        date: body.date || new Date().toISOString().split('T')[0],
+        date: entryDate,
+        effective_accounting_date: effDate,
         amount: Number(body.amount || 0),
         type: body.type || "Deposit",
         notes: body.notes || ""
