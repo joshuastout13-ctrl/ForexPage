@@ -1567,9 +1567,9 @@ let state = {
       }
     });
 
-    document.getElementById('confirmStatusBtn').addEventListener('click', async (e) => {
+    document.getElementById('confirmStatusBtn')?.addEventListener('click', async (e) => {
        const btn = e.target; btn.disabled = true; btn.textContent = 'Processing...';
-       document.getElementById('statusModal').classList.add('saving-active');
+       document.getElementById('statusModal')?.classList.add('saving-active');
        try {
          const { targetContext: tab, targetAction: action, targetId: id } = state;
          let endpoint = '', method = 'POST';
@@ -1582,43 +1582,43 @@ let state = {
          else if (action === 'commission_reactivate') endpoint = \`/api/admin/commission-shares/\${id}/reactivate\`;
 
          await api.request(endpoint, { method, body: JSON.stringify({ action }) });
-         document.getElementById('statusModal').classList.add('hidden');
+         document.getElementById('statusModal')?.classList.add('hidden');
          loadTab(tab);
        } catch(ex) { alert('Action Failed: ' + ex.message); } 
-       finally { btn.disabled = false; btn.textContent = 'Confirm'; document.getElementById('statusModal').classList.remove('saving-active'); }
+       finally { btn.disabled = false; btn.textContent = 'Confirm'; document.getElementById('statusModal')?.classList.remove('saving-active'); }
     });
 
-    document.getElementById('addEntityBtn').addEventListener('click', () => openModal(state.tab, 'add', null));
-    document.getElementById('searchBar').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
-    document.getElementById('loginBtn').addEventListener('click', async () => {
+    document.getElementById('addEntityBtn')?.addEventListener('click', () => openModal(state.tab, 'add', null));
+    document.getElementById('searchBar')?.addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
+    document.getElementById('loginBtn')?.addEventListener('click', async () => {
       const lb = document.getElementById('loginBtn');
       lb.disabled = true; lb.textContent = 'Authenticating...';
       try { await api.login(document.getElementById('loginUser').value, document.getElementById('loginPass').value); init(); }
       catch(e) { document.getElementById('loginError').textContent = e.message; }
       finally { lb.disabled = false; lb.textContent = 'Authenticate'; }
     });
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
       const lb = document.getElementById('logoutBtn');
       lb.disabled = true; lb.textContent = 'Logging out...';
       try { await api.logout(); window.location.reload(); }
       catch(e) { lb.disabled = false; lb.textContent = 'Logout'; }
     });
-    document.getElementById('statusModal').querySelector('.closeModalBtn').addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
-    document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
-    document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); }));
+    document.getElementById('statusModal')?.querySelector('.closeModalBtn')?.addEventListener('click', () => document.getElementById('statusModal').classList.add('hidden'));
+    document.querySelectorAll('.closeModalBtn').forEach(b => b?.addEventListener('click', () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'))));
+    document.querySelectorAll('.modal-overlay').forEach(m => m?.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); }));
 
-    document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importBtn')?.addEventListener('click', () => {
       document.getElementById('importPreview').innerHTML = '';
       document.getElementById('csvFileInput').value = '';
-      document.getElementById('importModal').classList.remove('hidden');
+      document.getElementById('importModal')?.classList.remove('hidden');
     });
 
-    document.getElementById('processImportBtn').addEventListener('click', async () => {
+    document.getElementById('processImportBtn')?.addEventListener('click', async () => {
       const file = document.getElementById('csvFileInput').files[0];
       if(!file) return alert('Select a file');
       const btn = document.getElementById('processImportBtn');
       btn.disabled = true; btn.textContent = 'Importing...';
-      document.getElementById('importModal').classList.add('saving-active');
+      document.getElementById('importModal')?.classList.add('saving-active');
 
       try {
         const text = await file.text();

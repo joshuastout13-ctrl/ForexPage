@@ -1209,13 +1209,13 @@
       });
     }
 
-    document.getElementById("loginBtn").addEventListener("click", login);
-    document.getElementById("changePassBtn").addEventListener("click", changePassword);
-    document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("loginBtn")?.addEventListener("click", login);
+    document.getElementById("changePassBtn")?.addEventListener("click", changePassword);
+    document.getElementById("logoutBtn")?.addEventListener("click", logout);
     document.getElementById("retryBtn")?.addEventListener("click", () => loadDashboard(true));
     document.getElementById("errorLogoutBtn")?.addEventListener("click", logout);
     
-    document.getElementById("summaryGrid").addEventListener("click", (e) => {
+    document.getElementById("summaryGrid")?.addEventListener("click", (e) => {
       const metricBox = e.target.closest('.metric');
       if (metricBox && metricBox.dataset.action === 'showCommissionModal') {
         showCommissionModal();
