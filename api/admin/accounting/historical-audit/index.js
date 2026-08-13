@@ -107,11 +107,6 @@ export default async function handler(req, res) {
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       return res.send(buffer);
     }
-      
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      return res.send(buffer);
-    }
 
     // 5. Default JSON Response
     return res.status(200).json({
