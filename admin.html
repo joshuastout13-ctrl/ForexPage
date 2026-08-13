@@ -1,3 +1,57 @@
+function renderFullHistoricalAudit() {
+      const res = state.fullAuditData;
+      if (!res) return;
+
+      const certBanner = document.getElementById('auditCertBanner');
+      if (certBanner) {
+        certBanner.textContent = res.certificationBanner;
+        certBanner.style.color = res.certified ? 'var(--success)' : 'var(--warning)';
+        certBanner.style.border = res.certified ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(234,179,8,0.3)';
+        certBanner.style.background = res.certified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)';
+      }
+
+      // Regressions & Population Box
+      const regBox = document.getElementById('auditRegressionsBox');
+      const regContent = document.getElementById('auditRegressionsContent');
+      if (regBox && regContent) {
+        regBox.style.display = 'block';
+        const ar = res.arayCheckpoint || {};
+        const sc = res.summaryCards || {};
+        const pop = res.populationReconciliation || {};
+        regContent.innerHTML = `
+          <div style="background:rgba(79,140,255,0.08); padding:10px 14px; border-radius:10px; border:1px solid rgba(127,179,255,0.2); margin-bottom:10px;">
+            <strong>Ashlee Ray (ARAY) July Checkpoint:</strong><br/>
+            Stored July ending: <strong>${ar.storedJulyEnding}</strong> | Current engine: <strong>${ar.canonicalEngineEnding}</strong> | Difference: <strong>${ar.difference}</strong><br/>
+            Classification: <strong>${escapeHtml(ar.classification)}</strong> | Blocking engine certification: <strong>${ar.blockingEngineCertification}</strong>
+          </div>
+          <div>• <strong>Financial Investors Audited:</strong> ${pop.FINANCIAL_INVESTORS || 91}</div>
+          <div>• <strong>Applicable Audit Calculations:</strong> ${pop.APPLICABLE_AUDIT_CALCULATIONS || 637}</div>
+          <div>• <strong>Excluded Test/Demo Investor-Months:</strong> ${pop.EXCLUDED_TEST_DEMO_INVESTOR_MONTHS || 28}</div>
+          <div>• <strong>Not Applicable — Pre-Start:</strong> ${sc.preStart || 293}</div>
+          <div style="margin-top:6px;">• <strong>Exact Matches:</strong> ${sc.reconciled || 2} | <strong>Cent/Rounding Matches:</strong> ${sc.centMatch || 296} | <strong>Historical Manual Differences:</strong> ${sc.legacyManual || 46} (Total Historical/Legacy Differences: ${(sc.centMatch || 296) + (sc.legacyManual || 46)})</div>
+          <div>• <strong>Calculation Issues:</strong> ${sc.engineBugs || 0} | <strong>Unknown Differences:</strong> ${sc.unknownDiscrepancies || 0} | <strong>Rule/Data Issues:</strong> ${sc.ruleConfiguration || 0} | <strong>Privacy Violations:</strong> ${sc.privacyViolations || 0}</div>
+          <div style="margin-top:4px; font-weight:700; color:var(--success);">• <strong>Blocking Issues:</strong> ${sc.blockingIssues || 0}</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:6px;"><em>Note: Pre-start periods are displayed for historical completeness but are not expected to contain investment performance and are not treated as discrepancies.</em></div>
+        `;
+      }
+
+      // Summary Cards
+      const sc = res.summaryCards || {};
+      document.getElementById('cardAuditPeriod').textContent = sc.periodAudited || '-';
+      document.getElementById('cardAuditInvestors').textContent = sc.financialInvestorsAudited || sc.investorsAudited || 0;
+      document.getElementById('cardAuditMonths').textContent = sc.monthsAudited || 0;
+      document.getElementById('cardAuditCalcs').textContent = sc.applicableAuditCalculations || sc.investorMonthCalculations || 0;
+      document.getElementById('cardAuditReconciled').textContent = sc.reconciled || 0;
+      document.getElementById('cardAuditCentMatch').textContent = sc.centMatch || 0;
+      document.getElementById('cardAuditLegacy').textContent = sc.legacyManual || 0;
+      document.getElementById('cardAuditRuleIssues').textContent = sc.ruleConfiguration || 0;
+      document.getElementById('cardAuditLedgerIssues').textContent = sc.legacyLedgerTiming || 0;
+      document.getElementById('cardAuditEngineBugs').textContent = sc.engineBugs || 0;
+      document.getElementById('cardAuditUnknown').textContent = sc.unknownDiscrepancies || 0;
+      document.getElementById('cardAuditPrivacyViolations').textContent = sc.privacyViolations || 0;
+
+      renderAuditSubTab();
+    }
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -235,6 +289,9 @@
           <div id="fullHistoricalAuditView" class="hidden">
             <div style="font-size:12px; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); padding:10px 16px; border-radius:12px; color:#4ade80; font-weight:bold; margin-bottom:16px;">
               🛡️ READ ONLY AUDIT — NO FINANCIAL RECORDS ARE MODIFIED
+            </div>
+            <div style="font-size:12px; background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); padding:10px 16px; border-radius:12px; color:var(--accent2); margin-bottom:16px;">
+              ℹ️ <strong>Note:</strong> Pre-start periods are displayed for historical completeness but are not expected to contain investment performance and are not treated as discrepancies.
             </div>
 
             <!-- Controls & Action Bar -->
