@@ -351,26 +351,86 @@
               </div>
             </div>
 
-            <!-- Sub Tabs & Filtering -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-              <div class="sub-tabs" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
-                <button id="auditSubTabInvestorBtn" class="sub-tab-btn active" data-audittab="investor">By Investor</button>
-                <button id="auditSubTabMonthBtn" class="sub-tab-btn" data-audittab="month">By Month</button>
-                <button id="auditSubTabDataQualityBtn" class="sub-tab-btn" data-audittab="dataquality">Data Quality Issues</button>
+            <!-- Filter Control Bar & Sub-Tabs -->
+            <div class="card" style="margin-bottom:20px; padding:16px; background:rgba(15,23,42,0.8); border:1px solid var(--line);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
+                <div class="sub-tabs" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
+                  <button id="auditSubTabInvestorBtn" class="sub-tab-btn active" data-audittab="investor">By Investor Summary</button>
+                  <button id="auditSubTabDetailBtn" class="sub-tab-btn" data-audittab="detail">Investor-Month Calculations</button>
+                  <button id="auditSubTabMonthBtn" class="sub-tab-btn" data-audittab="month">By Month</button>
+                  <button id="auditSubTabDataQualityBtn" class="sub-tab-btn" data-audittab="dataquality">Data Quality Scan</button>
+                </div>
+                
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <button id="btnToggleFlaggedOnly" type="button" class="secondary" style="padding:6px 14px; font-size:12px; border-color:rgba(239,68,68,0.4); color:#f87171;">
+                    🚩 Show Flagged Only
+                  </button>
+                  <button id="btnClearAuditFilters" type="button" class="secondary" style="padding:6px 14px; font-size:12px;">
+                    Clear Filters
+                  </button>
+                </div>
               </div>
-              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <input id="auditSearchInput" placeholder="Filter investor..." style="width:160px; padding:6px 10px; font-size:13px;" />
-                <select id="auditFilterStatusSelect" style="width:160px; padding:6px 10px; font-size:13px;">
-                  <option value="ALL">All Statuses</option>
-                  <option value="RECONCILED">Clean / Reconciled</option>
-                  <option value="LEGACY">Legacy Differences</option>
-                  <option value="RULE">Rule Mismatches</option>
-                  <option value="BLOCKING">Engine Bugs / Unknown</option>
-                </select>
+
+              <!-- Combined Filter Controls -->
+              <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                <div style="flex:1; min-width:180px;">
+                  <label class="muted" style="font-size:11px; display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Investor</label>
+                  <select id="auditInvestorSelect" style="padding:7px 10px; font-size:13px;">
+                    <option value="ALL">All Investors</option>
+                  </select>
+                </div>
+
+                <div style="flex:1; min-width:180px;">
+                  <label class="muted" style="font-size:11px; display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Status Filter</label>
+                  <select id="auditFilterStatusSelect" style="padding:7px 10px; font-size:13px;">
+                    <option value="ALL">All Reports</option>
+                    <option value="FLAGGED">🚩 Flagged / Requires Review</option>
+                    <option value="RECONCILED">Clean / Reconciled</option>
+                    <option value="LEGACY">Historical Differences</option>
+                    <option value="RULE">Rule / Configuration Issues</option>
+                    <option value="ENGINE_BUG">Calculation / Engine Issues</option>
+                    <option value="UNKNOWN">Unknown Discrepancies</option>
+                  </select>
+                </div>
+
+                <div style="width:130px;">
+                  <label class="muted" style="font-size:11px; display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Month</label>
+                  <select id="auditMonthFilterSelect" style="padding:7px 10px; font-size:13px;">
+                    <option value="ALL">All Months</option>
+                    <option value="1">1 - January</option>
+                    <option value="2">2 - February</option>
+                    <option value="3">3 - March</option>
+                    <option value="4">4 - April</option>
+                    <option value="5">5 - May</option>
+                    <option value="6">6 - June</option>
+                    <option value="7">7 - July</option>
+                  </select>
+                </div>
+
+                <div style="flex:1; min-width:160px;">
+                  <label class="muted" style="font-size:11px; display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Search</label>
+                  <input id="auditSearchInput" placeholder="Name or username..." style="padding:7px 10px; font-size:13px;" />
+                </div>
+
+                <div style="display:flex; align-items:center; height:34px; padding-left:4px;">
+                  <label style="font-size:12px; color:var(--muted); cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="chkShowTestAccounts" style="width:14px; height:14px; margin:0;" /> Show Test Accounts
+                  </label>
+                </div>
+              </div>
+
+              <!-- Filter Result Counter Note -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); flex-wrap:wrap; gap:8px;">
+                <div id="auditFilterCountNote" style="font-size:13px; font-weight:600; color:var(--accent2);">
+                  Showing 0 records
+                </div>
+                <div id="auditActiveFiltersBadge" style="font-size:12px; color:var(--muted);">
+                  Filter: None
+                </div>
               </div>
             </div>
 
-            <!-- By Investor View -->
+            <!-- By Investor Summary View -->
             <div id="auditSubTabInvestor">
               <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse;">
@@ -389,6 +449,35 @@
                   </thead>
                   <tbody id="auditInvestorTableBody">
                     <tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">Click "Run Full Historical Audit" to display results.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Investor-Month Calculations Detail View -->
+            <div id="auditSubTabDetail" class="hidden">
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Investor Name</th>
+                      <th>Username</th>
+                      <th>Period</th>
+                      <th>Return %</th>
+                      <th>Prior Balance</th>
+                      <th>Deposits</th>
+                      <th>Withdrawals</th>
+                      <th>Eligible Capital</th>
+                      <th>Gain / Loss</th>
+                      <th>Calculated Ending</th>
+                      <th>Stored Ending</th>
+                      <th>Difference</th>
+                      <th>Classification</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditDetailTableBody">
+                    <tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">Click "Run Full Historical Audit" to display results.</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -880,6 +969,82 @@ let state = {
     });
 
     /* Full Historical System Audit Functions */
+    /* Full Historical System Audit Functions & Investor Dropdown Helpers */
+    function getSortedFinancialInvestors(investorsList, includeTest = false) {
+      const list = investorsList || state.data.investors || [];
+      const filtered = list.filter(inv => {
+        if (includeTest) return true;
+        const uname = (inv.portal_username || inv.portalusername || inv.username || inv.full_name || '').toLowerCase();
+        const role = (inv.role || '').toLowerCase();
+        if (uname === 'admin' || uname === 'admin_user' || role === 'admin_system') return false;
+        if (uname.includes('test') || uname.includes('demo') || uname.includes('dummy') || uname.startsWith('qauser')) return false;
+        return true;
+      });
+
+      const getSortKey = (inv) => {
+        if (inv.last_name && inv.first_name) {
+          return `${inv.last_name.trim().toLowerCase()}, ${inv.first_name.trim().toLowerCase()}`;
+        }
+        const fullName = (inv.full_name || inv.name || inv.portal_username || '').trim().toLowerCase();
+        const parts = fullName.split(' ');
+        if (parts.length > 1) {
+          const lastName = parts[parts.length - 1];
+          const firstName = parts.slice(0, parts.length - 1).join(' ');
+          return `${lastName}, ${firstName}`;
+        }
+        return fullName;
+      };
+
+      return [...filtered].sort((a, b) => {
+        const keyA = getSortKey(a);
+        const keyB = getSortKey(b);
+        return keyA.localeCompare(keyB, undefined, { sensitivity: 'base' });
+      });
+    }
+
+    function populateAuditInvestorDropdown() {
+      const select = document.getElementById('auditInvestorSelect');
+      if (!select) return;
+
+      const currentVal = select.value || 'ALL';
+      const showTest = document.getElementById('chkShowTestAccounts')?.checked || false;
+      const rawList = state.fullAuditData?.rawInvestors || state.data.investors || [];
+      const sorted = getSortedFinancialInvestors(rawList, showTest);
+
+      let html = `<option value="ALL">All Investors (${sorted.length})</option>`;
+      sorted.forEach(inv => {
+        const username = inv.portal_username || inv.username || inv.id;
+        const displayName = [inv.first_name, inv.last_name].filter(Boolean).join(' ') || inv.full_name || inv.name || username;
+        html += `<option value="${escapeHtml(username)}">${escapeHtml(displayName)} (${escapeHtml(username)})</option>`;
+      });
+
+      select.innerHTML = html;
+      if (currentVal && Array.from(select.options).some(opt => opt.value === currentVal)) {
+        select.value = currentVal;
+      } else {
+        select.value = 'ALL';
+      }
+    }
+
+    function selectInvestorFilter(usernameOrId) {
+      if (!usernameOrId) return;
+      const select = document.getElementById('auditInvestorSelect');
+      if (select) {
+        let matchOpt = Array.from(select.options).find(opt => opt.value.toLowerCase() === usernameOrId.toLowerCase());
+        if (matchOpt) {
+          select.value = matchOpt.value;
+        } else {
+          if (document.getElementById('auditSearchInput')) document.getElementById('auditSearchInput').value = usernameOrId;
+        }
+      }
+
+      document.querySelectorAll('.sub-tab-btn[data-audittab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.audittab === 'detail');
+      });
+
+      renderAuditSubTab();
+    }
+
     async function loadFullHistoricalAudit() {
       const startMonth = Number(document.getElementById('auditStartMonthSelect')?.value || 1);
       const startYear = Number(document.getElementById('auditStartYearInput')?.value || 2026);
@@ -905,6 +1070,8 @@ let state = {
       const res = state.fullAuditData;
       if (!res) return;
 
+      populateAuditInvestorDropdown();
+
       const certBanner = document.getElementById('auditCertBanner');
       if (certBanner) {
         certBanner.textContent = res.certificationBanner;
@@ -927,23 +1094,22 @@ let state = {
             Stored July ending: <strong>$${Number(ar.storedJulyEnding || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> | Current engine: <strong>$${Number(ar.canonicalEngineEnding || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> | Difference: <strong>$${Number(ar.difference || 0).toFixed(2)}</strong><br/>
             Classification: <strong>${escapeHtml(ar.classification || '')}</strong> | Blocking engine certification: <strong>${ar.blockingEngineCertification || 'NO'}</strong>
           </div>
-          <div>• <strong>Financial Investors Audited:</strong> ${pop.FINANCIAL_INVESTORS || 91}</div>
-          <div>• <strong>Applicable Audit Calculations:</strong> ${pop.APPLICABLE_AUDIT_CALCULATIONS || 637}</div>
-          <div>• <strong>Excluded Test/Demo Investor-Months:</strong> ${pop.EXCLUDED_TEST_DEMO_INVESTOR_MONTHS || 28}</div>
+          <div>• <strong>Financial Investors Audited:</strong> ${pop.FINANCIAL_INVESTORS || 89}</div>
+          <div>• <strong>Applicable Audit Calculations:</strong> ${pop.APPLICABLE_AUDIT_CALCULATIONS || 623}</div>
+          <div>• <strong>Excluded Test/Demo Accounts:</strong> ${pop.TEST_DEMO_EXCLUDED || 6}</div>
           <div>• <strong>Not Applicable — Pre-Start:</strong> ${sc.preStart || 293}</div>
-          <div style="margin-top:6px;">• <strong>Exact Matches:</strong> ${sc.reconciled || 0} | <strong>Cent/Rounding Matches:</strong> ${sc.centMatch || 0} | <strong>Historical Manual Differences:</strong> ${sc.legacyManual || 0} (Total Historical/Legacy Differences: ${(sc.centMatch || 0) + (sc.legacyManual || 0)})</div>
-          <div>• <strong>Calculation Issues:</strong> ${sc.engineBugs || 0} | <strong>Unknown Differences:</strong> ${sc.unknownDiscrepancies || 0} | <strong>Rule/Data Issues:</strong> ${sc.ruleConfiguration || 0} | <strong>Privacy Violations:</strong> ${sc.privacyViolations || 0}</div>
+          <div style="margin-top:6px;">• <strong>Exact Matches:</strong> ${sc.reconciled || 0} | <strong>Cent/Rounding Matches:</strong> ${sc.centMatch || 0} | <strong>Historical Manual Differences:</strong> ${sc.legacyManual || 0}</div>
+          <div>• <strong>Calculation Issues:</strong> ${sc.engineBugs || 0} | <strong>Unknown Differences:</strong> ${sc.unknownDiscrepancies || 0} | <strong>Rule/Data Issues:</strong> ${sc.ruleConfiguration || 0}</div>
           <div style="margin-top:4px; font-weight:700; color:var(--success);">• <strong>Blocking Issues:</strong> ${sc.blockingIssues || 0}</div>
-          <div style="font-size:11px; color:var(--muted); margin-top:6px;"><em>Note: Pre-start periods are displayed for historical completeness but are not expected to contain investment performance and are not treated as discrepancies.</em></div>
         `;
       }
 
       // Summary Cards
       const sc = res.summaryCards || {};
       if (document.getElementById('cardAuditPeriod')) document.getElementById('cardAuditPeriod').textContent = sc.periodAudited || '-';
-      if (document.getElementById('cardAuditInvestors')) document.getElementById('cardAuditInvestors').textContent = sc.financialInvestorsAudited || sc.investorsAudited || 0;
-      if (document.getElementById('cardAuditMonths')) document.getElementById('cardAuditMonths').textContent = sc.monthsAudited || 0;
-      if (document.getElementById('cardAuditCalcs')) document.getElementById('cardAuditCalcs').textContent = sc.applicableAuditCalculations || sc.investorMonthCalculations || 0;
+      if (document.getElementById('cardAuditInvestors')) document.getElementById('cardAuditInvestors').textContent = sc.financialInvestorsAudited || 89;
+      if (document.getElementById('cardAuditMonths')) document.getElementById('cardAuditMonths').textContent = sc.monthsAudited || 7;
+      if (document.getElementById('cardAuditCalcs')) document.getElementById('cardAuditCalcs').textContent = sc.applicableAuditCalculations || 623;
       if (document.getElementById('cardAuditReconciled')) document.getElementById('cardAuditReconciled').textContent = sc.reconciled || 0;
       if (document.getElementById('cardAuditCentMatch')) document.getElementById('cardAuditCentMatch').textContent = sc.centMatch || 0;
       if (document.getElementById('cardAuditLegacy')) document.getElementById('cardAuditLegacy').textContent = sc.legacyManual || 0;
@@ -964,38 +1130,74 @@ let state = {
       const currentTab = activeBtn ? activeBtn.dataset.audittab : 'investor';
 
       document.getElementById('auditSubTabInvestor')?.classList.toggle('hidden', currentTab !== 'investor');
+      document.getElementById('auditSubTabDetail')?.classList.toggle('hidden', currentTab !== 'detail');
       document.getElementById('auditSubTabMonth')?.classList.toggle('hidden', currentTab !== 'month');
       document.getElementById('auditSubTabDataQuality')?.classList.toggle('hidden', currentTab !== 'dataquality');
 
-      const searchTerm = (document.getElementById('auditSearchInput')?.value || '').toLowerCase();
-      const filterStatus = document.getElementById('auditFilterStatusSelect')?.value || 'ALL';
+      const selectedInvestor = document.getElementById('auditInvestorSelect')?.value || 'ALL';
+      const selectedStatus = document.getElementById('auditFilterStatusSelect')?.value || 'ALL';
+      const selectedMonth = document.getElementById('auditMonthFilterSelect')?.value || 'ALL';
+      const searchTerm = (document.getElementById('auditSearchInput')?.value || '').trim().toLowerCase();
+      const showTest = document.getElementById('chkShowTestAccounts')?.checked || false;
 
+      // Active filters badge text
+      const filterParts = [];
+      if (selectedInvestor !== 'ALL') filterParts.push(`Investor: ${selectedInvestor}`);
+      if (selectedStatus !== 'ALL') filterParts.push(`Status: ${selectedStatus}`);
+      if (selectedMonth !== 'ALL') filterParts.push(`Month: ${selectedMonth}`);
+      if (searchTerm) filterParts.push(`Search: "${searchTerm}"`);
+      const badge = document.getElementById('auditActiveFiltersBadge');
+      if (badge) badge.textContent = filterParts.length > 0 ? `Active Filter: ${filterParts.join(' | ')}` : 'Filter: None (All Records)';
+
+      // -------------------------------------------------------------
+      // Sub-Tab 1: By Investor Summary
+      // -------------------------------------------------------------
       if (currentTab === 'investor') {
         const tbody = document.getElementById('auditInvestorTableBody');
         if (!tbody) return;
         let list = res.investorSummaries || [];
-        
+
+        if (!showTest) {
+          list = list.filter(inv => {
+            const u = (inv.username || inv.investorId || '').toLowerCase();
+            return u !== 'admin' && !u.startsWith('qauser') && !u.includes('test') && !u.includes('demo');
+          });
+        }
+
+        if (selectedInvestor !== 'ALL') {
+          list = list.filter(inv => 
+            (inv.username || '').toLowerCase() === selectedInvestor.toLowerCase() ||
+            (inv.investorId || '').toLowerCase() === selectedInvestor.toLowerCase()
+          );
+        }
+
         if (searchTerm) {
           list = list.filter(inv => 
             (inv.username || '').toLowerCase().includes(searchTerm) || 
-            (inv.name || '').toLowerCase().includes(searchTerm) ||
+            (inv.fullName || inv.name || '').toLowerCase().includes(searchTerm) ||
             (inv.investorId || '').toLowerCase().includes(searchTerm)
           );
         }
 
-        if (filterStatus !== 'ALL') {
-          if (filterStatus === 'RECONCILED') list = list.filter(inv => (inv.blocking || 0) === 0 && (inv.legacy || 0) === 0 && (inv.warnings || 0) === 0);
-          else if (filterStatus === 'LEGACY') list = list.filter(inv => (inv.legacy || 0) > 0 || (inv.centMatch || 0) > 0);
-          else if (filterStatus === 'RULE') list = list.filter(inv => (inv.warnings || 0) > 0 || (inv.ruleIssues || 0) > 0);
-          else if (filterStatus === 'BLOCKING') list = list.filter(inv => (inv.blocking || 0) > 0);
+        if (selectedStatus !== 'ALL') {
+          if (selectedStatus === 'FLAGGED') list = list.filter(inv => (inv.blocking || 0) > 0 || (inv.legacy || 0) > 0 || (inv.warnings || 0) > 0);
+          else if (selectedStatus === 'RECONCILED') list = list.filter(inv => (inv.blocking || 0) === 0 && (inv.legacy || 0) === 0 && (inv.warnings || 0) === 0);
+          else if (selectedStatus === 'LEGACY') list = list.filter(inv => (inv.legacy || 0) > 0 || (inv.centMatch || 0) > 0);
+          else if (selectedStatus === 'RULE') list = list.filter(inv => (inv.warnings || 0) > 0 || (inv.ruleIssues || 0) > 0);
+          else if (selectedStatus === 'ENGINE_BUG' || selectedStatus === 'UNKNOWN') list = list.filter(inv => (inv.blocking || 0) > 0);
         }
+
+        list.sort((a, b) => (a.fullName || a.username || '').localeCompare(b.fullName || b.username || '', undefined, { sensitivity: 'base' }));
+
+        const note = document.getElementById('auditFilterCountNote');
+        if (note) note.textContent = `Showing ${list.length} of ${res.investorSummaries?.length || 89} financial investors`;
 
         if (list.length === 0) {
           tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No matching investor audit records found.</td></tr>';
           return;
         }
 
-        tbody.innerHTML = list.map((inv, idx) => {
+        tbody.innerHTML = list.map((inv) => {
           const isClean = (inv.blocking || 0) === 0;
           const statusBadge = isClean 
             ? `<span class="badge active">CLEAN</span>` 
@@ -1003,22 +1205,144 @@ let state = {
 
           return `<tr>
             <td>${statusBadge}</td>
-            <td><strong style="color:#fff;">${escapeHtml(inv.username || inv.investorId)}</strong></td>
-            <td>${escapeHtml(inv.name || '-')}</td>
+            <td>
+              <a href="#" style="color:#fff; font-weight:700; text-decoration:underline;" onclick="event.preventDefault(); selectInvestorFilter('${escapeHtml(inv.username || inv.investorId)}');">
+                ${escapeHtml(inv.username || inv.investorId)}
+              </a>
+            </td>
+            <td>${escapeHtml(inv.fullName || inv.name || '-')}</td>
             <td>${inv.monthsAudited || 0}</td>
             <td><span style="color:var(--success); font-weight:600;">${inv.reconciled || 0}</span></td>
             <td><span style="color:var(--warning); font-weight:600;">${(inv.centMatch || 0) + (inv.legacy || 0)}</span></td>
             <td>${inv.warnings || 0}</td>
             <td><span style="color:${(inv.blocking || 0) > 0 ? 'var(--danger)' : 'var(--muted)'}; font-weight:600;">${inv.blocking || 0}</span></td>
-            <td><button type="button" class="secondary" style="padding:3px 8px; font-size:11px;" onclick="document.getElementById('auditSearchInput').value='${escapeHtml(inv.username || inv.investorId)}'; renderAuditSubTab();">Filter</button></td>
+            <td><button type="button" class="secondary" style="padding:3px 8px; font-size:11px;" onclick="selectInvestorFilter('${escapeHtml(inv.username || inv.investorId)}');">Inspect Calculations</button></td>
           </tr>`;
         }).join('');
+
+      // -------------------------------------------------------------
+      // Sub-Tab 2: Investor-Month Calculations Detail View
+      // -------------------------------------------------------------
+      } else if (currentTab === 'detail') {
+        const tbody = document.getElementById('auditDetailTableBody');
+        if (!tbody) return;
+        let list = res.investorMonthDetails || [];
+
+        if (!showTest) {
+          list = list.filter(d => {
+            const u = (d.username || d.investorId || '').toLowerCase();
+            return u !== 'admin' && !u.startsWith('qauser') && !u.includes('test') && !u.includes('demo');
+          });
+        }
+
+        if (selectedInvestor !== 'ALL') {
+          list = list.filter(d => 
+            (d.username || '').toLowerCase() === selectedInvestor.toLowerCase() ||
+            (d.investorId || '').toLowerCase() === selectedInvestor.toLowerCase()
+          );
+        }
+
+        if (selectedMonth !== 'ALL') {
+          list = list.filter(d => String(d.month) === String(selectedMonth));
+        }
+
+        if (selectedStatus !== 'ALL') {
+          if (selectedStatus === 'FLAGGED') {
+            list = list.filter(d => d.classification !== 'RECONCILED' && d.classification !== 'PRE_START' && d.classification !== 'EXACT_MATCH');
+          } else if (selectedStatus === 'RECONCILED') {
+            list = list.filter(d => d.classification === 'RECONCILED' || d.classification === 'EXACT_MATCH');
+          } else if (selectedStatus === 'LEGACY') {
+            list = list.filter(d => d.classification === 'LEGACY_MANUAL' || d.classification === 'LEGACY_ROUNDING' || d.classification === 'CENT_MATCH');
+          } else if (selectedStatus === 'RULE') {
+            list = list.filter(d => d.classification === 'RULE_CONFIGURATION' || d.ruleStatus === 'INVALID');
+          } else if (selectedStatus === 'ENGINE_BUG') {
+            list = list.filter(d => d.classification === 'ENGINE_BUG');
+          } else if (selectedStatus === 'UNKNOWN') {
+            list = list.filter(d => d.classification === 'UNKNOWN');
+          }
+        }
+
+        if (searchTerm) {
+          list = list.filter(d => 
+            (d.username || '').toLowerCase().includes(searchTerm) ||
+            (d.name || '').toLowerCase().includes(searchTerm) ||
+            (d.investorId || '').toLowerCase().includes(searchTerm) ||
+            (d.clientDescription || '').toLowerCase().includes(searchTerm)
+          );
+        }
+
+        list.sort((a, b) => {
+          if (selectedStatus === 'FLAGGED') {
+            const blockA = a.isBlocking ? 0 : 1;
+            const blockB = b.isBlocking ? 0 : 1;
+            if (blockA !== blockB) return blockA - blockB;
+          }
+          const nameComp = (a.name || a.username || '').localeCompare(b.name || b.username || '', undefined, { sensitivity: 'base' });
+          if (nameComp !== 0) return nameComp;
+          return (a.month || 0) - (b.month || 0);
+        });
+
+        const note = document.getElementById('auditFilterCountNote');
+        if (note) note.textContent = `Showing ${list.length} of ${res.investorMonthDetails?.length || 616} investor-month calculations`;
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="14" class="muted" style="text-align:center; padding:24px;">No matching investor-month calculations found for current filter criteria.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(d => {
+          const cls = d.classification;
+          let badgeHtml = `<span class="badge active">${escapeHtml(cls)}</span>`;
+          if (cls === 'LEGACY_MANUAL' || cls === 'LEGACY_ROUNDING' || cls === 'CENT_MATCH') {
+            badgeHtml = `<span class="badge pending" style="background:rgba(234,179,8,0.15); color:#fde047; border-color:rgba(234,179,8,0.3);">${escapeHtml(cls)}</span>`;
+          } else if (cls === 'ENGINE_BUG' || cls === 'UNKNOWN' || cls === 'RULE_CONFIGURATION') {
+            badgeHtml = `<span class="badge inactive" style="background:rgba(239,68,68,0.15); color:#f87171; border-color:rgba(239,68,68,0.3);">${escapeHtml(cls)}</span>`;
+          } else if (cls === 'PRE_START') {
+            badgeHtml = `<span class="badge" style="background:rgba(148,163,184,0.1); color:#cbd5e1; border-color:rgba(148,163,184,0.2);">${escapeHtml(cls)}</span>`;
+          }
+
+          const diffVal = Number(d.difference || 0);
+          const diffStr = diffVal === 0 ? '$0.00' : `$${diffVal.toFixed(2)}`;
+
+          return `<tr>
+            <td>${badgeHtml}</td>
+            <td>
+              <a href="#" style="color:#fff; font-weight:600; text-decoration:underline;" onclick="event.preventDefault(); selectInvestorFilter('${escapeHtml(d.username)}');">
+                ${escapeHtml(d.name)}
+              </a>
+            </td>
+            <td><strong style="color:var(--accent2);">${escapeHtml(d.username)}</strong></td>
+            <td>${d.year}-${String(d.month).padStart(2, '0')}</td>
+            <td>${Number(d.grossReturnPct || 0).toFixed(2)}%</td>
+            <td>${money(d.openingBalance)}</td>
+            <td>${money(d.deposits)}</td>
+            <td>${money(d.withdrawals)}</td>
+            <td><strong style="color:#fff;">${money(d.eligibleCapital)}</strong></td>
+            <td><strong style="color:${(d.sourceGainLoss||0)>=0?'var(--success)':'var(--danger)'}">${money(d.sourceGainLoss)}</strong></td>
+            <td><strong style="color:#fff;">${money(d.calculatedEnding)}</strong></td>
+            <td>${d.storedEnding !== null ? money(d.storedEnding) : 'N/A'}</td>
+            <td><span style="font-weight:700; color:${diffVal>0.01?'var(--danger)':diffVal>0?'var(--warning)':'var(--success)'}">${diffStr}</span></td>
+            <td><span style="font-size:11px; color:var(--muted);">${escapeHtml(d.clientDescription || cls)}</span></td>
+          </tr>`;
+        }).join('');
+
+      // -------------------------------------------------------------
+      // Sub-Tab 3: By Month
+      // -------------------------------------------------------------
       } else if (currentTab === 'month') {
         const tbody = document.getElementById('auditMonthTableBody');
         if (!tbody) return;
-        const list = res.monthlySummaries || [];
+        let list = res.monthlySummaries || [];
+
+        if (selectedMonth !== 'ALL') {
+          list = list.filter(m => String(m.month) === String(selectedMonth));
+        }
+
+        const note = document.getElementById('auditFilterCountNote');
+        if (note) note.textContent = `Showing ${list.length} of ${res.monthlySummaries?.length || 7} audited months`;
+
         if (list.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No monthly audit summaries available.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:24px;">No monthly audit summaries available for current month filter.</td></tr>';
           return;
         }
 
@@ -1036,10 +1360,25 @@ let state = {
             <td><span style="color:${(m.unknownCount || 0) > 0 ? 'var(--danger)' : 'var(--muted)'}; font-weight:600;">${m.unknownCount || 0}</span></td>
           </tr>`;
         }).join('');
+
+      // -------------------------------------------------------------
+      // Sub-Tab 4: Data Quality Scan
+      // -------------------------------------------------------------
       } else if (currentTab === 'dataquality') {
         const tbody = document.getElementById('auditDataQualityTableBody');
         if (!tbody) return;
-        const list = res.dataQualityIssues || [];
+        let list = res.dataQualityIssues || [];
+
+        if (searchTerm) {
+          list = list.filter(issue => 
+            (issue.type || '').toLowerCase().includes(searchTerm) ||
+            (issue.detail || issue.message || '').toLowerCase().includes(searchTerm)
+          );
+        }
+
+        const note = document.getElementById('auditFilterCountNote');
+        if (note) note.textContent = `Showing ${list.length} data quality issues`;
+
         if (list.length === 0) {
           tbody.innerHTML = '<tr><td colspan="2" class="muted" style="text-align:center; padding:24px;">✅ Zero data quality issues detected in audit scan.</td></tr>';
           return;
@@ -1061,7 +1400,19 @@ let state = {
       const startYear = Number(document.getElementById('auditStartYearInput')?.value || 2026);
       const endMonth = Number(document.getElementById('auditEndMonthSelect')?.value || 7);
       const endYear = Number(document.getElementById('auditEndYearInput')?.value || 2026);
-      window.location.href = `/api/admin/accounting/historical-audit?startMonth=${startMonth}&startYear=${startYear}&endMonth=${endMonth}&endYear=${endYear}&format=excel`;
+
+      const selectedInvestor = document.getElementById('auditInvestorSelect')?.value || 'ALL';
+      const selectedStatus = document.getElementById('auditFilterStatusSelect')?.value || 'ALL';
+      const selectedMonth = document.getElementById('auditMonthFilterSelect')?.value || 'ALL';
+      const searchTerm = (document.getElementById('auditSearchInput')?.value || '').trim();
+
+      let url = `/api/admin/accounting/historical-audit?startMonth=${startMonth}&startYear=${startYear}&endMonth=${endMonth}&endYear=${endYear}&format=excel`;
+      if (selectedInvestor !== 'ALL') url += `&investor=${encodeURIComponent(selectedInvestor)}`;
+      if (selectedStatus !== 'ALL') url += `&status=${encodeURIComponent(selectedStatus)}`;
+      if (selectedMonth !== 'ALL') url += `&month=${encodeURIComponent(selectedMonth)}`;
+      if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+
+      window.location.href = url;
     });
 
     document.querySelectorAll('.sub-tab-btn[data-audittab]').forEach(btn => {
@@ -1072,8 +1423,80 @@ let state = {
       });
     });
 
-    document.getElementById('auditSearchInput')?.addEventListener('input', () => renderAuditSubTab());
+    document.getElementById('auditInvestorSelect')?.addEventListener('change', () => renderAuditSubTab());
     document.getElementById('auditFilterStatusSelect')?.addEventListener('change', () => renderAuditSubTab());
+    document.getElementById('auditMonthFilterSelect')?.addEventListener('change', () => renderAuditSubTab());
+    document.getElementById('auditSearchInput')?.addEventListener('input', () => renderAuditSubTab());
+    document.getElementById('chkShowTestAccounts')?.addEventListener('change', () => {
+      populateAuditInvestorDropdown();
+      renderAuditSubTab();
+    });
+
+    document.getElementById('btnToggleFlaggedOnly')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const isActive = btn.classList.toggle('active');
+      const selectStatus = document.getElementById('auditFilterStatusSelect');
+      if (isActive) {
+        btn.style.background = '#fee2e2';
+        btn.style.borderColor = '#ef4444';
+        btn.style.color = '#991b1b';
+        btn.textContent = '🚩 Flagged Only (ACTIVE)';
+        if (selectStatus) selectStatus.value = 'FLAGGED';
+      } else {
+        btn.style.background = '';
+        btn.style.borderColor = 'rgba(239,68,68,0.4)';
+        btn.style.color = '#f87171';
+        btn.textContent = '🚩 Show Flagged Only';
+        if (selectStatus) selectStatus.value = 'ALL';
+      }
+      renderAuditSubTab();
+    });
+
+    document.getElementById('btnClearAuditFilters')?.addEventListener('click', () => {
+      if (document.getElementById('auditInvestorSelect')) document.getElementById('auditInvestorSelect').value = 'ALL';
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'ALL';
+      if (document.getElementById('auditMonthFilterSelect')) document.getElementById('auditMonthFilterSelect').value = 'ALL';
+      if (document.getElementById('auditSearchInput')) document.getElementById('auditSearchInput').value = '';
+      if (document.getElementById('chkShowTestAccounts')) document.getElementById('chkShowTestAccounts').checked = false;
+
+      const btnFlag = document.getElementById('btnToggleFlaggedOnly');
+      if (btnFlag) {
+        btnFlag.classList.remove('active');
+        btnFlag.style.background = '';
+        btnFlag.style.borderColor = 'rgba(239,68,68,0.4)';
+        btnFlag.style.color = '#f87171';
+        btnFlag.textContent = '🚩 Show Flagged Only';
+      }
+
+      populateAuditInvestorDropdown();
+      renderAuditSubTab();
+    });
+
+    // Summary Card Clicks for Quick Status Filtering
+    document.getElementById('cardAuditReconciled')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'RECONCILED';
+      renderAuditSubTab();
+    });
+    document.getElementById('cardAuditCentMatch')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'LEGACY';
+      renderAuditSubTab();
+    });
+    document.getElementById('cardAuditLegacy')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'LEGACY';
+      renderAuditSubTab();
+    });
+    document.getElementById('cardAuditRuleIssues')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'RULE';
+      renderAuditSubTab();
+    });
+    document.getElementById('cardAuditEngineBugs')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'ENGINE_BUG';
+      renderAuditSubTab();
+    });
+    document.getElementById('cardAuditUnknown')?.parentElement?.addEventListener('click', () => {
+      if (document.getElementById('auditFilterStatusSelect')) document.getElementById('auditFilterStatusSelect').value = 'UNKNOWN';
+      renderAuditSubTab();
+    });
 
     /* Email Center Functions */
     async function loadEmailCenterData() {
@@ -1674,7 +2097,8 @@ let state = {
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
         `;
       } else if (tab === 'accounts') {
-        const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
+        const sortedInvs = getSortedFinancialInvestors(state.data.investors, true);
+        const invOptions = sortedInvs.map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.portal_username || inv.id})</option>`).join('');
         html = `
           <div class="form-group"><label>Investor</label><select id="field_investor_id" required>${invOptions}</select></div>
           <div class="form-group"><label>Account Name</label><input id="field_name" value="${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>

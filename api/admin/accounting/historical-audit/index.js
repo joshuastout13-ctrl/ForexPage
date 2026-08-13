@@ -70,8 +70,25 @@ export default async function handler(req, res) {
 
     // 4. Return Excel file if format=excel or export=excel
     if (format === "excel" || exportType === "excel") {
-      const buffer = await generateFullHistoricalAuditExcel(auditResult);
-      const filename = "Stone_and_Company_Accounting_Comparison_Jan-Jul_2026.xlsx";
+      const investorFilter = req.query.investor || "ALL";
+      const statusFilter = req.query.status || "ALL";
+      const monthFilter = req.query.month || "ALL";
+      const searchTerm = req.query.search || "";
+
+      const buffer = await generateFullHistoricalAuditExcel(auditResult, {
+        investorFilter,
+        statusFilter,
+        monthFilter,
+        searchTerm
+      });
+
+      let filename = "Stone_and_Company_Accounting_Comparison_Jan-Jul_2026.xlsx";
+      if (statusFilter === "FLAGGED") {
+        filename = "Stone_and_Company_Audit_FLAGGED_Jan-Jul_2026.xlsx";
+      } else if (investorFilter !== "ALL") {
+        const cleanInvName = investorFilter.replace(/[^a-zA-Z0-9_]/g, "_");
+        filename = `Stone_and_Company_Audit_${cleanInvName}_Jan-Jul_2026.xlsx`;
+      }
       
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
