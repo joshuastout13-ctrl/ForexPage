@@ -134,17 +134,10 @@
       border-color: var(--danger);
     }
     
-    /* Click-blocking transition guards */
-    body.loading-active .sidebar,
-    body.loading-active #viewActions,
-    body.loading-active table,
-    body.loading-active #logoutBtn,
-    body.loading-active .nav-btn {
-      pointer-events: none;
-      opacity: 0.6;
-    }
-    .modal-overlay.saving-active {
-      pointer-events: none;
+    /* Non-blocking loading indicator state */
+    body.loading-active table {
+      opacity: 0.85;
+      transition: opacity 0.2s;
     }
     .modal-overlay.saving-active .modal {
       opacity: 0.7;
@@ -293,14 +286,14 @@
               Click "Run Full Historical Audit" to generate historical system certification.
             </div>
 
-            <!-- Primary Action Banner for Flagged Accounts -->
-            <div id="auditFlaggedActionBanner" class="card" style="margin-bottom:18px; padding:16px 20px; background:linear-gradient(135deg, rgba(239,68,68,0.14) 0%, rgba(234,179,8,0.14) 100%); border:1px solid rgba(239,68,68,0.35); border-radius:14px; display:none; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <!-- Prominent Callout Banner for Flagged Accounts -->
+            <div id="auditFlaggedCalloutBanner" class="card" style="margin-bottom:16px; padding:18px 22px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
               <div>
-                <div style="font-size:16px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                <div style="font-size:16px; font-weight:700; color:#f87171; display:flex; align-items:center; gap:8px;">
                   <span>🚩</span> <span>Historical Account Review Required</span>
                 </div>
                 <div style="font-size:12px; color:var(--muted); margin-top:4px;">
-                  Shows historical review items and blocking issues. Accepted cent-level matches are excluded.
+                  Shows historical review items and blocking issues. Acceptable historical differences (≤ $25.00) are excluded.
                 </div>
               </div>
               <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -308,6 +301,19 @@
                   🚩 View Flagged Accounts (<span id="countPrimaryFlagged">0</span>)
                 </button>
               </div>
+            </div>
+
+            <!-- Historical Comparison Tolerance Information Callout -->
+            <div class="card" style="margin-bottom:20px; padding:14px 18px; background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.3); border-radius:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <div style="font-size:13px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:6px;">
+                  <span>⚖️</span> <span>Historical Comparison Tolerance: $25.00</span>
+                </div>
+                <div style="font-size:12px; color:var(--muted); margin-top:3px;">
+                  Per fund administrator guidance, historical stored-vs-calculated differences of $25.00 or less are treated as acceptable for audit review. Accounting calculations themselves remain cent-accurate.
+                </div>
+              </div>
+              <span class="badge active" style="font-size:11px; padding:4px 10px;">Audit-Only Tolerance</span>
             </div>
 
             <!-- Regressions Status Box -->
@@ -970,6 +976,110 @@ let state = {
       }
     }
 
+    /* Centralized Audit Reason Code Humanization Helper */
+    function humanizeAuditCode(code) {
+      if (!code) return { title: 'Reconciled', desc: 'Exact mathematical match.' };
+      const raw = String(code).trim();
+      const codeUpper = raw.toUpperCase();
+
+      const dictionary = {
+        'CASHFLOW_EFFECTIVE_DATE_REVIEW': {
+          title: 'Accounting effective date needs review',
+          desc: 'Deposits and withdrawals are applied from the first day of their accounting month.'
+        },
+        'NON_FIRST_DAY_CASHFLOW': {
+          title: 'Accounting effective date needs review',
+          desc: 'Deposits and withdrawals are applied from the first day of their accounting month.'
+        },
+        'NEGATIVE_ELIGIBLE_CAPITAL': {
+          title: 'Account capital is below $0 before monthly return',
+          desc: 'After applying the month\'s deposits, withdrawals and commission credits, this account\'s capital available for the monthly return is below $0.'
+        },
+        'NEGATIVE_ENDING_BALANCE': {
+          title: 'Calculated ending balance is below $0',
+          desc: 'The calculated month-end account balance is negative. This requires admin review before finalization.'
+        },
+        'UNDER_ALLOCATED_RULES': {
+          title: 'Commission percentages do not total 100%',
+          desc: 'The sum of commission percentages configured for this investor is less than 100%.'
+        },
+        'OVER_ALLOCATED_RULES': {
+          title: 'Commission percentages exceed 100%',
+          desc: 'The sum of commission percentages configured for this investor exceeds 100%.'
+        },
+        'OVERLAPPING_RULES': {
+          title: 'Multiple commission rules overlap',
+          desc: 'Multiple commission rules for the same recipient overlap in the active period.'
+        },
+        'MISSING_SOURCE_SPLIT': {
+          title: 'Investor share percentage is missing',
+          desc: 'The source investor\'s split percentage is not configured.'
+        },
+        'MISSING_OPENING_BALANCE': {
+          title: 'Opening balance is missing',
+          desc: 'The opening balance for this accounting period could not be resolved.'
+        },
+        'MISSING_RETURN': {
+          title: 'Monthly return rate is missing',
+          desc: 'No approved gross return percentage was found for this period.'
+        },
+        'LEDGER_NOT_CAPITALIZED': {
+          title: 'Commission earning is not reflected in account history',
+          desc: 'Commissions earned were not credited to the recipient\'s starting capital balance.'
+        },
+        'ACCEPTABLE_HISTORICAL_DIFFERENCE': {
+          title: 'Acceptable historical difference (within $25.00 tolerance)',
+          desc: 'Difference is within the $25.00 historical comparison tolerance approved by fund administration.'
+        },
+        'CENT_MATCH': {
+          title: 'Historical cent-level match',
+          desc: 'Difference within cent-matching tolerance ($0.01).'
+        },
+        'LEGACY_ROUNDING': {
+          title: 'Historical rounding difference',
+          desc: 'Documented $0.01 cent-level rounding variance in historical records.'
+        },
+        'LEGACY_MANUAL': {
+          title: 'Historical/manual balance difference',
+          desc: 'Difference accumulated in historical spreadsheet baseline prior to automated engine cutover.'
+        },
+        'ENGINE_BUG': {
+          title: 'Calculation issue',
+          desc: 'Calculation formula discrepancy detected in engine evaluation.'
+        },
+        'UNKNOWN': {
+          title: 'Requires investigation',
+          desc: 'Discrepancy requires detailed ledger investigation.'
+        },
+        'RECONCILED': {
+          title: 'Reconciled',
+          desc: 'Exact mathematical match with historical records.'
+        },
+        'PRE_START': {
+          title: 'Pre-start period',
+          desc: 'Period is prior to investor account start date.'
+        }
+      };
+
+      if (dictionary[codeUpper]) {
+        return dictionary[codeUpper];
+      }
+
+      if (raw.includes(',')) {
+        const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+        const titles = parts.map(p => dictionary[p.toUpperCase()]?.title || p);
+        return {
+          title: titles.join(', '),
+          desc: 'Multiple items require administrative review.'
+        };
+      }
+
+      return {
+        title: raw,
+        desc: 'Review required.'
+      };
+    }
+
     /* Accounting Preview Functions */
     async function generateAccountingPreview() {
       const month = Number(document.getElementById('previewMonthSelect')?.value || 8);
@@ -1019,11 +1129,14 @@ let state = {
 
         let allocDrawerHtml = '';
         if (hasAlloc) {
-          const allocItems = recAlloc.map(a => 
-            `<div style="font-size:12px; padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px; margin-top:2px;">
-              ↳ <strong>${escapeHtml(a.recipientName)}</strong> (${a.recipientUsername}) — ${a.commissionPercent}% = <strong>${money(a.amount)}</strong>
-            </div>`
-          ).join('');
+          const allocItems = recAlloc.map(a => {
+            const name = escapeHtml(a.recipientName || a.recipient_name || a.name || 'Recipient');
+            const user = a.recipientUsername || a.recipient_username || a.recipientId || a.recipient_investor_id || '';
+            const userStr = user && user !== 'unknown' && user !== 'undefined' ? ` (${escapeHtml(user)})` : '';
+            return `<div style="font-size:12px; padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px; margin-top:2px;">
+              ↳ <strong>${name}</strong>${userStr} — ${a.commissionPercent}% = <strong>${money(a.amount)}</strong>
+            </div>`;
+          }).join('');
 
           allocDrawerHtml = `<tr class="preview-drawer-${idx} hidden" style="background:rgba(15,23,42,0.8);">
             <td colspan="14" style="padding:10px 16px;">
@@ -1053,7 +1166,7 @@ let state = {
             ${hasAlloc ? `<button type="button" class="secondary" style="padding:2px 6px; font-size:10px; margin-left:4px;" onclick="document.querySelector('.preview-drawer-${idx}').classList.toggle('hidden')">Recipients ▼</button>` : ''}
           </td>
           <td><strong style="font-size:15px; color:#fff;">${money(inv.endingBalance)}</strong></td>
-          <td style="font-size:12px; max-width:180px;">${inv.flagReason ? `<span style="color:${isPass?'var(--muted)':'var(--danger)'}">${escapeHtml(inv.flagReason)}</span>` : 'Reconciled'}</td>
+          <td style="font-size:12px; max-width:180px;">${inv.flagReason ? `<span style="color:${isPass?'var(--muted)':'var(--danger)'}" title="${escapeHtml(humanizeAuditCode(inv.flagReason).desc)}">${escapeHtml(humanizeAuditCode(inv.flagReason).title)}</span>` : 'Reconciled'}</td>
         </tr>
         ${allocDrawerHtml}`;
       }).join('');
@@ -1175,14 +1288,15 @@ let state = {
         certBanner.style.background = res.certified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)';
       }
 
-      // Display Primary Action Banner for Flagged Accounts (Excludes accepted CENT_MATCH)
+      // Display Primary Action Banner for Flagged Accounts (Excludes accepted differences <= $25.00)
       const flaggedBanner = document.getElementById('auditFlaggedActionBanner');
       const countPrimarySpan = document.getElementById('countPrimaryFlagged');
       const flaggedItems = (res.investorMonthDetails || []).filter(d => 
         d.classification !== 'RECONCILED' && 
         d.classification !== 'PRE_START' && 
         d.classification !== 'EXACT_MATCH' &&
-        d.classification !== 'CENT_MATCH'
+        d.classification !== 'CENT_MATCH' &&
+        d.classification !== 'ACCEPTABLE_HISTORICAL_DIFFERENCE'
       );
       const financialFlaggedItems = flaggedItems.filter(d => {
         const u = (d.username || d.investorId || '').toLowerCase();
@@ -1261,7 +1375,8 @@ let state = {
         d.classification !== 'RECONCILED' && 
         d.classification !== 'PRE_START' && 
         d.classification !== 'EXACT_MATCH' &&
-        d.classification !== 'CENT_MATCH'
+        d.classification !== 'CENT_MATCH' &&
+        d.classification !== 'ACCEPTABLE_HISTORICAL_DIFFERENCE'
       );
 
       if (!showTest) {
@@ -1379,27 +1494,9 @@ let state = {
           const sevIcon = isBlock ? '🔴' : '🟡';
           const sevLabel = isBlock ? 'BLOCKING ISSUE' : 'HISTORICAL REVIEW';
 
-          let reasonTitle = 'Historical / manual balance difference requiring review';
-          let reasonDesc = 'Balance calculation differs from stored historical spreadsheet. Prior baseline or manual adjustment involved.';
-          if (item.classification === 'LEGACY_ROUNDING') {
-            reasonTitle = 'Historical $0.01 cent rounding difference';
-            reasonDesc = 'Rounding difference of $0.01 between historical calculation and stored summary.';
-          } else if (item.classification === 'LEGACY_MANUAL') {
-            reasonTitle = 'Historical / manual baseline balance difference';
-            reasonDesc = 'Difference accumulated prior to automated engine cutover in 2026.';
-          } else if (item.classification === 'CENT_MATCH') {
-            reasonTitle = 'Historical cent-level match difference';
-            reasonDesc = 'Difference within cent-matching tolerance ($0.01 - $0.99).';
-          } else if (item.classification === 'RULE_CONFIGURATION') {
-            reasonTitle = 'Commission rule configuration mismatch';
-            reasonDesc = 'Commission allocation rules or percentages for this investor require adjustment.';
-          } else if (item.classification === 'ENGINE_BUG') {
-            reasonTitle = 'Engine calculation bug detected';
-            reasonDesc = 'Calculation formula discrepancy detected in engine evaluation.';
-          } else if (item.classification === 'UNKNOWN') {
-            reasonTitle = 'Unknown balance discrepancy';
-            reasonDesc = 'Discrepancy requires detailed ledger investigation.';
-          }
+          const human = humanizeAuditCode(item.classification || item.flagReason);
+          let reasonTitle = human.title;
+          let reasonDesc = human.desc;
 
           const diffVal = Number(item.difference || 0);
           const monthName = item.monthName || `Month ${item.month}`;

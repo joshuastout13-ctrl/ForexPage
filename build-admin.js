@@ -618,18 +618,21 @@ let state = {
 
         let allocDrawerHtml = '';
         if (hasAlloc) {
-          const allocItems = recAlloc.map(a => 
-            \`<div style="font-size:12px; padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px; margin-top:2px;">
-              ↳ <strong>\${escapeHtml(a.recipientName)}</strong> (\${a.recipientUsername}) — \${a.commissionPercent}% = <strong>\${money(a.amount)}</strong>
-            </div>\`
-          ).join('');
+          const allocItems = recAlloc.map(a => {
+            const name = escapeHtml(a.recipientName || a.recipient_name || a.name || 'Recipient');
+            const user = a.recipientUsername || a.recipient_username || a.recipientId || a.recipient_investor_id || '';
+            const userStr = user && user !== 'unknown' && user !== 'undefined' ? ` (\${escapeHtml(user)})` : '';
+            return `<div style="font-size:12px; padding:4px 8px; background:rgba(255,255,255,0.03); border-radius:6px; margin-top:2px;">
+              ↳ <strong>\${name}</strong>\${userStr} — \${a.commissionPercent}% = <strong>\${money(a.amount)}</strong>
+            </div>`;
+          }).join('');
 
-          allocDrawerHtml = \`<tr class="preview-drawer-\${idx} hidden" style="background:rgba(15,23,42,0.8);">
+          allocDrawerHtml = `<tr class="preview-drawer-\${idx} hidden" style="background:rgba(15,23,42,0.8);">
             <td colspan="14" style="padding:10px 16px;">
               <div style="font-size:12px; font-weight:600; color:var(--accent2); margin-bottom:6px;">Recipient Commission Allocations:</div>
               \${allocItems}
             </td>
-          </tr>\`;
+          </tr>`;
         }
 
         return \`<tr>

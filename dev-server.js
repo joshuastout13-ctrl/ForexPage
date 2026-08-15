@@ -78,9 +78,14 @@ async function handleApiRequest(req, res, urlPath) {
         req.query.id = parts[parts.length - 1];
       } else if (parts.length >= 3) {
         const tryFile2 = path.join(__dirname, 'api', parts[0], parts[1], '[id]', parts[3] + '.js');
+        const tryFileAction = path.join(__dirname, 'api', parts[0], parts[1], '[id]', '[action].js');
         if (fs.existsSync(tryFile2)) {
           resolvedFile = tryFile2;
           req.query.id = parts[2];
+        } else if (fs.existsSync(tryFileAction)) {
+          resolvedFile = tryFileAction;
+          req.query.id = parts[2];
+          req.query.action = parts[3];
         }
       }
     }
