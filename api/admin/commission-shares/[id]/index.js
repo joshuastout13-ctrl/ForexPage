@@ -10,6 +10,41 @@ export default async function handler(req, res) {
 
     const { id } = req.query;
 
+    if (req.method === "POST") {
+      const action = req.body?.action || req.query?.action;
+      if (action === "deactivate") {
+        const { data, error } = await supabase
+          .from("commission_shares")
+          .update({ 
+            status: "cancelled",
+            effective_end_date: new Date().toISOString().split('T')[0],
+            updated_at: new Date()
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(200).json({ share: data });
+      }
+      
+      if (action === "reactivate") {
+        const { data, error } = await supabase
+          .from("commission_shares")
+          .update({ 
+            status: "active",
+            effective_end_date: null,
+            updated_at: new Date()
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(200).json({ share: data });
+      }
+    }
+
     if (req.method === "PATCH") {
       const updates = {};
       if (req.body.commissionPercent !== undefined) updates.commission_percent = req.body.commissionPercent;

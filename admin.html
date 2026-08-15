@@ -143,6 +143,12 @@
       opacity: 0.7;
     }
 
+    .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); display:flex; justify-content:center; align-items:flex-start; padding-top:5vh; z-index:1000; overflow-y:auto; padding-bottom:5vh; transition:opacity 0.2s ease; }
+    .modal-overlay.hidden { display:none !important; opacity:0; pointer-events:none; visibility:hidden; }
+    .modal { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; width:100%; max-width:600px; box-shadow:0 20px 40px rgba(0,0,0,.5); }
+    .form-group { margin-bottom:16px; }
+    .form-group label { display:block; margin-bottom:6px; color:var(--muted); font-size:13px; }
+
     /* Email Center Styles */
     .sub-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
     .sub-tab-btn { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
@@ -808,6 +814,136 @@
       </div>
     </div>
 </div>
+
+  <!-- Entity Edit / Add Modal -->
+  <div id="entityModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 id="modalTitle" style="margin:0">Add Item</h2>
+        <button type="button" class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
+      </div>
+      <form id="entityForm">
+        <input type="hidden" id="formAction" />
+        <input type="hidden" id="formId" />
+        <div id="dynamicFormFields"></div>
+        <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;margin-top:16px;"></div>
+        <div style="margin-top:24px;text-align:right;">
+          <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+          <button type="submit" id="saveEntityBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bulk Import History Modal -->
+  <div id="importModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="right" style="margin-bottom:20px;">
+        <h2 style="margin:0">Bulk Import History</h2>
+        <button type="button" class="secondary closeModalBtn" style="padding:6px 12px;border-radius:50%">✕</button>
+      </div>
+      <div class="muted" style="margin-bottom:20px;">Upload a CSV file with columns: month_number, year, opening_balance, deposits, withdrawals, gross_return_pct, manual_gain_amount, notes.</div>
+      <div class="form-group">
+        <label>Select CSV File</label>
+        <input type="file" id="csvFileInput" accept=".csv" />
+      </div>
+      <div id="importPreview" class="muted" style="margin-top:16px;max-height:200px;overflow:auto;font-size:12px;"></div>
+      <div style="margin-top:24px;text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="processImportBtn" type="button">Start Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status / Action Confirmation Modal -->
+  <div id="statusModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:400px;text-align:center">
+      <h2 id="statusModalTitle" style="margin:0 0 12px 0;">Confirm Action</h2>
+      <p id="statusModalDesc" class="muted" style="margin-bottom:24px;">Are you sure?</p>
+      <div class="right" style="justify-content:center">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmStatusBtn" class="danger" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Myfxbook Live Preview Modal -->
+  <div id="myfxbookPreviewModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:600px;">
+      <h2 style="margin:0 0 16px 0">Myfxbook Live Preview</h2>
+      <p class="muted" style="margin-bottom:20px;">Review the latest data pulled from Myfxbook. Clicking Accept will update the database and make it live for users.</p>
+      
+      <table style="min-width:auto; margin-bottom:24px; background:rgba(255,255,255,0.02); border-radius:12px;">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Current Value</th>
+            <th>New Value (Scrape.do)</th>
+          </tr>
+        </thead>
+        <tbody id="previewModalBody">
+          <!-- Rows injected via JS -->
+        </tbody>
+      </table>
+      
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:10px;">
+        <button type="button" class="secondary closeModalBtn">Reject</button>
+        <button id="acceptMyfxbookBtn" type="button" style="background:linear-gradient(135deg,#22c55e,#16a34a);">Accept & Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Test Modal -->
+  <div id="emailTestModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:450px;">
+      <div class="right" style="margin-bottom:16px;">
+        <h3 style="margin:0;">Send Test Email</h3>
+        <button type="button" class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
+      </div>
+      <p class="muted" style="margin-bottom:16px; font-size:13px;">Send a single test email via Resend to verify formatting and inbox delivery.</p>
+      <div class="form-group">
+        <label>Recipient Email Address</label>
+        <input id="testEmailAddressInput" type="email" placeholder="admin@example.com" />
+      </div>
+      <div style="margin-top:20px; text-align:right;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmTestSendBtn" type="button">Send Test Email</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email HTML Preview Modal -->
+  <div id="emailPreviewModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:700px; width:95%;">
+      <div class="right" style="margin-bottom:16px;">
+        <h3 style="margin:0;">Email HTML Preview</h3>
+        <button type="button" class="secondary closeModalBtn" style="padding:4px 10px; border-radius:50%;">✕</button>
+      </div>
+      <div id="emailPreviewContent" style="background:#08101d; border:1px solid var(--line); border-radius:12px; padding:16px; max-height:500px; overflow-y:auto;">
+        <!-- HTML Preview Injected -->
+      </div>
+      <div style="margin-top:20px; text-align:right;">
+        <button type="button" class="secondary closeModalBtn">Close Preview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Confirm Broadcast Modal -->
+  <div id="emailConfirmModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:500px;">
+      <h3 style="margin:0 0 12px 0;">Confirm Mass Email Broadcast</h3>
+      <p class="muted" style="margin-bottom:16px; font-size:14px;">You are about to send an email broadcast via Resend to <strong id="confirmRecipientCount">0</strong> selected recipients.</p>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div style="font-size:12px; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Subject</div>
+        <div id="confirmSubjectText" style="font-weight:600; color:#fff;"></div>
+      </div>
+      <div id="confirmAttachmentsNotice" style="font-size:13px; color:var(--accent2); margin-bottom:20px;"></div>
+      <div class="right" style="justify-content:flex-end;">
+        <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
+        <button id="confirmBroadcastSendBtn" type="button" style="background:linear-gradient(135deg,var(--success),#16a34a);">Confirm & Send Now</button>
+      </div>
+    </div>
+  </div>
 
   <script>
 let state = {
@@ -2654,36 +2790,64 @@ let state = {
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="number" step="0.01" value="${item ? item.gross_return_pct : ''}" placeholder="e.g. 2.81" required /></div>
         `;
       } else if (tab === 'commission_shares') {
-        const sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id : '');
-        const sourceInv = (state.data.investors || []).find(i => 
-          String(i.id).toLowerCase() === String(sourceInvId).toLowerCase() ||
-          String(i.portal_username).toLowerCase() === String(sourceInvId).toLowerCase()
-        );
-        const sourceUsername = sourceInv ? (sourceInv.portal_username || sourceInv.id) : sourceInvId;
-        const sourceName = sourceInv ? `${sourceInv.first_name || ''} ${sourceInv.last_name || ''}`.trim() || sourceUsername : sourceUsername;
+        let sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id || item.investor_id : '');
+        const investorsList = state.data.investors || [];
+        
+        let sourceSelectHtml = '';
+        let sourceUsername = '';
+        let sourceName = '';
 
-        const currentShares = (state.data.commission_shares || []).filter(s => 
-          String(s.source_investor_id || '').toLowerCase() === String(sourceInvId).toLowerCase() ||
-          String(s.source_investor_id || '').toLowerCase() === String(sourceUsername).toLowerCase()
-        );
+        if (sourceInvId) {
+          const sourceInv = investorsList.find(i => 
+            String(i.id).toLowerCase() === String(sourceInvId).toLowerCase() ||
+            String(i.portal_username || '').toLowerCase() === String(sourceInvId).toLowerCase()
+          );
+          sourceUsername = sourceInv ? (sourceInv.portal_username || sourceInv.id) : sourceInvId;
+          sourceName = sourceInv ? `${sourceInv.first_name || ''} ${sourceInv.last_name || ''}`.trim() || sourceUsername : sourceUsername;
+          sourceSelectHtml = `
+            <input type="hidden" id="bulk_source_investor_id" value="${escapeHtml(sourceUsername)}" />
+            <div style="background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
+              <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">Source Investor</div>
+              <div style="font-size:16px; font-weight:700; color:#fff;">${escapeHtml(sourceName)} (${escapeHtml(sourceUsername)})</div>
+            </div>
+          `;
+        } else {
+          const sortedInvs = [...investorsList].sort((a,b) => (a.portal_username||a.id||'').localeCompare(b.portal_username||b.id||''));
+          const invOptions = sortedInvs.map(i => {
+            const u = i.portal_username || i.id;
+            const n = [i.first_name, i.last_name].filter(Boolean).join(' ') || u;
+            return `<option value="${escapeHtml(u)}">${escapeHtml(n)} (${escapeHtml(u)})</option>`;
+          }).join('');
+          sourceUsername = sortedInvs[0]?.portal_username || sortedInvs[0]?.id || '';
+          sourceSelectHtml = `
+            <div class="form-group" style="margin-bottom:16px;">
+              <label style="font-weight:600; color:#fff;">Select Source Investor</label>
+              <select id="bulk_source_investor_id">
+                ${invOptions}
+              </select>
+            </div>
+          `;
+        }
 
-        const recOptions = (state.data.investors || [])
-          .filter(i => String(i.id).toLowerCase() !== String(sourceInvId).toLowerCase() && String(i.portal_username || '').toLowerCase() !== String(sourceUsername).toLowerCase())
-          .map(i => `<option value="${i.portal_username || i.id}">${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${i.portal_username || i.id})</option>`).join('');
+        const currentShares = (state.data.commission_shares || []).filter(s => {
+          const sSrc = String(s.source_investor_id || s.investor_id || '').toLowerCase();
+          return sSrc === String(sourceInvId).toLowerCase() || (sourceUsername && sSrc === String(sourceUsername).toLowerCase());
+        });
 
         let sharesRowsHtml = '';
         if (currentShares.length > 0) {
           sharesRowsHtml = currentShares.map((s, idx) => {
-            const isInactive = s.status === 'cancelled' || s.status === 'ended';
+            const recVal = s.recipient_investor_id || s.recipient_id || s.recipientUsername || '';
+            const sPct = s.commission_percent !== undefined ? s.commission_percent : (s.percent || 0);
             return `
               <div class="bulk-share-row" data-share-id="${s.id}" style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 40px; gap:8px; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px;">
                 <div>
                   <select class="bulk-rec-id" style="font-size:13px; padding:6px;">
-                    ${(state.data.investors || []).map(i => `<option value="${i.portal_username || i.id}" ${(s.recipient_investor_id === i.id || s.recipient_investor_id === i.portal_username) ? 'selected' : ''}>${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${i.portal_username || i.id})</option>`).join('')}
+                    ${(state.data.investors || []).map(i => `<option value="${i.portal_username || i.id}" ${(recVal === i.id || recVal === i.portal_username) ? 'selected' : ''}>${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${i.portal_username || i.id})</option>`).join('')}
                   </select>
                 </div>
                 <div>
-                  <input class="bulk-pct-input" type="number" step="0.1" value="${s.commission_percent || s.percent || 0}" style="font-size:13px; padding:6px;" placeholder="%" />
+                  <input class="bulk-pct-input" type="number" step="0.1" value="${sPct}" style="font-size:13px; padding:6px;" placeholder="%" />
                 </div>
                 <div>
                   <input class="bulk-start-date" type="date" value="${s.effective_start_date || '2000-01-01'}" style="font-size:12px; padding:6px;" />
@@ -2707,12 +2871,7 @@ let state = {
         }
 
         html = `
-          <input type="hidden" id="bulk_source_investor_id" value="${sourceUsername}" />
-          <div style="background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
-            <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">Source Investor</div>
-            <div style="font-size:16px; font-weight:700; color:#fff;">${escapeHtml(sourceName)}</div>
-          </div>
-
+          ${sourceSelectHtml}
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h4 style="margin:0; font-size:14px;">Commission Recipients & Rules</h4>
             <button type="button" id="btnAddShareRow" class="secondary" style="padding:6px 12px; font-size:12px;">+ Add Recipient</button>
