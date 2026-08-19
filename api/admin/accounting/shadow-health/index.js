@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
 import { calculateAccountingPeriod } from "../../../../lib/accounting-period-engine.js";
+import { loadAccountingData } from "../../../../lib/paginated-read.js";
 import { getMyfxbookLive } from "../../../../lib/myfxbook.js";
 
 export const ACCOUNTING_ENGINE_VERSION = "2.0.0";
@@ -38,26 +39,11 @@ export default async function handler(req, res) {
       console.warn("[ShadowHealth] Could not fetch live Myfxbook feed, using latest DB return:", e.message);
     }
 
-    // Parallel fetch current accounting tables from Supabase
-    const [
-      { data: investors },
-      { data: accounts },
-      { data: deposits },
-      { data: withdrawals },
-      { data: commissionShares },
-      { data: monthlyHistory },
-      { data: commissionEarnings },
-      { data: monthlyReturns }
-    ] = await Promise.all([
-      supabase.from("investors").select("*"),
-      supabase.from("investor_accounts").select("*"),
-      supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed", "pending"]),
-      supabase.from("commission_shares").select("*"),
-      supabase.from("investor_monthly_history").select("*"),
-      supabase.from("commission_earnings").select("*"),
-      supabase.from("monthly_returns").select("*")
-    ]);
+    // Parallel fetch current accounting tables using canonical paginated reads
+    const {
+      investors, accounts, deposits, withdrawals,
+      commissionShares, monthlyHistory: monthlyHistory, commissionEarnings, monthlyReturns
+    } = await loadAccountingData();
 
     // Check if a frozen return exists in monthly_returns for this period
     const periodReturnRow = (monthlyReturns || []).find(

@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { paginatedRead } from "../../../lib/paginated-read.js";
 import Decimal from "decimal.js";
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
@@ -25,16 +26,18 @@ export default async function handler(req, res) {
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings}, {data: allAccounts}, {data: allHistory} ] = await Promise.all([
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, commEarnings, {data: allAccounts}, allHistory ] = await Promise.all([
       supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_shares").select("*"),
       supabase.from("commission_rules").select("*"),
-      supabase.from("commission_earnings").select("*").in("year", [targetYear, targetYear - 1]),
+      paginatedRead('commission_earnings', { queryModifier: q => q.in('year', [targetYear, targetYear - 1]) }),
       supabase.from("investor_accounts").select("*").eq("status", "Active"),
-      supabase.from("investor_monthly_history").select("*").eq("year", targetYear)
+      paginatedRead('investor_monthly_history', { queryModifier: q => q.eq('year', targetYear) })
     ]);
+    const commEarningsData = commEarnings;
+    const allHistoryData = allHistory;
 
     // Build unified commission rules/shares list
     const unifiedCommRules = [];

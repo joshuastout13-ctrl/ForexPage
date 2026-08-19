@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
 import { runFullHistoricalAudit } from "../../../../lib/historical-audit-engine.js";
+import { loadAccountingData } from "../../../../lib/paginated-read.js";
 import { generateFullHistoricalAuditExcel, generateFlaggedAccountsExcel } from "../../../../lib/historical-audit-excel.js";
 
 /**
@@ -27,31 +28,11 @@ export default async function handler(req, res) {
   } = req.query || req.body || {};
 
   try {
-    // 2. Batch read all production data in memory (READ ONLY)
-    const [
-      { data: investors, error: errInv },
-      { data: accounts, error: errAcc },
-      { data: deposits, error: errDep },
-      { data: withdrawals, error: errWd },
-      { data: commissionShares, error: errShares },
-      { data: monthlyHistory, error: errHist },
-      { data: commissionEarnings, error: errEarn },
-      { data: monthlyReturns, error: errRet }
-    ] = await Promise.all([
-      supabase.from("investors").select("*"),
-      supabase.from("investor_accounts").select("*"),
-      supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed", "pending"]),
-      supabase.from("commission_shares").select("*"),
-      supabase.from("investor_monthly_history").select("*"),
-      supabase.from("commission_earnings").select("*"),
-      supabase.from("monthly_returns").select("*")
-    ]);
-
-    if (errInv || errAcc || errDep || errWd || errShares || errHist || errEarn || errRet) {
-      const err = errInv || errAcc || errDep || errWd || errShares || errHist || errEarn || errRet;
-      throw new Error(`Database batch fetch error: ${err.message}`);
-    }
+    // 2. Load all reference data using canonical paginated read
+    const {
+      investors, accounts, deposits, withdrawals,
+      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns
+    } = await loadAccountingData();
 
     // 3. Execute Full Historical Audit in Memory
     const auditResult = runFullHistoricalAudit({

@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
 import { calculateAccountingPeriod } from "../../../../lib/accounting-period-engine.js";
+import { loadAccountingData } from "../../../../lib/paginated-read.js";
 
 export const ACCOUNTING_ENGINE_VERSION = "2.0.0";
 
@@ -44,29 +45,12 @@ export default async function handler(req, res) {
     const m = Number(month);
 
     // 4. Batch fetch current Supabase inputs for authoritative server-side recalculation
-    const [
-      { data: investors, error: errInv },
-      { data: accounts, error: errAcc },
-      { data: deposits, error: errDep },
-      { data: withdrawals, error: errWd },
-      { data: commissionShares, error: errShares },
-      { data: monthlyHistory, error: errHist },
-      { data: commissionEarnings, error: errEarn },
-      { data: monthlyReturns, error: errRet }
-    ] = await Promise.all([
-      supabase.from("investors").select("*"),
-      supabase.from("investor_accounts").select("*"),
-      supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed", "pending"]),
-      supabase.from("commission_shares").select("*"),
-      supabase.from("investor_monthly_history").select("*"),
-      supabase.from("commission_earnings").select("*"),
-      supabase.from("monthly_returns").select("*")
-    ]);
+    //    Uses canonical paginated read for tables exceeding 1,000-row PostgREST limit
+    const {
+      investors, accounts, deposits, withdrawals,
+      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns
+    } = await loadAccountingData();
 
-    if (errInv || errAcc || errDep || errWd || errShares || errHist || errEarn || errRet) {
-      return res.status(500).json({ error: "DATABASE_FETCH_FAILED", message: "Failed to load accounting data." });
-    }
 
     // 5. Server-side authoritative recalculation
     const currentRun = calculateAccountingPeriod({
