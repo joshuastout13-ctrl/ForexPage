@@ -2,7 +2,8 @@
 
 **Document Status:** Official Adversarial Certification & Final QC Audit  
 **Audit Protocol:** READ-ONLY. Zero production mutations. Zero automated generation. Zero deployment.  
-**Execution Timestamp:** 2026-08-19T00:33:00+01:00  
+**Policy Status:** `ACCOUNTING_FINALIZATION_HOLD_PENDING_PAGINATION_CERTIFICATION`  
+**Execution Timestamp:** 2026-08-19T00:54:00+01:00  
 
 ---
 
@@ -11,24 +12,27 @@
 This adversarial audit independently tested every claim and candidate finding from the preliminary August 17–18 sweep.
 
 ### Key Certified Conclusions:
-1. **Zero Financial Exposure ($0.00):** The platform owes **$0.00** in unposted commissions for completed periods. The 199 candidate missing earnings were **disproven** as artifacts of unpaginated queries, pre-start dates, and rule effective dates.
+1. **Commission Ledger Rows Verified:** All 1,056 rows in `commission_earnings` have been verified to exist in the database with 0 duplicates across business keys. The 199 candidate missing earnings were disproven as artifacts of unpaginated queries, pre-start dates, and rule effective dates.
 2. **Mary Jo Harris Timing & Chronology ($1,042,087.23 vs $1,001,387.23):**
    - **July 31 Close:** Exactly **$1,042,087.23** (zero July withdrawals applied during July close).
-   - **August 1 Post-Transaction Balance:** Exactly **$1,001,387.23** after $40,700 in approved withdrawals (`$22,000.00` + `$18,700.00`).
-   - **Josh's Figure Comparison:** Josh's approximate ~$1,001,338 corresponds to the **August post-transaction stage**, with a remaining variance of **+$49.23**.
+   - **Post-August-Withdrawal Transaction Balance:** Exactly **$1,001,387.23** after $40,700 in approved withdrawals (`$22,000.00` + `$18,700.00`).
+   - **Josh's Figure Comparison:** Josh's approximate ~$1,001,338 corresponds to the **post-August-withdrawal transaction balance**, with a remaining variance of **+$49.23**.
    - **Discrepancy Status:** The $2,000 discrepancy between Josh's note ($20,000) and production (`$22,000.00` withdrawal record `wd_e4fc9d89`) is classified as `RECONCILIATION_REQUIRED` pending banking wire confirmation.
 3. **Michael Beck ← Josh Oviatt July Commission Exists ($81.03):**
    - Record `1ed31b74-ef4f-40ed-b878-dcdd44a80fbf` is stored in production `commission_earnings` for July 2026.
 4. **Mary Jo Harris → Michael Beck January is $0.00 (Not Missing):**
-   - Rule `54161622` has `effective_start_date: '2026-02-01'`. It was not effective in January. Feb–Jul commissions are 100% accurate to the cent.
+   - Rule `54161622` has `effective_start_date: '2026-02-01'`. It was not effective in January. Feb–Jul commissions are verified exact to the cent.
 5. **Commission Rule Basis Terminology:**
    - All commission rules calculate as **`PERCENT_OF_GROSS_PROFIT`**.
    - Example (Steve Kimbell → Bill Kimball): Steve's 50% split leaves a 50% residual company pool. Bill's 12.5% of gross profit equals exactly 25.0% of the 50% residual pool ($355.26 in July).
 6. **Performance Display Defect Certified (Dual Root Cause):**
    - **Semantic Defect:** Uses Gross % instead of Net %.
    - **Capital Basis Defect:** Multiplies `currentBalance` instead of `eligibleCapital` (`opening_balance + deposits - withdrawals`), distorting dollar amounts for **100% of investors** (including 100% split investors).
-7. **Global Query-Pagination Defect:**
-   - 133 query instances in admin/accounting scripts lack pagination on tables exceeding 1,000 rows (`commission_earnings` at 1,056 rows, `investor_monthly_history` at 1,152 rows). Classified as `TRUNCATION_RISK`.
+7. **Global Query-Pagination Defect & Containment:**
+   - 133 query instances in admin/accounting scripts lacked pagination on tables exceeding 1,000 rows.
+   - Without an explicit ORDER BY clause, PostgREST query truncation is nondeterministic.
+   - Critical paths (finalization, preview, historical-audit, shadow-health, recalculate-all, dashboard) have been locally patched with canonical `paginatedRead` and `loadAccountingData`.
+   - **Accounting Finalization Status:** Placed on **`HOLD`** pending full pagination certification.
 
 ---
 
@@ -143,7 +147,7 @@ A static code sweep of 117 repository script files identified 213 Supabase queri
 ## 7. Final Certification Summary Block
 
 ```
-Commission ledger Jan-Jul:                 100% RECONCILED (1,056 rows verified, 0 duplicates)
+Commission ledger Jan-Jul:                 1,056 rows verified in DB (0 duplicates, 0 missing)
 Actual duplicate earnings:                 0
 Audit pagination false positives:          56
 Mary Jo July-close balance:                $1,042,087.23
@@ -153,8 +157,8 @@ Mary Jo July $20k vs $22k discrepancy:     RECONCILIATION_REQUIRED (pending wire
 Commission percentage semantics:           PERCENT_OF_GROSS_PROFIT (100% confirmed across all rules)
 Performance capital basis:                 DUAL DEFECT (Fails split application AND uses ending balance instead of eligible capital)
 Performance display defect:                DISPLAY_SEMANTICS_DEFECT (100% of investors affected on $ basis)
-Production application pagination risks:   133 query instances at TRUNCATION_RISK across codebase
+Production application pagination risks:   133 query instances swept; 7 critical files locally patched
 Financial writes:                          FROZEN
-Finalization recommendation:               ALLOW WITH CAUTION (Ledger is cent-exact; pagination must be enforced)
+Finalization recommendation:               HOLD (ACCOUNTING_FINALIZATION_HOLD_PENDING_PAGINATION_CERTIFICATION)
 Admin UI:                                  ADMIN_UI_NOT_SAFE_FOR_CONTROLLED_USE
 ```

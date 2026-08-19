@@ -586,13 +586,30 @@
 
         <!-- Right Column (Sidebar) -->
         <div class="sidebar-col">
+          <!-- Account Performance (Investor Share / Net) -->
           <div class="card">
-            <h2 style="margin-bottom:20px;">Fund Performance</h2>
-            <div class="performance-list" id="liveGrid">
-              <!-- Live metrics injected here -->
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h2 style="font-size:20px;">Account Performance</h2>
+              <div id="accountSplitBadge" class="kicker" style="margin-bottom:0; font-size:11px; padding:4px 8px;"></div>
             </div>
-            <div id="liveMeta" class="muted" style="margin-top:24px; font-size:12px; text-align:center;"></div>
-            <div class="muted" style="margin-top:8px; font-size:11px; opacity:0.6; text-align:center;">
+            <p class="muted" style="font-size:12px; margin-top:-8px; margin-bottom:16px;">Investor net earnings and return rates</p>
+            <div class="performance-list" id="accountPerfGrid">
+              <!-- Account net metrics injected here -->
+            </div>
+          </div>
+
+          <!-- Fund Performance (Gross Fund Returns) -->
+          <div class="card" style="margin-top:20px;">
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h2 style="font-size:20px;">Fund Performance</h2>
+              <span class="muted" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Gross Return %</span>
+            </div>
+            <p class="muted" style="font-size:12px; margin-top:-8px; margin-bottom:16px;">Total trading system benchmark returns</p>
+            <div class="performance-list" id="fundPerfGrid">
+              <!-- Gross metrics injected here -->
+            </div>
+            <div id="liveMeta" class="muted" style="margin-top:20px; font-size:12px; text-align:center;"></div>
+            <div class="muted" style="margin-top:6px; font-size:11px; opacity:0.6; text-align:center;">
               Data refreshes daily at 4:00 PM PST
             </div>
           </div>
@@ -844,28 +861,87 @@
 
     function renderLive(data) {
       const live = data.live || {};
+      const splitPct = (data.investor && data.investor.splitPct !== undefined) ? data.investor.splitPct : 100;
+      const acctPerf = data.accountPerformance || {};
+      const fundPerf = data.fundPerformance || {};
       const liveDollarGains = data.liveDollarGains || {};
-      const items = [
-        { label: "Today", pct: live.today || "0.00%", dollar: liveDollarGains.today || 0 },
-        { label: "This Week", pct: live.week || "0.00%", dollar: liveDollarGains.week || 0 },
-        { label: "This Month", pct: live.month || "0.00%", dollar: liveDollarGains.month || 0 },
-        { label: "Last Month", pct: live.lastMonth || "0.00%", dollar: liveDollarGains.lastMonth || 0 },
-        { label: "This Year", pct: live.year || "0.00%", dollar: liveDollarGains.year || 0 }
+
+      // Set Split Badge
+      const splitBadge = document.getElementById("accountSplitBadge");
+      if (splitBadge) {
+        splitBadge.textContent = `${splitPct}% Investor Split`;
+      }
+
+      // Account Performance Items (Net Investor Share)
+      const acctItems = [
+        {
+          label: "This Month",
+          tag: "Live / Projected",
+          dollar: (acctPerf.month && acctPerf.month.netDollar !== undefined) ? acctPerf.month.netDollar : (liveDollarGains.month || 0),
+          pct: (acctPerf.month && acctPerf.month.netReturnPct !== undefined) ? `${acctPerf.month.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.month.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.month) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.month) || 0) * splitPct / 100).toFixed(2)}%`
+        },
+        {
+          label: "Last Month",
+          tag: "Finalized",
+          dollar: (acctPerf.lastMonth && acctPerf.lastMonth.netDollar !== undefined) ? acctPerf.lastMonth.netDollar : (liveDollarGains.lastMonth || 0),
+          pct: (acctPerf.lastMonth && acctPerf.lastMonth.netReturnPct !== undefined) ? `${acctPerf.lastMonth.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.lastMonth.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.lastMonth) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.lastMonth) || 0) * splitPct / 100).toFixed(2)}%`
+        },
+        {
+          label: "This Year (YTD)",
+          tag: "Cumulative",
+          dollar: (acctPerf.year && acctPerf.year.netDollar !== undefined) ? acctPerf.year.netDollar : (liveDollarGains.year || 0),
+          pct: null // Omitted pending client accounting definition for account-level multi-period rate
+        }
       ];
 
-      document.getElementById("liveGrid").innerHTML = items.map(item => `
-        <div class="perf-item">
-          <div class="info">
-            <div class="label">${item.label}</div>
-            <div class="val">${money(item.dollar)}</div>
+      const acctGrid = document.getElementById("accountPerfGrid");
+      if (acctGrid) {
+        acctGrid.innerHTML = acctItems.map(item => `
+          <div class="perf-item">
+            <div class="info">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="label">${item.label}</span>
+                ${item.tag ? `<span style="font-size:10px; background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:4px; color:var(--muted);">${item.tag}</span>` : ''}
+              </div>
+              <div class="val" style="color:var(--text); margin-top:2px;">${money(item.dollar)}</div>
+            </div>
+            <div class="change">
+              <div class="label" style="font-size:10px; text-transform:uppercase; color:var(--muted);">${item.pct !== null ? 'Net Return' : 'Total Gains'}</div>
+              <div class="pct ${item.pct !== null ? (parseFloat(item.pct) >= 0 ? 'green' : 'red') : 'green'}" style="margin-top:2px; ${item.pct === null ? 'font-size:13px; font-weight:600;' : ''}">
+                ${item.pct !== null ? item.pct : 'Cumulative'}
+              </div>
+            </div>
           </div>
-          <div class="change">
-            <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>
-          </div>
-        </div>
-      `).join("");
+        `).join("");
+      }
 
-      document.getElementById("liveMeta").textContent = `Last sync: ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })} PST`;
+      // Fund Performance Items (Gross Fund %)
+      const fundItems = [
+        { label: "Today", pct: (fundPerf.today && fundPerf.today.label) ? fundPerf.today.label : (live.today || "0.00%") },
+        { label: "This Week", pct: (fundPerf.week && fundPerf.week.label) ? fundPerf.week.label : (live.week || "0.00%") },
+        { label: "This Month", pct: (fundPerf.month && fundPerf.month.label) ? fundPerf.month.label : (live.month || "0.00%") },
+        { label: "Last Month", pct: (fundPerf.lastMonth && fundPerf.lastMonth.label) ? fundPerf.lastMonth.label : (live.lastMonth || "0.00%") },
+        { label: "This Year", pct: (fundPerf.year && fundPerf.year.label) ? fundPerf.year.label : (live.year || "0.00%") }
+      ];
+
+      const fundGrid = document.getElementById("fundPerfGrid");
+      if (fundGrid) {
+        fundGrid.innerHTML = fundItems.map(item => `
+          <div class="perf-item" style="padding:12px 16px;">
+            <div class="info">
+              <div class="label">${item.label}</div>
+            </div>
+            <div class="change">
+              <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      const liveMeta = document.getElementById("liveMeta");
+      if (liveMeta) {
+        liveMeta.textContent = `Last sync: ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })} PST`;
+      }
     }
 
     function renderMonths(monthlyHistory) {

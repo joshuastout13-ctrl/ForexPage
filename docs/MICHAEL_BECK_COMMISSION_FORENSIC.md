@@ -28,7 +28,7 @@
   * Record `wd_cd3c1dda`: $18,700.00 (Approved, labeled August)
   * Total Deductions = **$40,700.00**
 * **August Active Balance:** $\$1,042,087.23 - \$40,700.00 = \mathbf{\$1,001,387.23}$.
-* **Josh Approximate Comparison:** Josh's ~$1,001,338 figure corresponds to her **August post-transaction balance ($1,001,387.23)**, differing by **+$49.23**.
+* **Josh Approximate Comparison:** Josh's ~$1,001,338 figure corresponds to her **post-August-withdrawal transaction balance ($1,001,387.23)**, differing by **+$49.23**.
 * **Discrepancy:** The $2,000 difference between Josh's note ($20,000) and production record `wd_e4fc9d89` ($22,000) is marked `RECONCILIATION_REQUIRED` pending wire verification.
 
 ---
