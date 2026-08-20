@@ -287,9 +287,9 @@ graph TD
     $$\text{June Ending Balance} - \text{June Profit} = \$111,877.83 - \mathbf{\$1,877.83} = \mathbf{\$110,000.00}$$
   - Production record `wd_01d8c2cb` was created for exactly **$1,877.83** to reset her capital to the round principal ($110,000.00).
   - If the withdrawal were $1,877.33, her remaining eligible capital would have been an irregular **$110,000.50**.
-* **Root Cause:** A typographical error in Josh's text note ($1,877.33 vs $1,877.83). Production record `wd_01d8c2cb` ($1,877.83) is the mathematically exact distribution of June earnings.
+* **Root Cause & Audit Statement:** Josh's review value ($1,877.33) conflicts with primary source and accounting evidence supporting **$1,877.83**. Production record `wd_01d8c2cb` ($1,877.83) represents the exact distribution of June earnings to maintain a round principal baseline of $110,000.00.
 * **Action:** Retain production record `wd_01d8c2cb` ($1,877.83). No database mutation required.
-* **Status:** **`NO_CHANGE_REQUIRED`** (`VERIFIED`)
+* **Status:** **`SOURCE_DATA_PROVEN / NO_CHANGE`**
 
 ---
 
@@ -354,7 +354,7 @@ graph TD
     - July Net Return: $\$20,276.86 \times 1.565\% = \$317.33 \implies \text{July 31 Ending} = \mathbf{\$20,594.19}$.
 * **Forensic Conclusion:** The $7,029.40 $\to$ $20,594.19 sequence was **Ashlee Ray**, which was conflated with Austin Ray in legacy scripts due to username similarity. Austin Ray's account is 100% verified continuous from $4,016.80 $\to$ $4,083.28 $\to$ $4,158.21 $\to$ $4,223.28.
 * **Action:** Production database already holds correct values. Zero mutation required.
-* **Status:** **`NO_CHANGE_REQUIRED`** (`VERIFIED`)
+* **Status:** **`VERIFIED / NO_CHANGE`**
 
 ---
 
@@ -375,7 +375,7 @@ graph TD
     - Jun (3.67% @ 50% = 1.835%): $\$46,422.68 \times 1.01835 = \mathbf{\$47,274.52}$ *(Exact match for Cell T85)*
     - Jul (3.13% @ 50% = 1.565%): $\$47,274.52 \times 1.01565 = \mathbf{\$48,014.37}$
 * **Findings:** The Feb–June rows present in `investor_monthly_history` represent **August migration materialization** derived deterministically from primary starting capital and monthly fund returns.
-* **Status:** **`NO_CHANGE_REQUIRED`** (`VERIFIED`)
+* **Status:** **`VERIFIED_MATERIALIZED_HISTORY / NO_CHANGE`**
 
 ---
 
@@ -410,19 +410,19 @@ graph TD
 
 | # | Investor | Username | Category | Status | Actionability in Manifest |
 | :---: | :--- | :--- | :--- | :--- | :--- |
-| **1** | Jeannine Shaffar | `jshaffar` | Transaction / Dependency | **`READY_FOR_APPROVAL`** | **Actionable Mutation (Void `dep_e10ccd56`)** |
-| **2** | Jerrys Rogue Jets | `jerrys` | Transaction / Checkpoint | **`VERIFIED_TRANSACTION_ONLY`** | **Actionable Mutation (Insert Aug 1 WD $2,500)** |
+| **1** | Jeannine Shaffar | `jshaffar` | Transaction / Dependency | **`READY_FOR_APPROVAL`** | **Package 1 (Void `dep_e10ccd56`)** |
+| **2** | Jerrys Rogue Jets | `jerrys` | Transaction / Checkpoint | **`VERIFIED_TRANSACTION_ONLY`** (WD) / **`RECONCILIATION_REQUIRED`** ($59.42) | **Package 2 (Insert Aug 1 WD $2,500)** |
 | **3** | Mary Jo Harris | `mharris` | Transaction Provenance | **`RECONCILIATION_REQUIRED`** | Quarantined (Requires wire proof $20k vs $22k) |
-| **4** | Jeff Bennion | `jbennion` | Client Cutover | **`CLIENT_AUTHORIZED_CUTOVER`** | Held (Requires formal client authorization) |
-| **5** | Michael Landon | `mlandon` | Client Cutover | **`RECONCILIATION_REQUIRED`** | Held (Clarify $10.8k profit vs $73.1k capital) |
-| **6** | Gary Larson | `glarson` | Client Cutover / Seed | **`READY_FOR_APPROVAL`** | **Actionable Mutation (Aug 1 Start & $487k Capital)** |
-| **7** | Kyle Landon | `klandon` | Infrastructure Seed | **`VERIFIED_TRANSACTION_ONLY`** | **Actionable Mutation (Align Open Date to 2026-08-01)** |
-| **8** | Theresa Kruger | `tkruger` | Source Discrepancy | **`NO_CHANGE_REQUIRED`** | None ($0.50 note typo; DB $1,877.83 verified) |
-| **9** | Kelci Ray | `kray` | Source Discrepancy | **`NO_CHANGE_REQUIRED`** | None ($55,197.76 is July 1 post-deposit capital) |
-| **10** | Michael Beck | `mbeck` | Source Discrepancy | **`RECONCILIATION_REQUIRED`** | Held ($4,255.42 is pre-onboarding manual variance) |
-| **11** | Austin Ray | `austinray` | Continuity Provenance | **`NO_CHANGE_REQUIRED`** | None ($4,083.28 continuous; $7,029.40 was Ashlee Ray) |
-| **12** | Cathyann Jones | `cjones` | History Materialization | **`NO_CHANGE_REQUIRED`** | None (Feb–Jun materialized from $43,479.02 start) |
-| **13** | Ted Boardwalk | `tboardwalk` | Policy / Negative Equity | **`RECONCILIATION_REQUIRED`** | Held (Overdraft math sound; requires policy) |
+| **4** | Jeff Bennion | `jbennion` | Client Cutover | **`CLIENT_AUTHORIZED_CUTOVER / BLOCKED_DESIGN`** | Package 5 (Held; no deposit fabrication) |
+| **5** | Michael Landon | `mlandon` | Client Cutover | **`RECONCILIATION_REQUIRED`** | Package 9 (Held; clarify $10.8k profit vs $73.1k capital) |
+| **6** | Gary Larson | `glarson` | Client Cutover / Seed | **`READY_FOR_APPROVAL`** (Aug 1) / **`CLIENT_CLARIFICATION_REQUIRED`** (Sept) | **Package 3 (Aug 1 Start & $487k Capital)** |
+| **7** | Kyle Landon | `klandon` | Infrastructure Seed | **`READY_FOR_APPROVAL`** | **Package 4 (Align Open Date to 2026-08-01)** |
+| **8** | Theresa Kruger | `tkruger` | Source Discrepancy | **`SOURCE_DATA_PROVEN / NO_CHANGE`** | None ($1,877.83 verified; Josh $1,877.33 conflicts) |
+| **9** | Kelci Ray | `kray` | Source Discrepancy | **`VERIFIED / NO_CHANGE`** | None ($55,197.76 is July 1 post-deposit capital) |
+| **10** | Michael Beck | `mbeck` | Source Discrepancy | **`RECONCILIATION_REQUIRED`** | Package 6 (Held; $4,255.42 unexplainable from $4,704) |
+| **11** | Austin Ray | `austinray` | Continuity Provenance | **`VERIFIED / NO_CHANGE`** | None ($4,083.28 continuous; $7,029.40 was Ashlee Ray) |
+| **12** | Cathyann Jones | `cjones` | History Materialization | **`VERIFIED_MATERIALIZED_HISTORY / NO_CHANGE`** | None (Feb–Jun materialized from $43,479.02 start) |
+| **13** | Ted Boardwalk | `tboardwalk` | Policy / Negative Equity | **`RECONCILIATION_REQUIRED`** | Package 7 (Held; requires policy on overdrafts) |
 
 ---
 *End of Financial Exception Resolution Document.*

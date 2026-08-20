@@ -205,42 +205,49 @@ graph TD
 
 ---
 
-## 3. Global Correction Simulation (Certified In-Memory Model)
+## 3. Period-Specific Correction Simulations & Control Totals
 
-The following simulation executes all proven proposed corrections in memory against the certified production baseline dataset to verify complete mathematical integrity and confirm zero unexplained financial variance.
+All candidate mutations are simulated within their strictly bounded accounting periods rather than as an aggregate cross-period total. Complete package definitions are maintained in [FINANCIAL_CORRECTION_APPROVAL_PACKAGES.md](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/docs/FINANCIAL_CORRECTION_APPROVAL_PACKAGES.md).
 
-### 3.1 Simulation Equations & Mechanics
-1. **Gross Deposit Correction:** Voiding `dep_e10ccd56` on Jeannine Shaffar removes **$51,719.41** from July external deposits.
-2. **Gross Withdrawal Correction:** Jerrys Rogue Jets $2,500 withdrawal is effective August 1, 2026 (Month 8). Month 7 withdrawal delta is **$0.00**.
-3. **Investor Net Profit Correction:** Jeannine Shaffar's July net profit reduces from $1,081.80 (on $53,172.66 capital) to $29.57 (on $1,453.25 capital), yielding a net profit delta of **-$1,052.23**.
-4. **Commission Earnings Correction:** July commission allocations on Jeannine Shaffar reduce from $258.90 to $7.08, yielding a commission earnings delta of **-$251.82** across the 3 recipient rows.
-5. **Ending Capital Correction:** Jeannine Shaffar July 31 ending capital reduces from $54,254.46 to $1,482.82, yielding an ending capital delta of **-$52,771.64**.
+### 3.1 JULY_CORRECTION_CONTROL (Month 7 Close)
+*Applies Package 1 (Jeannine Shaffar Bogus Deposit Void).*
 
-### 3.2 Global Control Totals Reconciliation (Month 7 Close)
-
-| Global Accounting Category | Production Certified Baseline | Proposed Corrections Delta | Corrected Global Total | Reconciliation Equation Check |
+| July Control Metric | Certified Baseline | Proposed Corrections | Corrected July Total | Control Equation Check |
 | :--- | :---: | :---: | :---: | :---: |
-| **Opening Capital Total** | $20,077,705.53 | $0.00 | $20,077,705.53 | Verified Stored |
-| **Net External Deposits** | $1,283,429.94 | -$51,719.41 | $1,231,710.53 | $\Delta = -\$51,719.41$ |
-| **Net External Withdrawals** | $342,039.33 | $0.00 | $342,039.33 | $\Delta = \$0.00$ |
-| **Investor Net Profits** | $492,567.44 | -$1,052.23 | $491,515.21 | $\Delta = -\$1,052.23$ |
-| **Commission Earnings** | $620,113.09 | -$251.82 | $619,861.27 | $\Delta = -\$251.82$ |
-| **Ending Capital Total** | **$22,851,987.46** | **-$52,771.64** | **$22,799,215.82** | **Exact Identity** |
+| **Opening Capital Total** | $20,077,705.53 | $0.00 | $20,077,705.53 | Baseline Verified |
+| **Net External Deposits** | $1,283,429.94 | -$51,719.41 | $1,231,710.53 | Void `dep_e10ccd56` |
+| **Net External Withdrawals** | $342,039.33 | $0.00 | $342,039.33 | Unchanged |
+| **Investor Net Profits** | $492,567.44 | -$1,052.23 | $491,515.21 | Jeannine $1,081.80 $\to$ $29.57 |
+| **Commission Earnings** | $620,113.09 | -$251.82 | $619,861.27 | Jeannine $258.90 $\to$ $7.08 |
+| **Ending Capital Total** | **$22,851,987.46** | **-$52,771.64** | **$22,799,215.82** | $\mathbf{\Delta = -\$52,771.64}$ |
 
-### 3.3 Verification of Unexplained Variance
+$$\text{July Unexplained Variance} = -\$52,771.64 - (-\$51,719.41 - \$0.00 - \$1,052.23) = \mathbf{\$0.00}$$
 
-$$\begin{aligned}
-\text{Net Ending Capital Correction:} &\quad -\$52,771.64 \\
-\text{- Net Deposit Correction:} &\quad -(-\$51,719.41) \\
-\text{+ Net Withdrawal Correction:} &\quad +(\$0.00) \\
-\text{- Net Investor-Profit Correction:} &\quad -(-\$1,052.23) \\
-\hline
-\mathbf{\text{Unexplained Financial Variance:}} &\quad \mathbf{\$0.00}
-\end{aligned}$$
+---
 
-$$\mathbf{-\$52,771.64 - (-\$51,719.41 - \$0.00 - \$1,052.23) = \$0.00}$$
+### 3.2 AUGUST_CORRECTION_CONTROL (Month 8 Baseline)
+*Applies Package 1 (July Commission Roll-Forward), Package 2 (Jerrys Withdrawal), Package 3 (Gary Larson), Package 4 (Kyle Landon).*
 
-* **Conclusion:** The proposed correction set produces **$0.00 unexplained financial variance** and is certified mathematically sound.
+| August Control Metric | Baseline Stored | Proposed Corrections | Corrected August Total | Provenance / Delta Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **August Opening Capital Total** | $22,851,987.46 | **+$433,976.54** | **$23,285,964.00** | Jeannine (-$52.77k), Comm (-$251.82), Gary (+$487k) |
+| **August External Deposits** | $0.00 | $0.00 | $0.00 | Month 8 Baseline |
+| **August External Withdrawals** | $0.00 | **+$2,500.00** | **$2,500.00** | Insert `wd_jerrys_20260801` ($2,500) |
+| **August Active Eligible Capital** | $22,851,987.46 | **+$431,476.54** | **$23,283,464.00** | Net Trading Capital Baseline |
+| **August Commission Earnings** | — | — | — | Unfinalized / Live Period |
+
+$$\text{August Unexplained Variance} = +\$431,476.54 - (+\$433,976.54 - \$2,500.00) = \mathbf{\$0.00}$$
+
+---
+
+### 3.3 SEPTEMBER_PENDING_CONTROL (Month 9 Pending)
+*Tracks Quarantined / Pending Items.*
+
+| September Item | Record ID | Target Table | Amount | Status | Reason for Hold |
+| :--- | :--- | :--- | :---: | :--- | :--- |
+| **Gary Larson Deposit** | `dep_94a0ffe1` | `deposits` | $120,000.00 | `CLIENT_CLARIFICATION_REQUIRED` | Confirm if new cash or subsumed in $487k onboarding wire |
+
+$$\text{September Unexplained Variance} = \mathbf{\$0.00}$$
 
 ---
 
