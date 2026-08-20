@@ -1,19 +1,37 @@
-# Period-Specific Financial Correction Approval Packages
+# Period-Specific Financial Correction Approval Packages & Execution-Readiness Review
 
-**Document Version:** 1.0.0  
-**Production Baseline:** `ec19f5f` (with commit `447a57c`)  
+**Document Version:** 2.0.0  
+**Production Baseline:** `ec19f5f` (with commit `0b87ada`)  
 **Audit Protocol:** READ ONLY / SIMULATION ONLY  
 **Financial Writes Policy:** `NOT_AUTHORIZED`  
+**Financial Execution Authorization:** `NOT_YET_GRANTED`  
 **Accounting Finalization Policy:** `HOLD`  
 **Client Acceptance Status:** `NOT_COMPLETE_CLIENT_ACCEPTANCE_PENDING`  
 
 > [!CAUTION]
 > **SIMULATION ONLY — ZERO FINANCIAL WRITES:**  
-> No production mutations, voids, inserts, balance updates, commission regenerations, or accounting finalizations are executed. Every proposed correction is structured into an isolated, period-specific approval package with deterministic dependency tracking and independent rollback procedures.
+> No production mutations, voids, inserts, balance updates, commission regenerations, or accounting finalizations are executed. Every proposed correction is structured into an isolated, period-specific approval package with deterministic dependency tracking, Compare-And-Swap (CAS) preconditions, and independent rollback procedures.
 
 ---
 
-## 1. Frozen Resolved Findings (No Change Required)
+## 1. Universal Sign Conventions & Global Accounting Control Equation
+
+To eliminate sign ambiguity across transaction categories, all period controls strictly distinguish **TRANSACTION BUCKET DELTA** from **CAPITAL EFFECT**:
+
+| Accounting Bucket | Transaction Bucket Delta | Capital Effect on Ending Balance | Sign Convention in Balance Equation |
+| :--- | :---: | :---: | :---: |
+| **External Deposits** | $+\Delta D$ | $+\Delta D$ | $+\text{Deposit Delta}$ |
+| **External Withdrawals** | $+\Delta W$ | $-\Delta W$ | $-\text{Withdrawal Delta}$ |
+| **Investor Net Profits** | $+\Delta P$ | $+\Delta P$ | $+\text{Investor Profit Delta}$ |
+| **Capitalized Commissions** | $+\Delta C$ | $+\Delta C$ | $+\text{Capitalized Commission Delta}$ |
+| **Documented Cutovers** | $\pm \Delta X$ | $\pm \Delta X$ | $\pm \text{Cutover Effects}$ |
+
+### Unified Period Control Equation:
+$$\mathbf{\text{Ending Capital Delta}} = \text{Opening Capital Delta} + \text{Deposit Delta} - \text{Withdrawal Delta} + \text{Investor Profit Delta} + \text{Capitalized Commission Delta} \pm \text{Cutover Effects}$$
+
+---
+
+## 2. Frozen Resolved Findings (Zero Financial Mutation)
 
 The following four accounts have been forensically verified with complete source-data proof and require **zero database mutations**:
 
@@ -28,7 +46,7 @@ The following four accounts have been forensically verified with complete source
 2. **Theresa Kruger (`tkruger` / `inv_8cf28066`): `SOURCE_DATA_PROVEN / NO_CHANGE`**
    - *Provenance:* Account started 2026-06-01 with **$110,000.00**.
    - *Chronology:* June net profit was **$1,877.83** $\implies$ June 30 ending balance **$111,877.83**. Requesting a full payout of June profit on July 1 required exactly **$1,877.83** (`wd_01d8c2cb`) to reset principal to $110,000.00.
-   - *Audit Statement:* Josh's review note of $1,877.33 conflicts with source and accounting evidence supporting **$1,877.83**. Production record `wd_01d8c2cb` is verified exact.
+   - *Audit Statement:* Josh's review note of $1,877.33 conflicts with primary source and accounting evidence supporting **$1,877.83**. Production record `wd_01d8c2cb` is verified exact.
 
 3. **Kelci Ray (`kray` / `inv_8115c9d3`): `VERIFIED / NO_CHANGE`**
    - *Provenance:* May 1 start $5,021.00 $\to$ June 30 ending **$5,197.76**.
@@ -41,131 +59,138 @@ The following four accounts have been forensically verified with complete source
 
 ---
 
-## 2. Package 1 (July 2026): Jeannine Shaffar Bogus Deposit Void
+## 3. Package 1 (July 2026): Jeannine Shaffar Bogus Deposit Void & Downstream Cascade
 
-```mermaid
-flowchart TD
-    subgraph Step_A["Step A: Source Void"]
-        D["dep_e10ccd56 ($51,719.41) -> type = 'VOID'"]
-    end
+### 3.1 July Closed Ledger Correction
+- **Source Mutation:** Void bogus deposit `dep_e10ccd56` ($51,719.41).
+- **July Snapshot Recalculation:**
+  - July Eligible Capital: $53,172.66 $\to$ **$1,453.25** ($\Delta = -\$51,719.41$)
+  - July Fund Gross Return (3.13%): $1,664.30 $\to$ **$45.49** ($\Delta = -\$1,618.81$)
+  - Jeannine Net Profit (65% Split): $1,081.80 $\to$ **$29.57** ($\Delta = -\$1,052.23$)
+  - July 31 Ending Balance: $54,254.46 $\to$ **$1,482.82** ($\Delta = -\$52,771.64$)
 
-    subgraph Step_B["Step B: July Snapshot Recalculation"]
-        EC["July Eligible Capital: $53,172.66 -> $1,453.25"]
-        GP["Gross Profit @ 3.13%: $1,664.30 -> $45.49"]
-        NP["Jeannine Net Profit @ 65%: $1,081.80 -> $29.57"]
-        EB["July 31 Ending: $54,254.46 -> $1,482.82"]
-    end
+### 3.2 Targeted Recipient Commission Earnings Provenance
+All recipient earnings generated from Jeannine Shaffar's July trading possess exact primary record IDs:
 
-    subgraph Step_C["Step C: Targeted Commission Reversal"]
-        R1["inv_015f3774 @ 24% (row d6fe4b23): $124.27 -> $3.40"]
-        R2["inv_920b8af8 @ 24% (row a1068ad8): $124.27 -> $3.40"]
-        R3["stout001 @ 2% (row 714303b4): $10.36 -> $0.28"]
-    end
+| Record ID | Source Investor | Recipient Investor | Rule Share | Baseline Amount | Corrected Amount | Delta |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| `d6fe4b23-e95a-4051-b144-f56851b94025` | `inv_3e8224ee` | `inv_015f3774` | 24% | $124.27 | **$3.40** | **-$120.87** |
+| `a1068ad8-bd04-4b4c-9c49-b3d874b6de88` | `inv_3e8224ee` | `inv_920b8af8` | 24% | $124.27 | **$3.40** | **-$120.87** |
+| `714303b4-5de1-48f1-ab3b-b73c5df5491d` | `inv_3e8224ee` | `stout001` | 2% | $10.36 | **$0.28** | **-$10.08** |
+| **Residual Company Pool** | `inv_3e8224ee` | Stone & Co | 50% | $323.61 | **$8.84** | **-$314.77** |
+| **Total Recipient Earnings** | — | — | — | **$258.90** | **$7.08** | **-$251.82** |
 
-    subgraph Step_D["Step D: August N->N+1 Capitalization"]
-        JA["Jeannine Aug 1 Opening: $54,254.46 -> $1,482.82"]
-        RA["Recipients Aug 1 Opening: -$251.82 net incoming credits"]
-    end
+*Idempotency Rule:* Aggregate recipient balances are **NEVER manually edited**. Recipient earnings rows are updated strictly by primary key ID or regenerated through idempotent upsert matching the composite key `(source_investor_id, recipient_id, year, month_number)`.
 
-    Step_A --> Step_B --> Step_C --> Step_D
-```
+### 3.3 August Projected Downstream Returns (`PROJECTED_DEPENDENCY_EFFECT`)
+*Note: Evaluated at 2.81% live unfinalized August gross return. August ledger is NOT mutated.*
 
-### 2.1 Complete July $\to$ August Dependency Simulation
-| Metric / Account | Baseline Stored | Corrected Simulation | Delta / Adjustment |
-| :--- | :---: | :---: | :---: |
-| **July Opening Balance** | $1,453.25 | $1,453.25 | $0.00 |
-| **July External Deposits** | $51,719.41 | $0.00 | -$51,719.41 |
-| **July Eligible Capital** | $53,172.66 | $1,453.25 | -$51,719.41 |
-| **July Fund Gross Return (3.13%)** | $1,664.30 | $45.49 | -$1,618.81 |
-| **Jeannine Net Profit (65% Split)** | $1,081.80 | $29.57 | -$1,052.23 |
-| **July Commission Pool (35%)** | $582.51 | $15.92 | -$566.59 |
-| **- Recipient `inv_015f3774` (row `d6fe4b23`)** | $124.27 | $3.40 | -$120.87 |
-| **- Recipient `inv_920b8af8` (row `a1068ad8`)** | $124.27 | $3.40 | -$120.87 |
-| **- Recipient `stout001` (row `714303b4`)** | $10.36 | $0.28 | -$10.08 |
-| **- Residual Company Pool (50% of pool)** | $323.61 | $8.84 | -$314.77 |
-| **July 31 Jeannine Ending Balance** | **$54,254.46** | **$1,482.82** | **-$52,771.64** |
-| **August 1 Jeannine Opening Capital** | **$54,254.46** | **$1,482.82** | **-$52,771.64** |
-| **August 1 Recipient Capital Impact** | Baseline Credits | Corrected Credits | **-$251.82** |
+| Investor / Recipient | Split % | Current Aug Opening | Corrected Aug Opening | Opening Delta | Current Aug Profit | Corrected Aug Profit | Profit Delta | Corrected Projected Ending | Projected Ending Delta |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Jeannine Shaffar** | 65% | $54,254.46 | **$1,482.82** | -$52,771.64 | $990.91 | **$27.08** | -$963.83 | **$1,509.90** | **-$53,735.47** |
+| **Recipient `inv_015f3774`** | 75% | Baseline | Capital -$120.87 | -$120.87 | Baseline | Baseline -$2.55 | -$2.55 | Projected | **-$123.42** |
+| **Recipient `inv_920b8af8`** | 75% | Baseline | Capital -$120.87 | -$120.87 | Baseline | Baseline -$2.55 | -$2.55 | Projected | **-$123.42** |
+| **Recipient `stout001`** | 100% | Baseline | Capital -$10.08 | -$10.08 | Baseline | Baseline -$0.28 | -$0.28 | Projected | **-$10.36** |
 
-### 2.2 Commission Row Identifiers & Targeted Reversal
-All recipient rows generated from Jeannine Shaffar's July trading possess unambiguous composite business keys:
-- `source_investor_id`: `inv_3e8224ee`
-- `year`: `2026`
-- `month_number`: `7`
-- Row IDs: `d6fe4b23-e95a-4051-b144-f56851b94025`, `a1068ad8-bd04-4b4c-9c49-b3d874b6de88`, and `714303b4-5de1-48f1-ab3b-b73c5df5491d`.
-
-*Rule:* Aggregate recipient balances are **NEVER manually edited**. Recipient August opening balances inherit exact regenerated commission earnings rows through the canonical $N \to N+1$ capitalization pipeline.
-
-### 2.3 Safe Execution & Rollback Specification
-- **Execution Mechanism (Atomic Transaction):**
-  1. `UPDATE deposits SET type = 'VOID', notes = 'Client confirmed bogus deposit voided (T253)' WHERE id = 'dep_e10ccd56' AND type != 'VOID';`
-  2. Regenerate `investor_monthly_history` for `inv_3e8224ee` (Month 7: `opening_balance: 1453.25`, `deposits: 0`, `gross_gain: 45.49`, `net_profit: 29.57`, `ending_balance: 1482.82`).
-  3. Replace derived `commission_earnings` rows `d6fe4b23` ($3.40), `a1068ad8` ($3.40), and `714303b4` ($0.28).
-  4. Propagate August 1 capitalization.
-- **Rollback Operation:**
-  `UPDATE deposits SET type = 'Deposit', notes = 'This includes all of joshs commissions to date' WHERE id = 'dep_e10ccd56';` followed by recalculation pipeline.
-- **Package Status:** **`JEANNINE_READY_FOR_APPROVAL`**
+### 3.4 Preconditions & Transactional Execution Boundary
+- **Compare-And-Swap (CAS) Precondition:**
+  `SELECT 1 FROM deposits WHERE id = 'dep_e10ccd56' AND amount = 51719.41 AND date = '2026-07-01' AND type = 'Deposit';` (ABORT if row missing or type != 'Deposit').
+- **Transactional Boundary:** Individual REST calls in Supabase JS cannot guarantee atomic rollback across `deposits`, `investor_monthly_history`, and `commission_earnings`. Execution requires an atomic PostgreSQL stored procedure (RPC) wrapper.
+- **Classification:** **`JEANNINE_READY_FOR_APPROVAL`** / **`JEANNINE_EXECUTION_REQUIRES_TRANSACTION_DESIGN`**
 
 ---
 
-## 3. Package 2 (August 2026): Jerrys Rogue Jets Authorized Withdrawal
+## 4. Package 2 (August 2026): Jerrys Rogue Jets Authorized Withdrawal
 
-### 3.1 Verification & Duplicate Proof
-1. **Absence of Duplicate Record:** An exhaustive query of `withdrawals` confirms only two historical records exist for `jerrys001`:
-   - `wd_5614f2b2` ($2,500.00 on 2026-05-01, Completed)
-   - `wd_e380829e` ($2,500.00 on 2026-07-01, Completed)
-   - **Zero records exist for August 2026.**
-2. **Duplicate Protection Constraint:** Guarded by composite check on `(investor_id = 'jerrys001', year = 2026, month_number = 8, amount = 2500.00)`.
-3. **Withdrawal Timing Semantics:** Effective accounting date is **`2026-08-01`**. Under standard fund accounting, beginning-of-month withdrawals reduce eligible trading capital prior to return calculation:
-   $$\text{August Eligible Capital} = \text{August Opening Balance } (\$546,135.92) - \text{Withdrawal } (\$2,500.00) = \mathbf{\$543,635.92}$$
+### 4.1 Production Transaction Insert Design & Constraints
+- **Production ID Convention:** `api/admin/withdrawals/index.js` generates random 8-hex-char IDs: `wd_${crypto.randomBytes(4).toString('hex')}`.
+- **Database Uniqueness Constraint Retraction:** PostgreSQL table DDL for `withdrawals` does NOT contain a composite unique constraint on `(investor_id, year, month_number, amount)`. Stating that DDL enforces uniqueness is formally withdrawn.
+- **Deterministic Key & Check-Before-Insert Strategy:**
+  ```sql
+  INSERT INTO withdrawals (
+    id, investor_id, account_id, request_date, effective_accounting_date,
+    year, month_number, month, amount, status, notes
+  )
+  SELECT 
+    'wd_' || substring(md5('jerrys001_2026_08_2500') from 1 for 8),
+    'jerrys001', 'jerrys001', '2026-08-01', '2026-08-01',
+    2026, 8, 'August', 2500.00, 'Approved',
+    'Client authorized recurring August withdrawal per Josh workbook comment (T273)'
+  WHERE NOT EXISTS (
+    SELECT 1 FROM withdrawals 
+    WHERE investor_id = 'jerrys001' AND year = 2026 AND month_number = 8 AND amount = 2500.00 AND status != 'Cancelled'
+  );
+  ```
 
-### 3.2 Unresolved Checkpoint Isolation
-- **July 31 / August 1 Stored Balance:** **$546,135.92**
-- **Josh June Checkpoint (Cell `T273`):** **$534,486.05** (Variance: **+$59.42** against simple subtraction $534,426.63).
-- **Isolation Policy:** The candidate mutation only inserts the authorized $2,500 withdrawal for August. The $59.42 checkpoint variance remains strictly classified as **`RECONCILIATION_REQUIRED`** and does NOT alter July ending or August opening balance.
-- **Rollback Operation:** `DELETE FROM withdrawals WHERE id = 'wd_jerrys_20260801';`
-- **Package Status:**
-  - August 1 Withdrawal ($2,500.00): **`JERRY_WITHDRAWAL_READY_FOR_APPROVAL`**
-  - Historical Checkpoint ($59.42 Variance): **`RECONCILIATION_REQUIRED`** (Blocked)
+### 4.2 August Return & Projected Downstream Effect (`PROJECTED_DEPENDENCY_EFFECT`)
+- Investor Split: **70.00%** (Net Return = $2.81\% \times 70\% = 1.967\%$).
+- August Opening Balance: **$546,135.92**.
+- **Before Withdrawal (WD = $0.00):**
+  - Eligible Active Capital: **$546,135.92**
+  - Projected August Net Profit: $\$546,135.92 \times 1.967\% = \mathbf{\$10,742.50}$
+  - Projected August Ending Balance: $\$546,135.92 + \$10,742.50 = \mathbf{\$556,878.42}$
+- **After Withdrawal (WD = $2,500.00 inserted):**
+  - Eligible Active Capital: $\$546,135.92 - \$2,500.00 = \mathbf{\$543,635.92}$
+  - Projected August Net Profit: $\$543,635.92 \times 1.967\% = \mathbf{\$10,693.32}$
+  - Projected August Ending Balance: $\$543,635.92 + \$10,693.32 = \mathbf{\$554,329.24}$
+- **Deltas:**
+  - Withdrawal Bucket Delta: **+$2,500.00** (Capital Effect: **-$2,500.00**)
+  - Projected Net Profit Delta: **-$49.18** ($\$10,693.32 - \$10,742.50$)
+  - Projected Ending Balance Delta: **-$2,549.18** ($\$554,329.24 - \$556,878.42$).
+
+### 4.3 Checkpoint Isolation
+- Josh's manual checkpoint of **$534,486.05** (Cell `T273`) differs by **+$59.42** from true June 30 ending minus July 1 withdrawal ($534,426.63).
+- **Isolation Policy:** The $59.42 variance is classified as **`RECONCILIATION_REQUIRED`** and is NOT mutated.
+- **Package Status:** **`JERRY_WITHDRAWAL_READY_FOR_APPROVAL`** / **`JERRY_CHECKPOINT_RECONCILIATION_REQUIRED`**
 
 ---
 
-## 4. Package 3 (August 2026): Gary Larson Onboarding & Starting Capital Realignment
+## 5. Package 3 (August 2026): Gary Larson Starting Capital Realignment
 
-### 4.1 Independent Mutations (August Only)
-1. **Investor Entity Start Date:** `UPDATE investors SET start_date = '2026-08-01' WHERE id = 'inv_2093cd23';`
-2. **Account Entity Open Date:** `UPDATE investor_accounts SET open_date = '2026-08-01' WHERE id = 'glarson';`
-3. **Account Starting Capital:** `UPDATE investor_accounts SET starting_capital = 487000.00 WHERE id = 'glarson';`
+### 5.1 Analysis of Starting Capital Deltas
+1. **Database Column / Field Value Delta (`investor_accounts.starting_capital`):**
+   - Current Stored Field Value: **$75,000.00**
+   - Proposed Field Value: **$487,000.00**
+   - **Column Mutation Delta:** $\$487,000.00 - \$75,000.00 = \mathbf{+\$412,000.00}$.
+2. **Economic / Active August Capital Delta (in Calculation Engine):**
+   - Baseline State: Because `investors.start_date` was `'2026-09-01'`, the dynamic calculation engine treated Gary Larson as inactive ($0.00 eligible capital) for July and August.
+   - Proposed Corrected State: With `start_date = '2026-08-01'`, Gary enters active trading on August 1 with $487,000.00 capital.
+   - **Active August Trading Capital Delta:** $\$487,000.00 - \$0.00 = \mathbf{+\$487,000.00}$.
 
-### 4.2 Separation of September $120,000 Deposit
-- **September Deposit Record:** `dep_94a0ffe1` ($120,000.00 on `2026-09-01`).
-- **Policy:** The September deposit is **NOT TOUCHED** and remains quarantined under **`DEPENDENCY_REVIEW_REQUIRED / CLIENT_CLARIFICATION_REQUIRED`** for the September accounting close.
-- **Engine Derivation:** The accounting engine derives August starting capital directly from `investor_accounts.starting_capital` ($487,000.00) starting on `2026-08-01`. Pre-August history is dynamically suppressed with zero destructive record deletion.
-- **Rollback Operation:**
-  `UPDATE investors SET start_date = '2026-09-01' WHERE id = 'inv_2093cd23'; UPDATE investor_accounts SET starting_capital = 75000.00, open_date = '2026-09-01' WHERE id = 'glarson';`
-- **Package Status:**
-  - August Onboarding & $487k Capital: **`GARY_READY_FOR_APPROVAL`**
-  - September $120k Deposit: **`CLIENT_CLARIFICATION_REQUIRED`** (Quarantined)
+### 5.2 August Projected Return Effect (`PROJECTED_DEPENDENCY_EFFECT`)
+- Investor Split: **50.00%** (Net Return = $2.81\% \times 50\% = 1.405\%$).
+- **Before:** Active Capital = $0.00 $\implies$ Projected Profit = $0.00 $\implies$ Ending = $0.00.
+- **After:** Active Capital = $487,000.00 $\implies$ Projected Profit = $\$487,000.00 \times 1.405\% = \mathbf{\$6,842.35} \implies$ Projected Ending = **$493,842.35**.
+- **Deltas:**
+  - Active Capital Delta: **+$487,000.00**
+  - Projected Profit Delta: **+$6,842.35**
+  - Projected Ending Delta: **+$493,842.35**.
+
+### 5.3 Isolation of September $120,000 Deposit
+- Deposit record `dep_94a0ffe1` ($120,000.00 on `2026-09-01`) is **NOT TOUCHED** and remains quarantined under **`CLIENT_CLARIFICATION_REQUIRED`**.
+- **CAS Precondition:**
+  `SELECT 1 FROM investors WHERE id = 'inv_2093cd23' AND start_date = '2026-09-01';` AND `SELECT 1 FROM investor_accounts WHERE id = 'glarson' AND starting_capital = 75000.00 AND open_date = '2026-09-01';`
+- **Package Status:** **`GARY_READY_FOR_APPROVAL`** / **`GARY_SEPTEMBER_DEPOSIT_CLIENT_CLARIFICATION_REQUIRED`**
 
 ---
 
-## 5. Package 4 (August 2026): Kyle Landon Account Open Date Realignment
+## 6. Package 4 (August 2026): Kyle Landon Metadata Realignment
 
-### 5.1 Analysis of Production State
+### 6.1 Accounting & Visibility Analysis
 - `investors.start_date` = `'2026-08-01'` (Correct)
 - `investor_accounts.starting_capital` = `$75,000.00` (Correct)
-- `investor_accounts.open_date` = `'2026-01-01'` (Requires realignment)
-- Legacy Month 7 history contains a $75,000 opening capital seed row.
-
-### 5.2 Single Minimal Mutation
-- **Action:** `UPDATE investor_accounts SET open_date = '2026-08-01' WHERE id = 'klandon' AND open_date != '2026-08-01';`
-- **Effect:** Aligns account open date with investor onboarding date. The engine suppresses pre-August (Jan–Jul) investor-facing reporting while preserving historical materialization infrastructure.
-- **Rollback Operation:** `UPDATE investor_accounts SET open_date = '2026-01-01' WHERE id = 'klandon';`
+- `investor_accounts.open_date` = `'2026-01-01'` (Requires realignment to `'2026-08-01'`)
+- **Before Accounting Values:** Pre-August Active Capital = $0.00; August 1 Starting Capital = $75,000.00.
+- **After Accounting Values:** Pre-August Active Capital = $0.00; August 1 Starting Capital = $75,000.00.
+- **Financial Delta:** **$0.00** (Zero financial effect on active capital pools).
+- **Portal Visibility Effect:** Aligns account open date with investor onboarding, cleanly suppressing pre-August view states without deleting setup history rows.
+- **Control Totals Rule:** Kyle Landon is kept **OUT** of capital control totals ($0.00 financial delta).
+- **CAS Precondition:** `SELECT 1 FROM investor_accounts WHERE id = 'klandon' AND open_date = '2026-01-01';`
 - **Package Status:** **`KYLE_READY_FOR_APPROVAL`**
 
 ---
 
-## 6. Package 5 (Client Cutover): Jeff Bennion Baseline Override
+## 7. Package 5 (Client Cutover): Jeff Bennion Baseline Override
 
 ```
 ================================================================================
@@ -176,17 +201,17 @@ Implementation Design Status: BLOCKED_DESIGN
 ================================================================================
 ```
 
-### 6.1 Accounting Comparison
-- **Current Production (Source Continuous):**
-  - Stored June 30 Ending Balance: **$2,477,604.26** (compounded from $2,242,679.67 on April 1).
+### 7.1 Accounting Comparison
+- **Source-Continuous Production Ledger:**
+  - June 30 Stored Ending Balance: **$2,477,604.26** (compounded from $2,242,679.67 on April 1).
   - Jeff Bennion Split: **100.00%** (Gross Return = Net Return = 3.13% in July).
-  - Stored July Net Gain: **$77,549.01** $\implies$ Stored July 31 Ending Balance: **$2,555,153.27**.
+  - July Net Gain: **$77,549.01** $\implies$ July 31 Ending Balance: **$2,555,153.27**.
 - **Client Instruction (Cell `T259`):** `"change to this figure starting July 1 2026"` $\to$ **$2,672,544.48**.
-  - Injected Capital / Cutover Variance: **+$194,940.22** ($\$2,672,544.48 - \$2,477,604.26$).
+  - Injected Capital Cutover Variance: **+$194,940.22** ($\$2,672,544.48 - \$2,477,604.26$).
   - Simulated July Net Gain (3.13% @ 100%): **$83,640.64**.
   - Simulated July 31 Ending Balance: **$2,756,185.12**.
 
-### 6.2 Schema & Implementation Design Block
+### 7.2 Schema & Implementation Design Block
 - **Database Schema Audit:** The production database contains no dedicated `cutover_adjustments` or `audit_overrides` table.
 - **Strict Prohibition:** Misclassifying $194,940.22 as a "deposit" in the `deposits` table would fabricate a non-existent cash transaction in banking audits.
 - **Decision:** Implementation is **`BLOCKED_DESIGN`** until a formal cutover mechanism is architected or explicit client authorization is granted.
@@ -194,7 +219,7 @@ Implementation Design Status: BLOCKED_DESIGN
 
 ---
 
-## 7. Held & Blocked Exception Packages (Reconciliation Required)
+## 8. Held & Blocked Exception Packages (Reconciliation Required)
 
 ### Package 6: Michael Beck Workbook Checkpoint ($4,255.42 Discrepancy)
 - **Mathematical Impossibility Proof:**
@@ -223,7 +248,7 @@ Implementation Design Status: BLOCKED_DESIGN
 
 ---
 
-## 8. Period-Specific Control Totals Reconciliation
+## 9. Period-Specific Control Totals Reconciliation
 
 ```
 ================================================================================
@@ -231,62 +256,84 @@ PERIOD-SPECIFIC CONTROL TOTALS (READY_FOR_APPROVAL PACKAGES ONLY)
 ================================================================================
 ```
 
-### 8.1 JULY_CORRECTION_CONTROL (Month 7 Close)
+### 9.1 JULY_CLOSED_LEDGER_CONTROL (Month 7 Close)
 *Applies Package 1 (Jeannine Shaffar Bogus Deposit Void).*
 
-| July Control Metric | Certified Baseline | Proposed Corrections | Corrected July Total | Control Equation Check |
-| :--- | :---: | :---: | :---: | :---: |
-| **Opening Capital Total** | $20,077,705.53 | $0.00 | $20,077,705.53 | Baseline Verified |
-| **Net External Deposits** | $1,283,429.94 | -$51,719.41 | $1,231,710.53 | Void `dep_e10ccd56` |
-| **Net External Withdrawals** | $342,039.33 | $0.00 | $342,039.33 | Unchanged |
-| **Investor Net Profits** | $492,567.44 | -$1,052.23 | $491,515.21 | Jeannine $1,081.80 $\to$ $29.57 |
-| **Commission Earnings** | $620,113.09 | -$251.82 | $619,861.27 | Jeannine $258.90 $\to$ $7.08 |
+| July Control Category | Baseline Certified | Proposed Delta | Corrected July Total | Control Equation Verification |
+| :--- | :---: | :---: | :---: | :--- |
+| **Opening Capital Total** | $20,077,705.53 | $0.00 | $20,077,705.53 | Stored Verified |
+| **Deposit Bucket Delta** | $1,283,429.94 | -$51,719.41 | $1,231,710.53 | Void `dep_e10ccd56` ($51,719.41) |
+| **Withdrawal Bucket Delta** | $342,039.33 | $0.00 | $342,039.33 | Unchanged |
+| **Investor Net Profits** | $492,567.44 | -$1,052.23 | $491,515.21 | Jeannine Net Profit ($1,081.80 $\to$ $29.57) |
+| **Capitalized Commissions** | $0.00 | $0.00 | $0.00 | July commissions capitalize in August |
 | **Ending Capital Total** | **$22,851,987.46** | **-$52,771.64** | **$22,799,215.82** | $\mathbf{\Delta = -\$52,771.64}$ |
 
-$$\text{July Unexplained Variance} = -\$52,771.64 - (-\$51,719.41 - \$0.00 - \$1,052.23) = \mathbf{\$0.00}$$
+$$\begin{aligned}
+\text{Ending Capital Delta} &= \text{Opening Delta } (\$0.00) + \text{Deposit Delta } (-\$51,719.41) - \text{Withdrawal Delta } (\$0.00) + \text{Profit Delta } (-\$1,052.23) \\
+&= -\$52,771.64
+\end{aligned}$$
+$$\mathbf{\text{July Closed-Ledger Residual: } \$0.00}$$
 
 ---
 
-### 8.2 AUGUST_CORRECTION_CONTROL (Month 8 Baseline)
-*Applies Package 1 (July Commission Roll-Forward), Package 2 (Jerrys Withdrawal), Package 3 (Gary Larson), Package 4 (Kyle Landon).*
+### 9.2 AUGUST_SOURCE_CHANGE_CONTROL (Month 8 Baseline Changes)
+*Applies Package 1 (July Commission Roll-Forward), Package 2 (Jerrys Withdrawal), Package 3 (Gary Larson Active Start).*
 
-| August Control Metric | Baseline Stored | Proposed Corrections | Corrected August Total | Provenance / Delta Description |
+| August Source Control Category | Baseline Stored | Proposed Delta | Corrected August Baseline | Provenance / Delta Description |
 | :--- | :---: | :---: | :---: | :--- |
-| **August Opening Capital Total** | $22,851,987.46 | **+$433,976.54** | **$23,285,964.00** | Jeannine (-$52.77k), Comm (-$251.82), Gary (+$487k) |
-| **August External Deposits** | $0.00 | $0.00 | $0.00 | Month 8 Baseline |
-| **August External Withdrawals** | $0.00 | **+$2,500.00** | **$2,500.00** | Insert `wd_jerrys_20260801` ($2,500) |
-| **August Active Eligible Capital** | $22,851,987.46 | **+$431,476.54** | **$23,283,464.00** | Net Trading Capital Baseline |
-| **August Commission Earnings** | — | — | — | Unfinalized / Live Period |
+| **August Opening Capital Total** | $22,851,987.46 | **+$433,976.54** | **$23,285,964.00** | Jeannine (-$52.77k), Comm (-$251.82), Gary (+$487k active) |
+| **Deposit Bucket Delta** | $0.00 | $0.00 | $0.00 | Month 8 Baseline |
+| **Withdrawal Bucket Delta** | $0.00 | **+$2,500.00** | **$2,500.00** | Insert `wd_jerrys_20260801` ($2,500.00) |
+| **Net Active Eligible Capital** | **$22,851,987.46** | **+$431,476.54** | **$23,283,464.00** | Net Trading Capital Baseline |
 
-$$\text{August Unexplained Variance} = +\$431,476.54 - (+\$433,976.54 - \$2,500.00) = \mathbf{\$0.00}$$
+$$\begin{aligned}
+\text{Active Eligible Capital Delta} &= \text{Opening Capital Delta } (+\$433,976.54) - \text{Withdrawal Delta } (+\$2,500.00) \\
+&= +\$431,476.54
+\end{aligned}$$
+$$\mathbf{\text{August Source-Control Residual: } \$0.00}$$
 
 ---
 
-### 8.3 SEPTEMBER_PENDING_CONTROL (Month 9 Pending)
+### 9.3 AUGUST_PROJECTED_DEPENDENCY_CONTROL (Month 8 Projected Performance)
+*Evaluates live/unfinalized trading return (+2.81% gross) on corrected August eligible capital.*
+
+| Projected Control Category | Baseline Projected | Proposed Delta | Corrected Projected | Component Breakdown |
+| :--- | :---: | :---: | :---: | :--- |
+| **August Active Eligible Capital** | $22,851,987.46 | **+$431,476.54** | **$23,283,464.00** | Net Base from Source Control |
+| **Projected Investor Profits** | Baseline | **+$5,826.79** | Projected | Gary (+$6,842.35), Jeannine (-$963.83), Jerry (-$49.18), Recips (-$5.38) |
+| **Projected Ending Capital Total** | Baseline | **+$437,303.33** | Projected | $\mathbf{\Delta = +\$431,476.54 + \$5,826.79 = +\$437,303.33}$ |
+
+$$\mathbf{\text{August Projected Dependency Residual: } \$0.00}$$
+
+---
+
+### 9.4 SEPTEMBER_PENDING_CONTROL (Month 9 Pending)
 *Tracks Quarantined / Pending Items.*
 
 | September Item | Record ID | Target Table | Amount | Status | Reason for Hold |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | **Gary Larson Deposit** | `dep_94a0ffe1` | `deposits` | $120,000.00 | `CLIENT_CLARIFICATION_REQUIRED` | Confirm if new cash or subsumed in $487k onboarding wire |
 
-$$\text{September Unexplained Variance} = \mathbf{\$0.00}$$
+$$\mathbf{\text{September Pending Residual: } \$0.00}$$
 
 ---
 
-## 9. Staged Execution Order & Independent Rollback Protocols
+## 10. Staged Execution Order & Atomic Transaction Protocols
 
 When client authorization is granted, execution MUST proceed sequentially through the following staged order:
 
-1. **Pre-Execution Snapshot:** Generate full binary database backup and freeze connection pools.
-2. **Baseline Certification Gate:** Verify production commit is `ec19f5f` (with `447a57c`) or later certified baseline.
-3. **Immutability Verification:** Verify source records in `deposits`, `withdrawals`, `investors`, and `investor_accounts` have not mutated since forensic freeze.
-4. **Execute Package 1 (Jeannine Shaffar):** Execute in single transaction.
-5. **Scoped Recalculation (Package 1):** Recalculate only Jeannine Month 7 snapshot and 3 derived `commission_earnings` rows. Verify July control residual is $0.00.
-6. **Execute Package 2 (Jerrys Rogue Jets Withdrawal):** Insert `wd_jerrys_20260801`.
-7. **Execute Package 3 (Gary Larson Realignment):** Update `start_date`, `open_date`, `starting_capital`.
-8. **Execute Package 4 (Kyle Landon Realignment):** Update `open_date`.
-9. **Scoped Recalculation (Packages 2–4):** Re-compute August eligible capital baseline. Verify August control residual is $0.00.
-10. **Post-Execution Audit:** If ANY variance $> \$0.00$ is detected at any step, trigger immediate transaction rollback.
+```mermaid
+graph TD
+    S1["1. Pre-Execution Binary Backup & Freeze"] --> S2["2. Verify Commit ec19f5f / 0b87ada Baseline"]
+    S2 --> S3["3. Verify Source CAS Preconditions"]
+    S3 --> S4["4. Execute Package 1 via Atomic RPC Wrapper"]
+    S4 --> S5["5. Verify July Closed-Ledger Residual = $0.00"]
+    S5 --> S6["6. Execute Package 2 (Jerrys Withdrawal)"]
+    S6 --> S7["7. Execute Package 3 (Gary Larson Realignment)"]
+    S7 --> S8["8. Execute Package 4 (Kyle Landon Metadata)"]
+    S8 --> S9["9. Verify August Source-Control Residual = $0.00"]
+    S9 --> S10["10. Freeze & Report Final Certified State"]
+```
 
 ---
 *End of Financial Correction Approval Packages Document.*
