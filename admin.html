@@ -1259,6 +1259,10 @@ let state = {
           <div class="form-group"><label>Password</label><input id="field_password" value="${item ? escapeHtml(item.temp_password || item.password || item.temppasswordprototypeonly || '') : ''}" placeholder="${action === 'add' ? 'Leave blank to auto-generate' : 'Enter new password or leave unchanged'}" /></div>
           <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
+          <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:12px; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:10px; border:1px solid var(--line);">
+            <input type="checkbox" id="field_show_fund_performance" style="width:auto; cursor:pointer;" ${item && (item.show_fund_performance || item.showfundperformance) ? 'checked' : ''} />
+            <label for="field_show_fund_performance" style="margin:0; cursor:pointer; color:var(--text); font-weight:600;">Show Fund Performance Card to Investor</label>
+          </div>
         `;
       } else if (tab === 'accounts') {
         const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
@@ -1413,7 +1417,8 @@ let state = {
             email: document.getElementById('field_email')?.value,
             portalUsername: document.getElementById('field_portal_username')?.value,
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
-            monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0)
+            monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0),
+            showFundPerformance: !!document.getElementById('field_show_fund_performance')?.checked
           };
           const passVal = document.getElementById('field_password')?.value;
           if (passVal) {

@@ -53,6 +53,7 @@ export default async function handler(req, res) {
         monthly_draw: Number(body.monthlyDraw || 0),
         start_date: body.startDate || new Date().toISOString().split('T')[0],
         role: body.role || "Investor",
+        show_fund_performance: body.showFundPerformance === true || body.showFundPerformance === "true" || body.show_fund_performance === true,
         notes: body.notes || ""
       };
 

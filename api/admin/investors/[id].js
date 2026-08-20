@@ -23,6 +23,8 @@ export default async function handler(req, res) {
       if (body.monthlyDraw !== undefined) updates.monthly_draw = Number(body.monthlyDraw);
       if (body.startDate !== undefined) updates.start_date = body.startDate;
       if (body.role !== undefined) updates.role = body.role;
+      if (body.showFundPerformance !== undefined) updates.show_fund_performance = (body.showFundPerformance === true || body.showFundPerformance === "true");
+      if (body.show_fund_performance !== undefined) updates.show_fund_performance = (body.show_fund_performance === true || body.show_fund_performance === "true");
       if (body.notes !== undefined) updates.notes = body.notes;
 
       // Handle commission rules if provided

@@ -599,7 +599,7 @@
           </div>
 
           <!-- Fund Performance (Gross Fund Returns) -->
-          <div class="card" style="margin-top:20px;">
+          <div class="card" id="fundPerfCard" style="margin-top:20px;">
             <div class="flex-between" style="margin-bottom:16px;">
               <h2 style="font-size:20px;">Fund Performance</h2>
               <span class="muted" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Gross Return %</span>
@@ -816,16 +816,17 @@
           <tr>
             <th>Source Account Holder</th>
             <th style="text-align:right;">
-              <span style="color:var(--success); font-weight:700; display:inline-flex; align-items:center; gap:4px;">
-                <span style="font-size:11px;">🟢</span> Source Account Total Balance
+              <span style="color:var(--text); font-weight:700;">
+                July 2026 Commission Basis
               </span>
+              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital)</div>
             </th>
             <th style="text-align:right;">
-              <span style="color:var(--danger); font-weight:700; display:inline-flex; align-items:center; gap:4px;">
-                <span style="font-size:11px;">🔴</span> Commission %
+              <span style="color:var(--text); font-weight:700;">
+                Commission %
               </span>
             </th>
-            <th style="text-align:right;">This Month</th>
+            <th style="text-align:right;">July 2026</th>
             <th style="text-align:right;">2026 YTD</th>
           </tr>
         </thead>
@@ -840,9 +841,10 @@
               <div style="font-weight:700; color:var(--text);">${r.sourceName}</div>
             </td>
             <td style="text-align:right; font-family:'Outfit'; font-weight:600;" class="green">
-              ${r.sourceBalance ? money(r.sourceBalance) : '-'}
+              <div>${(r.sourceBalance !== undefined || r.eligibleCapital !== undefined) ? money(r.eligibleCapital !== undefined ? r.eligibleCapital : r.sourceBalance) : '-'}</div>
+              <div style="font-size:10px; color:var(--muted); font-weight:400;">Eligible Capital Basis</div>
             </td>
-            <td style="text-align:right; font-family:'Outfit'; font-weight:600;" class="red">
+            <td style="text-align:right; font-family:'Outfit'; font-weight:600;" class="green">
               ${typeof r.percent === 'number' ? r.percent.toFixed(1) + '%' : (r.percent || '-')}
             </td>
             <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">
@@ -872,25 +874,38 @@
         splitBadge.textContent = `${splitPct}% Investor Split`;
       }
 
-      // Account Performance Items (Net Investor Share)
+      // Conditional Fund Performance Display
+      const fundCard = document.getElementById("fundPerfCard");
+      const showFundPerf = !!(data.investor && (data.investor.showFundPerformance || data.investor.show_fund_performance));
+      if (fundCard) {
+        if (showFundPerf) {
+          fundCard.classList.remove("hidden");
+        } else {
+          fundCard.classList.add("hidden");
+        }
+      }
+
+      // Account Performance Items (Net Investor Share: Today, This Week, This Month, This Year)
       const acctItems = [
         {
+          label: "Today",
+          dollar: (acctPerf.today && acctPerf.today.netDollar !== undefined) ? acctPerf.today.netDollar : (liveDollarGains.today || 0),
+          pct: (acctPerf.today && acctPerf.today.netReturnPct !== undefined) ? `${acctPerf.today.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.today.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.today) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.today) || 0) * splitPct / 100).toFixed(2)}%`
+        },
+        {
+          label: "This Week",
+          dollar: (acctPerf.week && acctPerf.week.netDollar !== undefined) ? acctPerf.week.netDollar : (liveDollarGains.week || 0),
+          pct: (acctPerf.week && acctPerf.week.netReturnPct !== undefined) ? `${acctPerf.week.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.week.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.week) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.week) || 0) * splitPct / 100).toFixed(2)}%`
+        },
+        {
           label: "This Month",
-          tag: "Live / Projected",
           dollar: (acctPerf.month && acctPerf.month.netDollar !== undefined) ? acctPerf.month.netDollar : (liveDollarGains.month || 0),
           pct: (acctPerf.month && acctPerf.month.netReturnPct !== undefined) ? `${acctPerf.month.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.month.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.month) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.month) || 0) * splitPct / 100).toFixed(2)}%`
         },
         {
-          label: "Last Month",
-          tag: "Finalized",
-          dollar: (acctPerf.lastMonth && acctPerf.lastMonth.netDollar !== undefined) ? acctPerf.lastMonth.netDollar : (liveDollarGains.lastMonth || 0),
-          pct: (acctPerf.lastMonth && acctPerf.lastMonth.netReturnPct !== undefined) ? `${acctPerf.lastMonth.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.lastMonth.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.lastMonth) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.lastMonth) || 0) * splitPct / 100).toFixed(2)}%`
-        },
-        {
           label: "This Year (YTD)",
-          tag: "Cumulative",
           dollar: (acctPerf.year && acctPerf.year.netDollar !== undefined) ? acctPerf.year.netDollar : (liveDollarGains.year || 0),
-          pct: null // Omitted pending client accounting definition for account-level multi-period rate
+          pct: null // Total cumulative net dollar gains
         }
       ];
 
@@ -899,10 +914,7 @@
         acctGrid.innerHTML = acctItems.map(item => `
           <div class="perf-item">
             <div class="info">
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span class="label">${item.label}</span>
-                ${item.tag ? `<span style="font-size:10px; background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:4px; color:var(--muted);">${item.tag}</span>` : ''}
-              </div>
+              <span class="label">${item.label}</span>
               <div class="val" style="color:var(--text); margin-top:2px;">${money(item.dollar)}</div>
             </div>
             <div class="change">
