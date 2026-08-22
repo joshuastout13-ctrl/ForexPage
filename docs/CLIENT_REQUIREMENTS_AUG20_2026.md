@@ -160,6 +160,6 @@ On August 20, 2026, Josh provided authoritative client business instructions res
 | `UI-REQ-02` | Account Performance Primary | Render Daily (Today), Weekly (This Week), Monthly (This Month), Annual (This Year) net earnings & rates. | `DESIGN_READY` |
 | `UI-REQ-03` | Badge Removal | Remove badges "Live / Projected", "Finalized", "Cumulative" from investor portal. | `DESIGN_READY` |
 | `UI-REQ-04` | FX Book Live Feed | Connect Today, Week, Month to verified Scrape.do / `live_performance` feed with exact net multiplier. | `CERTIFIED` |
-| `UI-REQ-05` | Account Graph Semantics | Graph represents total account net earnings ($ made) over time, not gross fund benchmark. | `CERTIFIED` |
-| `UI-REQ-06` | Withdrawal Validation | Client and server-side hard check preventing withdrawals exceeding available equity. | `DESIGN_READY` |
+| `UI-REQ-05` | Account Graph Semantics | Graph represents investor net trading performance ONLY ($ made / % on account). Bars strictly exclude referral commissions, deposits, and withdrawals. Bottom summary table itemizes all cashflows and commissions separately. | `CERTIFIED_BY_CLIENT (2026-08-22)` |
+| `UI-REQ-06` | Withdrawal Validation | Client and server-side hard check preventing withdrawals exceeding available equity. | `STAGING_CERTIFIED (Package B)` |
 | `UI-REQ-07` | Commission Detail Regression | Full audit verification of source names, accurate post-withdrawal source balances, and rates. | `REQUIRED_REGRESSION` |

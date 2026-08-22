@@ -1,5 +1,6 @@
 import { readSupabaseTable } from "../../lib/supabase.js";
 import { createSession, adminSessionCookie } from "../../lib/auth.js";
+import { verifyPassword } from "../../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -29,10 +30,28 @@ export default async function handler(req, res) {
       const role = String(row.role || "").trim().toLowerCase();
       if (role !== "admin") return false;
 
-      const rowUser = String(row.portalusername ?? row.username ?? "").trim().toLowerCase();
-      const rowPass = String(row.temppassword ?? row.password ?? "").trim();
+      // Account MUST be active (if active flag exists)
+      if (row.active !== undefined && row.active !== null && !row.active) return false;
 
-      return rowUser === username && rowPass === password;
+      const rowUser = String(
+        row.portal_username ?? 
+        row.portalusername ?? 
+        row.username ?? 
+        row.id ?? 
+        ""
+      ).trim().toLowerCase();
+
+      const storedPass = String(
+        row.temp_password ?? 
+        row.temppassword ?? 
+        row.password ?? 
+        row.temppasswordprototypeonly ?? 
+        ""
+      ).trim();
+
+      if (rowUser !== username) return false;
+
+      return verifyPassword(password, storedPass);
     });
 
     if (!adminUser) {
@@ -45,7 +64,7 @@ export default async function handler(req, res) {
     }
 
     const token = createSession({ adminId, role: "admin" });
-    res.setHeader("Set-Cookie", adminSessionCookie(token));
+    res.setHeader("Set-Cookie", adminSessionCookie(token, req));
     return res.status(200).json({ success: true, adminId });
   } catch (err) {
     return res.status(500).json({ error: err.message || "Login failed" });

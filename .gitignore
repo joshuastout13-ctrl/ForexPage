@@ -3,3 +3,16 @@
 node_modules
 scratch
 supabase/backups
+.staging-pgdata*
+audit-*.mjs
+test-*.mjs
+forensic-*.mjs
+dissect-*.mjs
+investigate-*.mjs
+post-deploy-*.mjs
+regression-*.mjs
+shadow-*.mjs
+sweep-*.mjs
+verify-*.mjs
+build-variance-bridge.mjs
+
