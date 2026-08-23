@@ -31,26 +31,15 @@ export default async function handler(req, res) {
       const splitPct = updates.split_pct !== undefined ? updates.split_pct : undefined;
       const commissionRules = Array.isArray(body.commissionRules) ? body.commissionRules : null;
 
-      let isCommission = body.isCommission === true || body.isCommission === "true";
-      if (body.isCommission === undefined) {
-        // Need to check if existing account is a commission account
-        const { data: existingAccs } = await supabase.from("investor_accounts").select("is_commission").eq("investor_id", id);
-        if (existingAccs && existingAccs.length > 0) {
-          isCommission = existingAccs[0].is_commission;
-        }
+      if (splitPct !== undefined && (isNaN(splitPct) || splitPct < 0 || splitPct > 100)) {
+        throw new Error("Invalid split percentage: must be between 0 and 100");
       }
 
-      if (isCommission && (commissionRules !== null || splitPct !== undefined)) {
-        const effectiveSplit = splitPct !== undefined ? splitPct : Number(body.splitPct !== undefined ? body.splitPct : 100);
-        let effectiveRules = commissionRules;
-        if (effectiveRules === null) {
-          const { data: existingRules } = await supabase.from("commission_rules").select("*").eq("investor_id", id);
-          effectiveRules = existingRules || [];
-        }
-        const totalCommissions = effectiveRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
-        
-        if (Math.abs(effectiveSplit + totalCommissions - 100) > 0.01) {
-          throw new Error(`Split (${effectiveSplit}%) and Commissions (${totalCommissions}%) must equal 100% for commission accounts`);
+      if (commissionRules !== null) {
+        const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
+        const effectiveSplit = splitPct !== undefined ? splitPct : 100;
+        if (effectiveSplit + totalCommissions > 100.01) {
+          throw new Error(`Total split (${effectiveSplit}%) and commission rules (${totalCommissions}%) cannot exceed 100%`);
         }
       }
 

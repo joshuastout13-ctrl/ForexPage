@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: "Missing account ID" });
 
-  if (req.method === "PATCH") {
+  if (req.method === "PATCH" || req.method === "PUT") {
     try {
       const body = req.body || {};
       const updates = {};
@@ -48,5 +48,6 @@ export default async function handler(req, res) {
     }
   }
 
+  res.setHeader("Allow", ["PATCH", "PUT"]);
   res.status(405).json({ error: "Method not allowed" });
 }

@@ -34,10 +34,14 @@ export default async function handler(req, res) {
       const isCommission = body.isCommission === true || body.isCommission === "true";
       
       // Validate split
-      if (isCommission) {
+      if (isNaN(splitPct) || splitPct < 0 || splitPct > 100) {
+        throw new Error("Invalid split percentage: must be between 0 and 100");
+      }
+
+      if (commissionRules.length > 0) {
         const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
-        if (Math.abs(splitPct + totalCommissions - 100) > 0.01) {
-          throw new Error(`Split (${splitPct}%) and Commissions (${totalCommissions}%) must equal 100% for commission accounts`);
+        if (splitPct + totalCommissions > 100.01) {
+          throw new Error(`Total split (${splitPct}%) and commission rules (${totalCommissions}%) cannot exceed 100%`);
         }
       }
       
