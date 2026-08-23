@@ -22,6 +22,7 @@ export default async function handler(req, res) {
       if (body.splitPct !== undefined) updates.split_pct = Number(body.splitPct);
       if (body.monthlyDraw !== undefined) updates.monthly_draw = Number(body.monthlyDraw);
       if (body.startDate !== undefined) updates.start_date = body.startDate;
+      if (body.asOfDate !== undefined) updates.start_date = body.asOfDate;
       if (body.role !== undefined) updates.role = body.role;
       if (body.showFundPerformance !== undefined) updates.show_fund_performance = (body.showFundPerformance === true || body.showFundPerformance === "true");
       if (body.show_fund_performance !== undefined) updates.show_fund_performance = (body.show_fund_performance === true || body.show_fund_performance === "true");
@@ -49,20 +50,30 @@ export default async function handler(req, res) {
 
       // Update associated account details if provided
       let primaryAccId = null;
-      const { data: existingAccs } = await supabase.from("investor_accounts").select("*").eq("investor_id", id);
+      const { data: allAccs } = await supabase.from("investor_accounts").select("*");
+      const targetPortalUsername = body.portalUsername || (data && data[0] ? data[0].portal_username : "");
+      const existingAccs = (allAccs || []).filter(a => 
+        String(a.investor_id || '').toLowerCase() === String(id).toLowerCase() ||
+        (targetPortalUsername && String(a.investor_id || '').toLowerCase() === String(targetPortalUsername).toLowerCase()) ||
+        (targetPortalUsername && String(a.id || '').toLowerCase() === String(targetPortalUsername).toLowerCase())
+      );
+
       if (existingAccs && existingAccs.length > 0) {
-        const primaryAcc = existingAccs[0];
-        primaryAccId = primaryAcc.id;
-        const accUpdates = {};
-        if (body.name !== undefined) accUpdates.name = body.name;
-        if (body.startingCapital !== undefined) accUpdates.starting_capital = Number(body.startingCapital);
-        if (body.totalCashIn !== undefined) accUpdates.total_cash_in = Number(body.totalCashIn);
-        if (body.isCommission !== undefined) accUpdates.is_commission = body.isCommission === true || body.isCommission === "true";
-        if (body.splitPct !== undefined) accUpdates.split_pct = Number(body.splitPct);
-        if (body.startDate !== undefined) accUpdates.open_date = body.startDate;
-        
-        if (Object.keys(accUpdates).length > 0) {
-          await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAccId);
+        for (const primaryAcc of existingAccs) {
+          primaryAccId = primaryAcc.id;
+          const accUpdates = {};
+          if (body.name !== undefined) accUpdates.name = body.name;
+          if (body.startingCapital !== undefined) accUpdates.starting_capital = Number(body.startingCapital);
+          if (body.totalCashIn !== undefined) accUpdates.total_cash_in = Number(body.totalCashIn);
+          if (body.isCommission !== undefined) accUpdates.is_commission = body.isCommission === true || body.isCommission === "true";
+          if (body.splitPct !== undefined) accUpdates.split_pct = Number(body.splitPct);
+          if (body.startDate !== undefined || body.asOfDate !== undefined) {
+            accUpdates.open_date = body.startDate || body.asOfDate;
+          }
+          
+          if (Object.keys(accUpdates).length > 0) {
+            await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
+          }
         }
       } else if (body.startingCapital !== undefined && body.startingCapital !== "") {
         primaryAccId = body.accountId || body.portalUsername || id;
@@ -72,7 +83,7 @@ export default async function handler(req, res) {
           name: body.name || [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
           starting_capital: Number(body.startingCapital || 0),
           total_cash_in: Number(body.totalCashIn !== undefined ? body.totalCashIn : (body.startingCapital || 0)),
-          open_date: body.startDate || new Date().toISOString().split('T')[0],
+          open_date: body.startDate || body.asOfDate || new Date().toISOString().split('T')[0],
           status: "Active",
           is_commission: body.isCommission === true || body.isCommission === "true",
           split_pct: Number(body.splitPct !== undefined ? body.splitPct : 100),

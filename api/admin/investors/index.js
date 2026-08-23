@@ -11,12 +11,28 @@ export default async function handler(req, res) {
       const { data: investors, error } = await supabase.from("investors").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       
-      const { data: rules, error: rulesError } = await supabase.from("commission_rules").select("*");
-      if (!rulesError && rules) {
-        investors.forEach(inv => {
-          inv.commissionRules = rules.filter(r => r.investor_id === inv.id);
-        });
-      }
+      const [accRes, rulesRes] = await Promise.all([
+        supabase.from("investor_accounts").select("*"),
+        supabase.from("commission_rules").select("*")
+      ]);
+
+      const accounts = accRes.data || [];
+      const rules = rulesRes.data || [];
+
+      (investors || []).forEach(inv => {
+        const invAccs = accounts.filter(a => 
+          String(a.investor_id || '').toLowerCase() === String(inv.id || '').toLowerCase() ||
+          String(a.investor_id || '').toLowerCase() === String(inv.portal_username || '').toLowerCase() ||
+          String(a.id || '').toLowerCase() === String(inv.portal_username || '').toLowerCase()
+        );
+        inv.accounts = invAccs;
+        if (invAccs.length > 0) {
+          inv.starting_capital = invAccs[0].starting_capital;
+          inv.start_date = inv.start_date || invAccs[0].open_date;
+          inv.account_id = invAccs[0].id;
+        }
+        inv.commissionRules = rules.filter(r => r.investor_id === inv.id);
+      });
       
       return res.status(200).json({ investors });
     } catch (err) {

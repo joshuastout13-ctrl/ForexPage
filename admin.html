@@ -1132,22 +1132,30 @@ let state = {
       let d = state.data[state.tab];
 
       if (state.tab === 'investors') {
-        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Username</th><th>Password</th><th>Starting Capital</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Username</th><th>Password</th><th>Starting Balance</th><th>As Of Date</th><th>Current Balance</th><th>Split %</th><th>Draw</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.first_name} ${i.last_name} ${i.email}`.toLowerCase().includes(s));
         d.sort((a, b) => (a.portal_username || '').localeCompare(b.portal_username || ''));
         bd.innerHTML = d.map(i => {
           const stClass = i.active ? 'active' : 'inactive';
-          const primaryAcc = state.data.accounts.find(a => a.investor_id === i.id) || {};
-          const startCap = primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A';
-          const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (primaryAcc.starting_capital !== undefined ? money(primaryAcc.starting_capital) : 'N/A');
-          const split = primaryAcc.split_pct !== undefined ? `${primaryAcc.split_pct}%` : `${i.split_pct}%`;
+          const primaryAcc = (state.data.accounts || []).find(a => 
+            String(a.investor_id || '').toLowerCase() === String(i.id || '').toLowerCase() ||
+            String(a.investor_id || '').toLowerCase() === String(i.portal_username || '').toLowerCase() ||
+            String(a.id || '').toLowerCase() === String(i.portal_username || '').toLowerCase()
+          ) || {};
+          const rawStart = i.starting_capital !== undefined ? i.starting_capital : (primaryAcc.starting_capital !== undefined ? primaryAcc.starting_capital : 0);
+          const startCap = money(rawStart);
+          const asOfDate = i.start_date || primaryAcc.open_date || '—';
+          const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (rawStart !== undefined ? money(rawStart) : 'N/A');
+          const split = primaryAcc.split_pct !== undefined ? `${primaryAcc.split_pct}%` : `${i.split_pct !== undefined ? i.split_pct : 100}%`;
           const pass = i.temp_password || i.password || i.temppasswordprototypeonly || '••••••••';
           
           return `<tr>
             <td><span class="badge ${stClass}">${i.active?'Active':'Inactive'}</span></td>
             <td>${i.id}</td><td>${i.portal_username}</td>
             <td><code style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-family:monospace;">${escapeHtml(pass)}</code></td>
-            <td>${startCap}</td><td><div style="font-weight:600">${currBal}</div></td>
+            <td>${startCap}</td>
+            <td><span class="muted" style="font-size:12px">${asOfDate}</span></td>
+            <td><div style="font-weight:600">${currBal}</div></td>
             <td>${split}</td><td>${money(i.monthly_draw)}</td>
             <td>
               <div class="btn-group">
@@ -1383,12 +1391,24 @@ let state = {
 
       let html = '';
       if (tab === 'investors') {
+        const matchingAcc = (state.data.accounts || []).find(a => 
+          item && (
+            String(a.investor_id || '').toLowerCase() === String(item.id || '').toLowerCase() ||
+            String(a.investor_id || '').toLowerCase() === String(item.portal_username || item.portalusername || '').toLowerCase() ||
+            String(a.id || '').toLowerCase() === String(item.portal_username || item.portalusername || '').toLowerCase()
+          )
+        );
+        const startingCap = item ? (item.starting_capital !== undefined ? item.starting_capital : (matchingAcc ? matchingAcc.starting_capital : (item.startingcapital || 0))) : 0;
+        const startDate = item ? (item.start_date || item.startdate || (matchingAcc ? matchingAcc.open_date : '') || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
+
         html = `
           <div class="form-group"><label>First Name</label><input id="field_first_name" value="${item ? escapeHtml(item.first_name || item.firstname || '') : ''}" required /></div>
           <div class="form-group"><label>Last Name</label><input id="field_last_name" value="${item ? escapeHtml(item.last_name || item.lastname || '') : ''}" required /></div>
           <div class="form-group"><label>Email</label><input id="field_email" type="email" value="${item ? escapeHtml(item.email || '') : ''}" required /></div>
           <div class="form-group"><label>Portal Username</label><input id="field_portal_username" value="${item ? escapeHtml(item.portal_username || item.portalusername || '') : ''}" required /></div>
           <div class="form-group"><label>Password</label><input id="field_password" value="${item ? escapeHtml(item.temp_password || item.password || item.temppasswordprototypeonly || '') : ''}" placeholder="${action === 'add' ? 'Leave blank to auto-generate' : 'Enter new password or leave unchanged'}" /></div>
+          <div class="form-group"><label>Starting Balance ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${startingCap}" placeholder="0.00" required /></div>
+          <div class="form-group"><label>As Of Date / Start Date</label><input id="field_start_date" type="date" value="${startDate}" required /></div>
           <div class="form-group"><label>Investor Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct !== undefined ? item.split_pct : (item.split || 100)) : 100}" required /></div>
           <div class="form-group"><label>Monthly Draw ($)</label><input id="field_monthly_draw" type="number" step="0.01" value="${item ? (item.monthly_draw !== undefined ? item.monthly_draw : (item.monthlydraw || 0)) : 0}" /></div>
           <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:12px; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:10px; border:1px solid var(--line);">
@@ -1598,12 +1618,15 @@ let state = {
         let endpoint = '', method = 'POST', body = {};
         if (tab === 'investors') {
           endpoint = action === 'edit' ? `/api/admin/investors/${id}` : '/api/admin/investors';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
             firstName: document.getElementById('field_first_name')?.value,
             lastName: document.getElementById('field_last_name')?.value,
             email: document.getElementById('field_email')?.value,
             portalUsername: document.getElementById('field_portal_username')?.value,
+            startingCapital: Number(document.getElementById('field_starting_capital')?.value || 0),
+            startDate: document.getElementById('field_start_date')?.value,
+            asOfDate: document.getElementById('field_start_date')?.value,
             splitPct: Number(document.getElementById('field_split_pct')?.value || 100),
             monthlyDraw: Number(document.getElementById('field_monthly_draw')?.value || 0),
             showFundPerformance: !!document.getElementById('field_show_fund_performance')?.checked
