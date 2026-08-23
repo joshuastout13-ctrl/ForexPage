@@ -77,7 +77,22 @@ export default async function handler(req, res) {
         notes: body.notes || ""
       };
 
-      const { data: invData, error: invError } = await supabase.from("investors").insert([investorPayload]).select();
+      let { data: invData, error: invError } = await supabase.from("investors").insert([investorPayload]).select();
+      if (invError && invError.message && invError.message.includes("show_fund_performance")) {
+        delete investorPayload.show_fund_performance;
+        const retryRes = await supabase.from("investors").insert([investorPayload]).select();
+        invData = retryRes.data;
+        invError = retryRes.error;
+      }
+      if (invError && invError.message && invError.message.includes("Could not find the '")) {
+        const colMatch = invError.message.match(/Could not find the '([^']+)' column/);
+        if (colMatch && colMatch[1]) {
+          delete investorPayload[colMatch[1]];
+          const retryRes = await supabase.from("investors").insert([investorPayload]).select();
+          invData = retryRes.data;
+          invError = retryRes.error;
+        }
+      }
       if (invError) throw invError;
 
       // Optionally create an account row if starting data is provided

@@ -44,8 +44,23 @@ export default async function handler(req, res) {
         }
       }
 
-      // Update investors table
-      const { data, error } = await supabase.from("investors").update(updates).eq("id", id).select();
+      // Update investors table with schema resilience
+      let { data, error } = await supabase.from("investors").update(updates).eq("id", id).select();
+      if (error && error.message && error.message.includes("show_fund_performance")) {
+        delete updates.show_fund_performance;
+        const retryRes = await supabase.from("investors").update(updates).eq("id", id).select();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+      if (error && error.message && error.message.includes("Could not find the '")) {
+        const colMatch = error.message.match(/Could not find the '([^']+)' column/);
+        if (colMatch && colMatch[1]) {
+          delete updates[colMatch[1]];
+          const retryRes = await supabase.from("investors").update(updates).eq("id", id).select();
+          data = retryRes.data;
+          error = retryRes.error;
+        }
+      }
       if (error) throw error;
 
       // Update associated account details if provided
@@ -72,7 +87,14 @@ export default async function handler(req, res) {
           }
           
           if (Object.keys(accUpdates).length > 0) {
-            await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
+            let { error: accErr } = await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
+            if (accErr && accErr.message && accErr.message.includes("Could not find the '")) {
+              const match = accErr.message.match(/Could not find the '([^']+)' column/);
+              if (match && match[1]) {
+                delete accUpdates[match[1]];
+                await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
+              }
+            }
           }
         }
       } else if (body.startingCapital !== undefined && body.startingCapital !== "") {
