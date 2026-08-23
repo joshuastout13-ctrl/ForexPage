@@ -905,7 +905,7 @@
         {
           label: "This Year (YTD)",
           dollar: (acctPerf.year && acctPerf.year.netDollar !== undefined) ? acctPerf.year.netDollar : (liveDollarGains.year || 0),
-          pct: null // Total cumulative net dollar gains
+          pct: (acctPerf.year && acctPerf.year.netReturnPct !== undefined) ? `${acctPerf.year.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.year.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.year) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.year) || 0) * splitPct / 100).toFixed(2)}%`
         }
       ];
 
@@ -918,9 +918,9 @@
               <div class="val" style="color:var(--text); margin-top:2px;">${money(item.dollar)}</div>
             </div>
             <div class="change">
-              <div class="label" style="font-size:10px; text-transform:uppercase; color:var(--muted);">${item.pct !== null ? 'Net Return' : 'Total Gains'}</div>
-              <div class="pct ${item.pct !== null ? (parseFloat(item.pct) >= 0 ? 'green' : 'red') : 'green'}" style="margin-top:2px; ${item.pct === null ? 'font-size:13px; font-weight:600;' : ''}">
-                ${item.pct !== null ? item.pct : 'Cumulative'}
+              <div class="label" style="font-size:10px; text-transform:uppercase; color:var(--muted);">Net Return</div>
+              <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}" style="margin-top:2px;">
+                ${item.pct}
               </div>
             </div>
           </div>
