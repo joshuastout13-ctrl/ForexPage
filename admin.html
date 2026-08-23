@@ -670,7 +670,9 @@ let state = {
             state.data.accounts = accRes.accounts || [];
           } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
             const res = await api.request(endpoints[tab]);
-            state.data[tab] = res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || [];
+            state.data[tab] = Array.isArray(res) 
+              ? res 
+              : (res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || res[tab] || []);
           }
           
           if (['accounts', 'deposits', 'withdrawals', 'history', 'commission_shares'].includes(tab) && state.data.investors.length===0) {
@@ -1404,15 +1406,26 @@ let state = {
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" ${item && item.status==='Active'?'selected':''}>Active</option><option value="Inactive" ${item && item.status==='Inactive'?'selected':''}>Inactive</option></select></div>
         `;
       } else if (tab === 'deposits') {
-        const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(acc.name)} (${acc.id})</option>`).join('');
+        const accOptions = (state.data.accounts || []).map(acc => {
+          const inv = (state.data.investors || []).find(i => String(i.id).toLowerCase() === String(acc.investor_id).toLowerCase() || String(i.portal_username || '').toLowerCase() === String(acc.investor_id).toLowerCase());
+          const invName = inv ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : '';
+          const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
+          return `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
+        const typeOptions = ['Wire', 'Check', 'Internal Transfer', 'Cash', 'Deposit'].map(t => `<option value="${t}" ${item && item.type === t ? 'selected' : ''}>${t}</option>`).join('');
         html = `
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
           <div class="form-group"><label>Deposit Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Effective Date</label><input id="field_date" type="date" value="${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
-          <div class="form-group"><label>Type</label><select id="field_type"><option value="Wire">Wire</option><option value="Check">Check</option><option value="Internal Transfer">Internal Transfer</option></select></div>
+          <div class="form-group"><label>Type</label><select id="field_type">${typeOptions}</select></div>
         `;
       } else if (tab === 'withdrawals') {
-        const accOptions = (state.data.accounts || []).map(acc => `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(acc.name)} (${acc.id})</option>`).join('');
+        const accOptions = (state.data.accounts || []).map(acc => {
+          const inv = (state.data.investors || []).find(i => String(i.id).toLowerCase() === String(acc.investor_id).toLowerCase() || String(i.portal_username || '').toLowerCase() === String(acc.investor_id).toLowerCase());
+          const invName = inv ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : '';
+          const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
+          return `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
         const monthOptions = MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('');
         html = `
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
@@ -1530,8 +1543,8 @@ let state = {
           const y = document.getElementById('field_year')?.value || new Date().getFullYear();
           const mIdx = MONTHS.indexOf(m) + 1;
           const effDate = y + '-' + String(mIdx).padStart(2, '0') + '-01';
-          const targetAcc = (state.data.accounts || []).find(a => a.id === accId);
-          const invId = targetAcc?.investor_id;
+          const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
+          const invId = targetAcc?.investor_id || (item ? item.investor_id : accId);
           const fbEl = document.getElementById('withdrawalEquityFeedback');
 
           if (!invId || !fbEl) return;
@@ -1611,19 +1624,27 @@ let state = {
             status: document.getElementById('field_status')?.value || 'Active'
           };
         } else if (tab === 'deposits') {
+          const accId = document.getElementById('field_account_id')?.value;
+          const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
+          const invId = targetAcc?.investor_id || '';
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
-            accountId: document.getElementById('field_account_id')?.value,
+            investorId: invId,
+            accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             date: document.getElementById('field_date')?.value,
-            type: document.getElementById('field_type')?.value || 'DEPOSIT'
+            type: document.getElementById('field_type')?.value || 'Deposit'
           };
         } else if (tab === 'withdrawals') {
+          const accId = document.getElementById('field_account_id')?.value;
+          const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
+          const invId = targetAcc?.investor_id || '';
           endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
-          method = action === 'edit' ? 'PUT' : 'POST';
+          method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
-            accountId: document.getElementById('field_account_id')?.value,
+            investorId: invId,
+            accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             month: document.getElementById('field_month')?.value,
             year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),

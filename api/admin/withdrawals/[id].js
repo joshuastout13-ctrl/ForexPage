@@ -1,16 +1,24 @@
+import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
 
 export default async function handler(req, res) {
+  const session = verifyAdminSession(req);
+  if (!session) return res.status(401).json({ error: "Unauthorized" });
+
   const { id } = req.query;
 
-  if (req.method === "PATCH") {
+  if (req.method === "PATCH" || req.method === "PUT") {
     try {
-      const body = req.body;
+      const body = req.body || {};
       const updates = {};
       if (body.amount !== undefined) updates.amount = parseFloat(body.amount);
       if (body.status !== undefined) updates.status = body.status;
       if (body.notes !== undefined) updates.notes = body.notes;
+      if (body.month !== undefined) updates.month = body.month;
+      if (body.year !== undefined) updates.year = parseInt(body.year, 10);
+      if (body.accountId !== undefined || body.account_id !== undefined) updates.account_id = body.accountId || body.account_id;
+      if (body.investorId !== undefined || body.investor_id !== undefined) updates.investor_id = body.investorId || body.investor_id;
 
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
@@ -19,7 +27,7 @@ export default async function handler(req, res) {
           p_amount: updates.amount !== undefined ? updates.amount : null,
           p_status: updates.status !== undefined ? updates.status : null,
           p_notes: updates.notes !== undefined ? updates.notes : null,
-          p_updated_by: body.updated_by || "admin"
+          p_updated_by: body.updated_by || (session?.adminId || "admin")
         });
 
         if (!rpcError && rpcData) {
@@ -63,8 +71,8 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `WITHDRAWAL_NOT_FOUND: Withdrawal ${id} not found.` });
       }
 
-      const invId = currentWd.investor_id;
-      const accId = currentWd.account_id;
+      const invId = updates.investor_id || currentWd.investor_id;
+      const accId = updates.account_id || currentWd.account_id;
       const effDate = currentWd.effective_accounting_date || currentWd.request_date || `${currentWd.year}-${String(currentWd.month_number).padStart(2, '0')}-01`;
       const targetAmount = updates.amount !== undefined ? updates.amount : currentWd.amount;
       const targetStatus = updates.status !== undefined ? updates.status : currentWd.status;
@@ -96,12 +104,16 @@ export default async function handler(req, res) {
         }
       }
 
-      const { data, error } = await supabase.from("withdrawals").update(updates).eq("id", id).select();
-      if (error) throw error;
+      let updateRes = await supabase.from("withdrawals").update(updates).eq("id", id).select();
+      if (updateRes.error && updateRes.error.message && updateRes.error.message.includes("effective_accounting_date")) {
+        delete updates.effective_accounting_date;
+        updateRes = await supabase.from("withdrawals").update(updates).eq("id", id).select();
+      }
+      if (updateRes.error) throw updateRes.error;
 
       return res.status(200).json({
         status: "SUCCESS",
-        withdrawal: data[0]
+        withdrawal: updateRes.data[0]
       });
     } catch (error) {
       console.error("Error updating withdrawal:", error);
@@ -119,6 +131,6 @@ export default async function handler(req, res) {
     }
   }
 
-  res.setHeader("Allow", ["PATCH", "DELETE"]);
+  res.setHeader("Allow", ["PATCH", "PUT", "DELETE"]);
   return res.status(405).json({ error: "Method not allowed" });
 }

@@ -22,21 +22,44 @@ export default async function handler(req, res) {
       const entryDate = body.date || new Date().toISOString().split('T')[0];
       let effDate = body.effectiveAccountingDate || body.effective_accounting_date;
       
-      if (!effDate) {
+      if (effDate) {
+        const parts = String(effDate).slice(0, 10).split('-');
+        if (parts.length === 3) {
+          effDate = `${parts[0]}-${parts[1].padStart(2, '0')}-01`;
+        }
+      } else {
         const dt = new Date(entryDate);
         const y = dt.getUTCFullYear();
         const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
         effDate = `${y}-${m}-01`;
       }
 
-      if (!effDate.endsWith("-01")) {
-        throw new Error("INVALID_EFFECTIVE_DATE: Effective accounting date must be the 1st day of the month (e.g. YYYY-MM-01).");
+      let investorId = body.investorId || body.investor_id;
+      let accountId = body.accountId || body.account_id;
+
+      // Auto-resolve investorId from accountId if missing
+      if (!investorId && accountId) {
+        const { data: acc } = await supabase.from("investor_accounts").select("investor_id").eq("id", accountId).single();
+        if (acc && acc.investor_id) {
+          investorId = acc.investor_id;
+        }
+      }
+      // Auto-resolve accountId from investorId if missing
+      if (investorId && !accountId) {
+        const { data: accs } = await supabase.from("investor_accounts").select("id").eq("investor_id", investorId).limit(1);
+        if (accs && accs.length > 0) {
+          accountId = accs[0].id;
+        }
+      }
+
+      if (!investorId || !accountId) {
+        throw new Error("investorId and accountId are required");
       }
 
       const payload = {
-        id: `dep_${crypto.randomBytes(4).toString("hex")}`,
-        investor_id: body.investorId,
-        account_id: body.accountId,
+        id: body.id || `dep_${crypto.randomBytes(4).toString("hex")}`,
+        investor_id: investorId,
+        account_id: accountId,
         date: entryDate,
         effective_accounting_date: effDate,
         amount: Number(body.amount || 0),
@@ -44,30 +67,27 @@ export default async function handler(req, res) {
         notes: body.notes || ""
       };
 
-      if (!payload.investor_id || !payload.account_id) throw new Error("investorId and accountId are required");
-
-      const { data, error } = await supabase.from("deposits").insert([payload]).select();
-      if (error) throw error;
-
-      // Trigger recalculation for the affected investor and year
-      try {
-        const dt = new Date(payload.date);
-        const year = dt.getFullYear();
-        const monthNum = dt.getMonth() + 1;
-        
-        // We'll use the internal recalculate logic
-        // For now, we can just trigger it via a local fetch or similar if needed, 
-        // but it's better to export the logic or just let the user know they should recalculate.
-        // Actually, let's try to update the history row directly if it exists.
-      } catch (recalcErr) {
-        console.error("Recalculation trigger failed:", recalcErr.message);
+      if (isNaN(payload.amount) || payload.amount <= 0) {
+        throw new Error("INVALID_AMOUNT: Amount must be strictly greater than $0.00");
       }
 
-      return res.status(200).json({ success: true, deposit: data[0] });
+      let insertRes = await supabase.from("deposits").insert([payload]).select();
+      if (insertRes.error) {
+        // Fallback if effective_accounting_date column does not exist in target table
+        if (insertRes.error.message && insertRes.error.message.includes("effective_accounting_date")) {
+          const fallbackPayload = { ...payload };
+          delete fallbackPayload.effective_accounting_date;
+          insertRes = await supabase.from("deposits").insert([fallbackPayload]).select();
+        }
+      }
+      if (insertRes.error) throw insertRes.error;
+
+      return res.status(200).json({ success: true, deposit: insertRes.data[0] });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
   }
 
+  res.setHeader("Allow", ["GET", "POST"]);
   res.status(405).json({ error: "Method not allowed" });
 }

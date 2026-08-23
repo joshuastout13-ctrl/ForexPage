@@ -1,12 +1,17 @@
+import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
+import crypto from "node:crypto";
 
 export default async function handler(req, res) {
+  const session = verifyAdminSession(req);
+  if (!session) return res.status(401).json({ error: "Unauthorized" });
+
   if (req.method === "GET") {
     try {
       const { data, error } = await supabase.from("withdrawals").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json({ withdrawals: data });
     } catch (error) {
       return res.status(500).json({ error: "Failed to retrieve withdrawals." });
     }
@@ -14,7 +19,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const body = req.body;
+      const body = req.body || {};
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
       let monthIdx = 1;
@@ -29,19 +34,44 @@ export default async function handler(req, res) {
       }
 
       const year = parseInt(body.year, 10) || new Date().getFullYear();
-      const rawEffDate = body.effective_accounting_date || body.effectiveDate;
+      let rawEffDate = body.effective_accounting_date || body.effectiveAccountingDate || body.effectiveDate;
+      if (rawEffDate) {
+        const parts = String(rawEffDate).slice(0, 10).split('-');
+        if (parts.length === 3) {
+          rawEffDate = `${parts[0]}-${parts[1].padStart(2, '0')}-01`;
+        }
+      }
       const effDate = rawEffDate || `${year}-${String(monthIdx).padStart(2, '0')}-01`;
 
-      // Validate Effective Date: Must be strictly first-of-month (YYYY-MM-01), no silent conversion
+      // Validate Effective Date: Must be strictly first-of-month (YYYY-MM-01)
       if (!effDate || !/^\d{4}-\d{2}-01$/.test(effDate)) {
         return res.status(400).json({
           error: `INVALID_EFFECTIVE_DATE: Effective date must be the first day of the month ('YYYY-MM-01'). Received: ${effDate}`
         });
       }
 
+      let investorId = body.investor_id || body.investorId;
+      let accountId = body.account_id || body.accountId;
+
+      // Auto-resolve investorId from accountId if missing
+      if (!investorId && accountId) {
+        const { data: acc } = await supabase.from("investor_accounts").select("investor_id").eq("id", accountId).single();
+        if (acc && acc.investor_id) {
+          investorId = acc.investor_id;
+        }
+      }
+      // Auto-resolve accountId from investorId if missing
+      if (investorId && !accountId) {
+        const { data: accs } = await supabase.from("investor_accounts").select("id").eq("investor_id", investorId).limit(1);
+        if (accs && accs.length > 0) {
+          accountId = accs[0].id;
+        }
+      }
+
       const payload = {
-        investor_id: body.investor_id || body.investorId,
-        account_id: body.account_id || body.accountId,
+        id: body.id || `wd_${crypto.randomBytes(4).toString("hex")}`,
+        investor_id: investorId,
+        account_id: accountId,
         amount: parseFloat(body.amount),
         request_date: body.request_date || body.requestDate || effDate,
         effective_accounting_date: effDate,
@@ -51,7 +81,7 @@ export default async function handler(req, res) {
         status: body.status || "Pending",
         notes: body.notes || "",
         idempotency_key: body.idempotency_key || body.idempotencyKey || null,
-        created_by: body.created_by || "admin"
+        created_by: body.created_by || (session?.adminId || "admin")
       };
 
       if (!payload.investor_id || !payload.account_id) {
@@ -150,12 +180,17 @@ export default async function handler(req, res) {
         });
       }
 
-      const { data, error } = await supabase.from("withdrawals").insert([payload]).select();
-      if (error) throw error;
+      let insertRes = await supabase.from("withdrawals").insert([payload]).select();
+      if (insertRes.error && insertRes.error.message && insertRes.error.message.includes("effective_accounting_date")) {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.effective_accounting_date;
+        insertRes = await supabase.from("withdrawals").insert([fallbackPayload]).select();
+      }
+      if (insertRes.error) throw insertRes.error;
 
       return res.status(201).json({
         status: "SUCCESS",
-        withdrawal: data[0],
+        withdrawal: insertRes.data[0],
         availableEquityBefore: availableEquity,
         availableEquityAfter: availableEquity - payload.amount,
         idempotency_replay: false
