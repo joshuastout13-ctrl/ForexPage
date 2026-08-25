@@ -133,13 +133,27 @@ export default async function handler(req, res) {
           if (msg.includes("INVESTOR_NOT_FOUND")) {
             return res.status(404).json({ error: msg });
           }
-          // If RPC is missing in DB (42883 undefined_function), fall through to application-level validation
-          if (!msg.includes("does not exist") && rpcError.code !== "42883") {
+          // If RPC is missing in DB (42883 undefined_function or PGRST202 / schema cache error), fall through to application-level validation
+          const isMissingRpc = !msg || 
+            msg.includes("does not exist") || 
+            msg.includes("schema cache") || 
+            msg.includes("Could not find the function") || 
+            rpcError.code === "42883" || 
+            rpcError.code === "PGRST202";
+
+          if (!isMissingRpc) {
             throw rpcError;
           }
         }
       } catch (rpcEx) {
-        if (!rpcEx.message?.includes("does not exist")) {
+        const exMsg = rpcEx.message || "";
+        const isMissingRpc = exMsg.includes("does not exist") || 
+          exMsg.includes("schema cache") || 
+          exMsg.includes("Could not find the function") || 
+          rpcEx.code === "42883" || 
+          rpcEx.code === "PGRST202";
+
+        if (!isMissingRpc) {
           throw rpcEx;
         }
       }

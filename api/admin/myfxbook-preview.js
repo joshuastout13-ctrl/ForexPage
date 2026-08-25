@@ -17,16 +17,18 @@ export default async function handler(req, res) {
 
   try {
     // 1. Fetch current DB values
-    const { data: currentRows, error: dbErr } = await supabase
-      .from("live_performance")
-      .select("*");
-    if (dbErr) throw dbErr;
-
     const current = {};
-    (currentRows || []).forEach(row => {
-      const key = row.metric;
-      current[key] = { value_pct: row.value_pct, source: row.source, last_updated: row.last_updated };
-    });
+    if (supabase) {
+      const { data: currentRows, error: dbErr } = await supabase
+        .from("live_performance")
+        .select("*");
+      if (dbErr) throw dbErr;
+
+      (currentRows || []).forEach(row => {
+        const key = row.metric;
+        current[key] = { value_pct: row.value_pct, source: row.source, last_updated: row.last_updated };
+      });
+    }
 
     // 2. Fetch live data from Myfxbook WITHOUT saving
     const preview = await getMyfxbookLive({ previewMode: true });

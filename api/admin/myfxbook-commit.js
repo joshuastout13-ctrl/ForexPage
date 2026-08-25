@@ -26,25 +26,27 @@ export default async function handler(req, res) {
       { key: "year",  metric: "This Year", value: year }
     ];
 
-    const updates = mapping.map(m => {
-      const cleanVal = String(m.value || "0.00%").replace(/[+%\s]/g, "");
-      return {
-        metric: m.metric,
-        value_pct: cleanVal,
-        source: "Myfxbook (Admin Approved)",
-        last_updated: new Date().toISOString(),
-        is_override: false
-      };
-    });
+    if (supabase) {
+      const updates = mapping.map(m => {
+        const cleanVal = String(m.value || "0.00%").replace(/[+%\s]/g, "");
+        return {
+          metric: m.metric,
+          value_pct: cleanVal,
+          source: "Myfxbook (Admin Approved)",
+          last_updated: new Date().toISOString(),
+          is_override: false
+        };
+      });
 
-    const { error } = await supabase
-      .from("live_performance")
-      .upsert(updates, { onConflict: "metric" });
+      const { error } = await supabase
+        .from("live_performance")
+        .upsert(updates, { onConflict: "metric" });
 
-    if (error) throw error;
+      if (error) throw error;
+      console.log(`[Admin] Committed ${updates.length} Myfxbook metrics approved by ${session.name || "admin"}`);
+    }
 
-    console.log(`[Admin] Committed ${updates.length} Myfxbook metrics approved by ${session.name || "admin"}`);
-    return res.status(200).json({ success: true, updatedCount: updates.length });
+    return res.status(200).json({ success: true, updatedCount: mapping.length });
   } catch (err) {
     console.error("[Admin] Myfxbook commit failed:", err.message);
     return res.status(500).json({ error: err.message });

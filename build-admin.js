@@ -629,6 +629,7 @@ let state = {
         if (!isEmailTab && !isPreviewTab) {
           document.getElementById('addEntityBtn').style.display = (['snapshots','performance','history'].includes(state.tab)) ? 'none' : 'inline-block';
           document.getElementById('importBtn').classList.toggle('hidden', state.tab !== 'history');
+          document.getElementById('pullMyfxbookBtn')?.classList.toggle('hidden', state.tab !== 'performance');
         }
         
         loadTab(state.tab);
@@ -1222,10 +1223,15 @@ let state = {
             </td>
           </tr>\`).join('');
       } else if (state.tab === 'performance') {
-        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th></tr>\`;
+        hd.innerHTML = \`<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th><th>Actions</th></tr>\`;
         bd.innerHTML = d.map(i => \`<tr>
-            <td>\${i.metric}</td><td><div style="font-weight:600">\${i.value_pct}%</div></td>
+            <td>\${i.metric}</td><td><div style="font-weight:600">\${i.value_pct !== undefined ? i.value_pct : (i.value || '0.00')}%</div></td>
             <td>\${i.source || ''}</td><td>\${i.last_updated || ''}</td>
+            <td>
+              <div class="btn-group">
+                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.metric}">Edit</button>
+              </div>
+            </td>
           </tr>\`).join('');
       } else if (state.tab === 'snapshots') {
         hd.innerHTML = \`<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>\`;
@@ -1457,6 +1463,15 @@ let state = {
           <div class="form-group"><label>Month</label><select id="field_month" required>\${monthOptions}</select></div>
           <div class="form-group"><label>Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
           <div class="form-group"><label>Gross Return %</label><input id="field_gross_return_pct" type="number" step="0.01" value="\${item ? item.gross_return_pct : ''}" placeholder="e.g. 2.81" required /></div>
+        \`;
+      } else if (tab === 'performance') {
+        const metricName = id || (item ? item.metric : 'Today');
+        const currVal = item ? (item.value_pct !== undefined ? item.value_pct : (item.value || 0)) : (extraData?.val || 0);
+        html = \`
+          <div class="form-group"><label>Metric</label><input id="field_metric" value="\${escapeHtml(metricName)}" readonly style="opacity:0.7;" /></div>
+          <div class="form-group"><label>Value % (e.g. 0.37 for +0.37%)</label><input id="field_value_pct" type="number" step="0.01" value="\${currVal}" required /></div>
+          <div class="form-group"><label>Source</label><input id="field_source" value="Admin Manual Override" /></div>
+          <div class="form-group"><label>Notes / Reason</label><input id="field_notes" placeholder="Manual adjustment" /></div>
         \`;
       } else if (tab === 'commission_shares') {
         const sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id : '');
@@ -1709,6 +1724,16 @@ let state = {
             accountId: null,
             shares: sharesPayload
           };
+        } else if (tab === 'performance') {
+          endpoint = '/api/admin/live-performance';
+          method = 'PATCH';
+          body = {
+            metric: document.getElementById('field_metric')?.value,
+            valuePct: parseFloat(document.getElementById('field_value_pct')?.value || '0'),
+            source: document.getElementById('field_source')?.value || 'Admin Manual Override',
+            isOverride: true,
+            notes: document.getElementById('field_notes')?.value || ''
+          };
         }
 
         await api.request(endpoint, { method, body: JSON.stringify(body) });
@@ -1770,6 +1795,61 @@ let state = {
         if (modalDesc) modalDesc.textContent = \`Are you sure you want to \${action.replace('_', ' ')} item ID: \${id}?\`;
 
         document.getElementById('statusModal').classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('pullMyfxbookBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('pullMyfxbookBtn');
+      btn.disabled = true; btn.textContent = 'Pulling Live Data...';
+      try {
+        const res = await api.request('/api/admin/myfxbook-preview');
+        const preview = res.preview || {};
+        const current = res.current || {};
+
+        const metrics = [
+          { key: 'today', label: 'Today', cur: current['Today']?.value_pct || '0.00%', newVal: preview.today || '0.00%' },
+          { key: 'week', label: 'This Week', cur: current['This Week']?.value_pct || '0.00%', newVal: preview.week || '0.00%' },
+          { key: 'month', label: 'This Month', cur: current['This Month']?.value_pct || '0.00%', newVal: preview.month || '0.00%' },
+          { key: 'year', label: 'This Year', cur: current['This Year']?.value_pct || '0.00%', newVal: preview.year || '0.00%' }
+        ];
+
+        window._pendingMyfxbookMetrics = preview;
+
+        const body = document.getElementById('previewModalBody');
+        if (body) {
+          body.innerHTML = metrics.map(m => \`
+            <tr>
+              <td style="font-weight:600; color:#fff;">\${m.label}</td>
+              <td style="color:var(--muted);">\${m.cur}</td>
+              <td style="color:var(--success); font-weight:bold;">\${m.newVal}</td>
+            </tr>
+          \`).join('');
+        }
+
+        document.getElementById('myfxbookPreviewModal')?.classList.remove('hidden');
+      } catch (err) {
+        alert('Failed pulling Myfxbook data: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Pull Live Data';
+      }
+    });
+
+    document.getElementById('acceptMyfxbookBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('acceptMyfxbookBtn');
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        const data = window._pendingMyfxbookMetrics || {};
+        await api.request('/api/admin/myfxbook-commit', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+        document.getElementById('myfxbookPreviewModal')?.classList.add('hidden');
+        showToast('Live metrics successfully committed!');
+        loadTab('performance');
+      } catch (err) {
+        alert('Failed committing live metrics: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Accept & Save';
       }
     });
 
