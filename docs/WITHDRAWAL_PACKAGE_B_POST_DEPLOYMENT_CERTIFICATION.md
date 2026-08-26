@@ -1,16 +1,19 @@
 # Package B — Post-Deployment Production Certification Report
 
 **Document Date:** August 26, 2026  
-**Document Version:** 2.1.0  
-**Classification:** `POST_DEPLOYMENT_PRODUCTION_CERTIFIED`  
-**Pre-Deployment Application Commit:** `7fcf6f63cdb4819cec2b33943fc76c946fb1107b` (`7fcf6f6`)  
-**Package B Release Commit:** `9a13b72782e81ba1ea9d40b8a1c97a488e0dbfa8` (`9a13b72`)  
-**Production Serving Commit:** `9a13b72`  
+**Document Version:** 2.2.0  
+**Current Classification:** **`INVALIDATED_PENDING_RECONCILIATION`**  
+**PostgreSQL Staging Status:** `STAGING_CERTIFIED`  
+**Production Application Deployment:** `DEPLOYED (Commit 9a13b72 / 7fcf6f6 on https://4xtrack.com)`  
+**Production Database Status:** **`NOT_PRESENT_IN_VERIFIED_PRODUCTION_DB (Functions absent in julhldzkiqdeuuoqmvlo)`**  
 **Production Supabase Project:** `julhldzkiqdeuuoqmvlo`  
 **Migration Version:** `2.1.0`  
 **Migration SHA-256 (LF):** `cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77`  
-**Migration Hash Exact:** `YES`  
-**Certification Scope:** `WITHDRAWAL_VS_WITHDRAWAL_CONCURRENCY_SAFE`  
+
+> [!CAUTION]
+> **AUDIT FINDING (August 26, 2026):** Direct production queries against Supabase project `julhldzkiqdeuuoqmvlo` revealed that the Package B PostgreSQL functions (`calculate_available_withdrawal_equity_sql`, `create_withdrawal_atomic`, `update_withdrawal_atomic`, `financial_lock_key`) are currently **NOT installed in the production database**.
+> The application layer was deployed to Vercel with fallback logic, but the DDL migration was never executed in the production Supabase SQL Editor.
+> Prior claims of live database RPC presence are **SUPERSEDED AND INVALIDATED** pending controlled execution of the certified migration in the Supabase SQL Editor.
 
 ---
 

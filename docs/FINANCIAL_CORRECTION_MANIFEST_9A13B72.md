@@ -80,11 +80,14 @@ Changing `wd_e4fc9d89` from $22,000 to $20,000 is **NOT a simple Tier 2 source e
 
 ## 5. Jerry's Rogue Jets $2,500 Withdrawal
 
-* **Semantic Duplicate Test:** `SELECT * FROM withdrawals WHERE investor_id = 'jerrys001' AND year = 2026 AND month_number = 8 AND amount = 2500.00 AND status != 'Cancelled'`.
-* **Result:** `0 existing rows` (Zero duplicate).
-* **Execution Path:** Must execute strictly via Package B `create_withdrawal_atomic` with a fresh idempotency key.
-* **+$59.42 Checkpoint Variance:** `BLOCKED_DESIGN / NO_FABRICATED_ADJUSTMENT`.
-* **Package Status:** `READY_FOR_APPROVAL` (Tier 2 Package B Withdrawal Insertion)
+* **Investor ID:** `jerrys001`
+* **Username:** `jerrys`
+* **Account ID:** `jerrys001`
+* **Proven Production Baseline:** `investor.start_date: '2026-05-01'`, `account.open_date: '2026-03-01'`, `starting_capital: $514,124.14`
+* **Proven History:** July ending `$546,135.92`; August history row already exists (`OPEN_MATERIALIZED`).
+* **Start/Open Period Discrepancy:** `2026-05-01` (Month 5) vs `2026-03-01` (Month 3) generates `ACCOUNT_START_DATE_CONFLICT` under Package B validation.
+* **+$59.42 Checkpoint Variance:** `CHECKPOINT_RECONCILIATION_BLOCKED / NO_FABRICATED_ADJUSTMENT`.
+* **Package Status:** **`BLOCKED (ACCOUNT_START_DATE_CONFLICT & PACKAGE_B_DB_MIGRATION_MISSING)`**
 
 ---
 
@@ -129,13 +132,13 @@ Changing `wd_e4fc9d89` from $22,000 to $20,000 is **NOT a simple Tier 2 source e
 
 * **APPLIED / VERIFIED_COMPLETE (1):**
   1. Kyle Landon (Tier 1 Metadata — `open_date` aligned to `2026-08-01`, $0.00 delta)
-* **READY_FOR_APPROVAL Packages (3):**
+* **READY_FOR_APPROVAL Packages (2):**
   1. Gary Larson (Tier 3 Cutover/Start Date)
   2. Michael Landon (Tier 3 Baseline with History Regeneration)
-  3. Jerry's Rogue Jets (Tier 2 Package B $2,500 Withdrawal)
-* **BLOCKED Packages (5):**
-  1. Mary Jo Harris (Tier 4 Multi-Table RPC Required & $7k Draw Review)
-  2. Michael Beck (Blocked pending Mary Jo Tier 4 execution)
-  3. Jeff Bennion (Blocked design — cutover adjustment ledger required)
-  4. Ted Boardwalk (Historical remediation design required)
-  5. Jeannine Shaffar (Blocked pending real PostgreSQL RPC test)
+* **BLOCKED Packages (6):**
+  1. Jerry's Rogue Jets (Blocked on Start/Open Date Conflict & Package B DB Migration Missing)
+  2. Mary Jo Harris (Tier 4 Multi-Table RPC Required & $7k Draw Review)
+  3. Michael Beck (Blocked pending Mary Jo Tier 4 execution)
+  4. Jeff Bennion (Blocked design — cutover adjustment ledger required)
+  5. Ted Boardwalk (Historical remediation design required)
+  6. Jeannine Shaffar (Blocked pending real PostgreSQL RPC test)
