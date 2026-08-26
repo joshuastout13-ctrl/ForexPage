@@ -37,7 +37,7 @@ SELECT
   i.portal_username,
   i.start_date AS investor_start_date,
   i.split_pct AS investor_split_pct,
-  i.status AS investor_status,
+  i.active AS investor_active,
   a.id AS account_id,
   a.open_date AS account_open_date,
   a.starting_capital,
