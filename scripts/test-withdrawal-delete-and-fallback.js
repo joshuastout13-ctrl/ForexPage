@@ -296,6 +296,39 @@ async function runTests() {
     recordFail("8. Read-only equity validation", e);
   }
 
+  // 9. Test Investor Deletion Protection: Blocks deletion when financial history exists
+  try {
+    const { default: investorItemHandler } = await import("../api/admin/investors/[id].js");
+
+    const originalFrom = supabase?.from;
+    supabase.from = (table) => {
+      return {
+        select: (cols, opts) => ({
+          eq: () => Promise.resolve({ count: table === "withdrawals" ? 2 : 0, error: null }),
+          or: () => Promise.resolve({ count: 0, error: null })
+        }),
+        delete: () => ({
+          eq: () => Promise.resolve({ error: null })
+        })
+      };
+    };
+
+    const { req, res } = createMockReqRes({
+      method: "DELETE",
+      query: { id: "test-investor-with-history" }
+    });
+
+    await investorItemHandler(req, res);
+
+    assert.strictEqual(res._getStatus(), 409, "Deleting investor with financial history must return 409 Conflict");
+    assert.ok(res._getData()?.error?.includes("FINANCIAL_HISTORY_IMMUTABLE"), "Error must state FINANCIAL_HISTORY_IMMUTABLE");
+    recordPass("9. Investor deletion blocks physical delete and returns 409 when financial records exist");
+
+    supabase.from = originalFrom;
+  } catch (e) {
+    recordFail("9. Investor deletion financial protection", e);
+  }
+
   console.log("\n===============================================================================");
   console.log(`TEST RESULTS: ${testsPassed} PASSED, ${testsFailed} FAILED`);
   console.log("===============================================================================\n");
@@ -306,3 +339,4 @@ async function runTests() {
 }
 
 runTests();
+
