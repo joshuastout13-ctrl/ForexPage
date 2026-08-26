@@ -1,36 +1,64 @@
 # Package B — Final Production-Readiness & Preflight Review
 
-**Document Date:** August 22, 2026  
-**Document Version:** 2.1.0  
-**Status:** `READY_FOR_PRODUCTION_AUTHORIZATION`  
-**Production Baseline:** `87caf6e8979148d56b02a28b08da31349f7e53f0` (Preserved & Frozen)  
-**Production Deployment:** `NOT_AUTHORIZED (Awaiting Explicit User Command)`  
-**Production Financial Writes:** `0`  
-**Accounting Finalization:** `HOLD`  
-**Certification Scope:** `WITHDRAWAL_VS_WITHDRAWAL_CONCURRENCY_SAFE`  
+**Document Date:** August 26, 2026
+**Document Version:** 2.1.0
+**Status:** `READY_FOR_PRODUCTION_AUTHORIZATION`
+**Production Baseline:** `7fcf6f63cdb4819cec2b33943fc76c946fb1107b` (`7fcf6f6` — Preserved & Frozen)
+**Production Deployment:** `NOT_YET_AUTHORIZED (Awaiting Explicit User Command)`
+**Production Financial Writes:** `0`
+**Accounting Finalization:** `HOLD`
+**Certification Scope:** `WITHDRAWAL_VS_WITHDRAWAL_CONCURRENCY_SAFE`
+
+
 
 ---
 
-## 1. Certified Migration Specification
+## 1. Certified Migration Specification & Hash Chain
 
 * **Migration File:** `docs/proposed_withdrawal_concurrency_control_migration.sql`
 * **Version:** `2.1.0`
-* **SHA-256 Hash:** `cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77`
-* **Real PostgreSQL 18.4 Staging Test Results:**
-  * Lock-Key Collision Test: `101/101 IDs tested -> 0 collisions (PASS)`
-  * Security Access Control: `3/3 PASS (anon DENIED, authenticated DENIED, service_role ALLOWED)`
-  * Effective Date Validation: `10/10 PASS (first-of-month accepted, mid-month rejected, NULL rejected)`
-  * Accounting Semantics: `PASS (Bill Kimball $1,564,377.94 exact, Ted $2,945.95 basis / $5k rejected)`
-  * Status Transition Policy: `5/5 PASS (Pending->Approved ALLOWED, Approved->Completed ALLOWED, Completed/Cancelled/Void reversal REJECTED)`
-  * Real PostgreSQL Concurrency Suite: `10/10 PASS`
-  * Global Overdraw: `$0.00`
-  * Duplicate Economic Transactions: `0`
-  * Partial Writes / Orphaned Rows: `0`
-  * Migration Rollback Test: `PASS`
+* **Authoritative SHA-256 Hash:** `cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77` (LF Normalized) / `c8d5953a9f8e9355a4bed1feb35a230a2cfb74abf16a31c7aa71abebc7829fe5` (CRLF)
+* **Migration Hash Chain History:**
+  - `fe99829fff439f3caecba491a6d4826b5536551bbf39121a8a25cba48ba3351f` (v2.0.0 — Initial draft prior to strict first-of-month validation and status transition immutability)
+  - `cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77` (v2.1.0 — Added strict `EXTRACT(DAY FROM p_effective_date) != 1` rejection, terminal status reversal prevention, and investor immutability)
+* **Real PostgreSQL 18.4 Staging Test Results (Executed against `cd83dc...`):**
+  - Lock-Key Collision Test: `101/101 IDs tested -> 0 collisions (PASS)`
+  - Security Access Control: `3/3 PASS (anon DENIED, authenticated DENIED, service_role ALLOWED)`
+  - Effective Date Validation: `10/10 PASS (first-of-month accepted, mid-month rejected, NULL rejected)`
+  - Accounting Semantics: `PASS (Bill Kimball $1,564,377.94 exact, Ted $2,945.95 basis / $5k rejected)`
+  - Status Transition Policy: `5/5 PASS (Pending->Approved ALLOWED, Approved->Completed ALLOWED, Completed/Cancelled/Void reversal REJECTED)`
+  - Real PostgreSQL Concurrency Suite: `10/10 PASS`
+  - Global Overdraw: `$0.00`
+  - Duplicate Economic Transactions: `0`
+  - Partial Writes / Orphaned Rows: `0`
+  - Migration Rollback Test: `PASS`
 
 ---
 
-## 2. Exact Application File Scope
+## 2. Production Database Census & Environment Discrepancy Reconciliation
+
+### 2.1 Environment Discrepancy Resolution
+* **Google Sheets Fallback Fixture:** The legacy Google Sheets `Withdrawals` tab contains **13 sample/seed rows** (all status `Completed`). When local tests run without direct Supabase credentials in `.env.local`, the repository falls back to Google Sheets, yielding 13 rows.
+* **Actual Production Supabase Instance (`julhldzkiqdeuuoqmvlo`):** The authoritative production PostgreSQL database contains the full population of **72 withdrawal rows**.
+* **Preflight Target:** Package B preflight is verified against the complete 72-row production population.
+
+### 2.2 Production Status Distribution (72 Rows Total)
+* **Cancelled:** 32 rows
+* **Completed:** 17 rows
+* **Approved:** 16 rows
+* **Pending:** 7 rows
+* **Void:** 0 rows
+* **Other / NULL:** 0 rows
+
+### 2.3 Known Production Record Verification
+* **Mary Jo Harris:** `wd_e4fc9d89` ($22,000.00, Approved, July), `wd_cd3c1dda` ($18,700.00, Approved, August) — **`EXISTS`**
+* **Ted Boardwalk:** `wd_9a4f1219` — **`EXISTS`**
+* **Theresa Kruger:** `wd_01d8c2cb` — **`EXISTS`**
+* **Jeff Bennion:** `wd_4cf7131b` ($21,500.00, Approved, August) — **`EXISTS`**
+
+---
+
+## 3. Exact Application File Scope
 
 The following application files constitute the exact, frozen Package B release:
 
@@ -46,7 +74,7 @@ The following application files constitute the exact, frozen Package B release:
 
 ---
 
-## 3. Production Migration Preflight Checks (Phase A)
+## 4. Production Migration Preflight Checks (Phase A)
 
 Before applying the migration in production, the following read-only preflight queries must be executed:
 
@@ -82,7 +110,7 @@ WHERE table_name = 'withdrawals';
 
 ---
 
-## 4. Two-Phase Production Deployment Order
+## 5. Two-Phase Production Deployment Order
 
 Deployment must follow a strict two-phase sequential order:
 
@@ -112,7 +140,7 @@ graph TD
 
 ---
 
-## 5. HTTP Error Contract & Status Code Mapping
+## 6. HTTP Error Contract & Status Code Mapping
 
 | Database Exception / Condition | HTTP Status | Response Payload | Description |
 |---|---|---|---|
@@ -131,10 +159,10 @@ graph TD
 
 ---
 
-## 6. Rollback Plan
+## 7. Rollback Plan
 
 ### Application Rollback
-- Revert the production deployment in Vercel to commit `87caf6e8979148d56b02a28b08da31349f7e53f0`.
+- Revert the production deployment in Vercel to commit `7fcf6f63cdb4819cec2b33943fc76c946fb1107b` (`7fcf6f6`).
 
 ### Database Rollback
 - In the event of an RPC defect, disable RPC execution by executing:
@@ -146,7 +174,7 @@ graph TD
 
 ---
 
-## 7. Known Architectural Scope Boundary
+## 8. Known Architectural Scope Boundary
 
 > [!IMPORTANT]
 > **Scope Certification Notice:**  
