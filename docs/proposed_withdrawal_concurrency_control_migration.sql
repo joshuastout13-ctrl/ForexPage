@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION calculate_available_withdrawal_equity_sql(
   p_investor_id TEXT,
   p_account_id TEXT,
   p_effective_date DATE,
-  p_exclude_withdrawal_id UUID DEFAULT NULL
+  p_exclude_withdrawal_id TEXT DEFAULT NULL
 )
 RETURNS NUMERIC(20, 2)
 LANGUAGE plpgsql
@@ -192,7 +192,7 @@ BEGIN
   SELECT COALESCE(SUM(amount), 0.00) INTO v_other_withdrawals
   FROM withdrawals
   WHERE investor_id = p_investor_id
-    AND (p_exclude_withdrawal_id IS NULL OR id != p_exclude_withdrawal_id)
+    AND (p_exclude_withdrawal_id IS NULL OR id::text != p_exclude_withdrawal_id::text)
     AND LOWER(TRIM(status)) IN ('pending', 'approved', 'completed')
     AND (
       (year = v_target_year AND month_number = v_target_month)
@@ -233,7 +233,7 @@ AS $$
 DECLARE
   v_lock_key BIGINT;
   v_available_equity NUMERIC(20, 2);
-  v_existing_id UUID;
+  v_existing_id TEXT;
   v_existing_amount NUMERIC(20, 2);
   v_existing_investor TEXT;
   v_existing_effective_date DATE;
@@ -242,6 +242,7 @@ DECLARE
   v_target_month INT;
   v_new_withdrawal RECORD;
   v_inv_id TEXT;
+  v_new_id TEXT;
 BEGIN
   -- Normalize & Validate Status
   v_normalized_status := INITCAP(TRIM(COALESCE(p_status, 'Pending')));
@@ -293,7 +294,7 @@ BEGIN
     IF v_existing_id IS NOT NULL THEN
       -- If same parameters, return existing record (Idempotent Replay)
       IF v_existing_investor = p_investor_id AND v_existing_amount = p_amount AND v_existing_effective_date = p_effective_date THEN
-        SELECT * INTO v_new_withdrawal FROM withdrawals WHERE id = v_existing_id;
+        SELECT * INTO v_new_withdrawal FROM withdrawals WHERE id::text = v_existing_id::text;
         RETURN jsonb_build_object(
           'status', 'IDEMPOTENT_REPLAY',
           'withdrawal_id', v_new_withdrawal.id,
@@ -328,8 +329,11 @@ BEGIN
     END IF;
   END IF;
 
+  v_new_id := gen_random_uuid()::text;
+
   -- 5. ATOMIC INSERT
   INSERT INTO withdrawals (
+    id,
     investor_id,
     account_id,
     amount,
@@ -344,6 +348,7 @@ BEGIN
     created_at,
     updated_at
   ) VALUES (
+    v_new_id,
     p_investor_id,
     p_account_id,
     p_amount,
@@ -376,7 +381,7 @@ $$;
 
 -- 5. ATOMIC WITHDRAWAL UPDATE RPC (PATCH)
 CREATE OR REPLACE FUNCTION update_withdrawal_atomic(
-  p_withdrawal_id UUID,
+  p_withdrawal_id TEXT,
   p_amount NUMERIC(20, 2) DEFAULT NULL,
   p_status TEXT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
@@ -398,7 +403,7 @@ BEGIN
   -- 1. Fetch current withdrawal with row lock
   SELECT * INTO v_current_wd
   FROM withdrawals
-  WHERE id = p_withdrawal_id
+  WHERE id::text = p_withdrawal_id::text
   FOR UPDATE;
 
   IF v_current_wd.id IS NULL THEN
@@ -462,7 +467,7 @@ BEGIN
     status = v_target_status,
     notes = COALESCE(p_notes, notes),
     updated_at = NOW()
-  WHERE id = p_withdrawal_id
+  WHERE id::text = p_withdrawal_id::text
   RETURNING * INTO v_updated_withdrawal;
 
   RETURN jsonb_build_object(
@@ -481,11 +486,11 @@ $$;
 
 -- 6. SECURITY & PERMISSIONS
 REVOKE EXECUTE ON FUNCTION financial_lock_key(TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION calculate_available_withdrawal_equity_sql(TEXT, TEXT, DATE, UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION calculate_available_withdrawal_equity_sql(TEXT, TEXT, DATE, TEXT) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION create_withdrawal_atomic(TEXT, TEXT, NUMERIC, DATE, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION update_withdrawal_atomic(UUID, NUMERIC, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION update_withdrawal_atomic(TEXT, NUMERIC, TEXT, TEXT, TEXT) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION financial_lock_key(TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION calculate_available_withdrawal_equity_sql(TEXT, TEXT, DATE, UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION calculate_available_withdrawal_equity_sql(TEXT, TEXT, DATE, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION create_withdrawal_atomic(TEXT, TEXT, NUMERIC, DATE, TEXT, TEXT, TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION update_withdrawal_atomic(UUID, NUMERIC, TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION update_withdrawal_atomic(TEXT, NUMERIC, TEXT, TEXT, TEXT) TO service_role;
