@@ -20,6 +20,12 @@ export default async function handler(req, res) {
       if (body.accountId !== undefined || body.account_id !== undefined) updates.account_id = body.accountId || body.account_id;
       if (body.investorId !== undefined || body.investor_id !== undefined) updates.investor_id = body.investorId || body.investor_id;
 
+      if (!supabase) {
+        return res.status(503).json({
+          error: "PACKAGE_B_RPC_UNAVAILABLE: Database client is not configured. Raw financial mutation blocked."
+        });
+      }
+
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", {
@@ -50,6 +56,7 @@ export default async function handler(req, res) {
           if (msg.includes("WITHDRAWAL_NOT_FOUND")) {
             return res.status(404).json({ error: msg });
           }
+
           const isMissingRpc = !msg || 
             msg.includes("does not exist") || 
             msg.includes("schema cache") || 
@@ -57,9 +64,13 @@ export default async function handler(req, res) {
             rpcError.code === "42883" || 
             rpcError.code === "PGRST202";
 
-          if (!isMissingRpc) {
-            throw rpcError;
+          if (isMissingRpc) {
+            return res.status(503).json({
+              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial update is blocked."
+            });
           }
+
+          return res.status(400).json({ error: msg });
         }
       } catch (rpcEx) {
         const exMsg = rpcEx.message || "";
@@ -69,65 +80,17 @@ export default async function handler(req, res) {
           rpcEx.code === "42883" || 
           rpcEx.code === "PGRST202";
 
-        if (!isMissingRpc) {
-          throw rpcEx;
-        }
-      }
-
-      // 2. Application-Level Fallback (when RPC is not yet installed in target database)
-      const { data: currentWd, error: fetchErr } = await supabase
-        .from("withdrawals")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (fetchErr || !currentWd) {
-        return res.status(404).json({ error: `WITHDRAWAL_NOT_FOUND: Withdrawal ${id} not found.` });
-      }
-
-      const invId = updates.investor_id || currentWd.investor_id;
-      const accId = updates.account_id || currentWd.account_id;
-      const effDate = currentWd.effective_accounting_date || currentWd.request_date || `${currentWd.year}-${String(currentWd.month_number).padStart(2, '0')}-01`;
-      const targetAmount = updates.amount !== undefined ? updates.amount : currentWd.amount;
-      const targetStatus = updates.status !== undefined ? updates.status : currentWd.status;
-
-      // Status Transition Rules for fallback
-      if (updates.status && updates.status !== currentWd.status) {
-        if (currentWd.status === "Completed") {
-          return res.status(400).json({ error: `INVALID_STATUS_TRANSITION: Completed withdrawals cannot transition to ${updates.status}.` });
-        }
-        if (currentWd.status === "Cancelled" || currentWd.status === "Void") {
-          return res.status(400).json({ error: `INVALID_STATUS_TRANSITION: Cannot transition terminal withdrawal status (${currentWd.status}) to ${updates.status}.` });
-        }
-      }
-
-      const normalizedStatus = String(targetStatus || '').toLowerCase();
-      if (normalizedStatus === 'pending' || normalizedStatus === 'approved' || normalizedStatus === 'completed') {
-        const { availableEquity } = await calculateAvailableWithdrawalEquity(invId, effDate, {
-          excludeWithdrawalId: id,
-          accountId: accId
-        });
-
-        if (targetAmount > availableEquity) {
-          return res.status(400).json({
-            error: `WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY: Updated amount ($${targetAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}) exceeds available account equity ($${availableEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}) at effective date ${effDate}.`,
-            availableEquity,
-            requestedAmount: targetAmount,
-            effectiveDate: effDate
+        if (isMissingRpc) {
+          return res.status(503).json({
+            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial update is blocked."
           });
         }
+
+        return res.status(400).json({ error: exMsg || "Withdrawal update failed." });
       }
 
-      let updateRes = await supabase.from("withdrawals").update(updates).eq("id", id).select();
-      if (updateRes.error && updateRes.error.message && updateRes.error.message.includes("effective_accounting_date")) {
-        delete updates.effective_accounting_date;
-        updateRes = await supabase.from("withdrawals").update(updates).eq("id", id).select();
-      }
-      if (updateRes.error) throw updateRes.error;
-
-      return res.status(200).json({
-        status: "SUCCESS",
-        withdrawal: updateRes.data[0]
+      return res.status(503).json({
+        error: "PACKAGE_B_RPC_UNAVAILABLE: Unable to complete atomic withdrawal update."
       });
     } catch (error) {
       console.error("Error updating withdrawal:", error);
@@ -136,15 +99,12 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "DELETE") {
-    try {
-      const { data, error } = await supabase.from("withdrawals").delete().eq("id", id).select();
-      if (error) throw error;
-      return res.status(200).json({ success: true, data });
-    } catch (error) {
-      return res.status(500).json({ error: "Failed to delete withdrawal." });
-    }
+    res.setHeader("Allow", ["PATCH", "PUT"]);
+    return res.status(405).json({
+      error: "METHOD_NOT_ALLOWED: Physical deletion of financial withdrawal records is permanently disabled to preserve audit integrity. Transition the record to 'Cancelled' or 'Void' status via PATCH /api/admin/withdrawals/[id]."
+    });
   }
 
-  res.setHeader("Allow", ["PATCH", "PUT", "DELETE"]);
+  res.setHeader("Allow", ["PATCH", "PUT"]);
   return res.status(405).json({ error: "Method not allowed" });
 }

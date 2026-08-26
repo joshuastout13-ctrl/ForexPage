@@ -92,6 +92,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "INVALID_AMOUNT: Amount must be strictly greater than $0.00" });
       }
 
+      if (!supabase) {
+        return res.status(503).json({
+          error: "PACKAGE_B_RPC_UNAVAILABLE: Database client is not configured. Raw financial mutation blocked."
+        });
+      }
+
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc("create_withdrawal_atomic", {
@@ -133,7 +139,7 @@ export default async function handler(req, res) {
           if (msg.includes("INVESTOR_NOT_FOUND")) {
             return res.status(404).json({ error: msg });
           }
-          // If RPC is missing in DB (42883 undefined_function or PGRST202 / schema cache error), fall through to application-level validation
+
           const isMissingRpc = !msg || 
             msg.includes("does not exist") || 
             msg.includes("schema cache") || 
@@ -141,9 +147,13 @@ export default async function handler(req, res) {
             rpcError.code === "42883" || 
             rpcError.code === "PGRST202";
 
-          if (!isMissingRpc) {
-            throw rpcError;
+          if (isMissingRpc) {
+            return res.status(503).json({
+              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (create_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial insertion is blocked."
+            });
           }
+
+          return res.status(400).json({ error: msg });
         }
       } catch (rpcEx) {
         const exMsg = rpcEx.message || "";
@@ -153,61 +163,17 @@ export default async function handler(req, res) {
           rpcEx.code === "42883" || 
           rpcEx.code === "PGRST202";
 
-        if (!isMissingRpc) {
-          throw rpcEx;
+        if (isMissingRpc) {
+          return res.status(503).json({
+            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (create_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial insertion is blocked."
+          });
         }
+
+        return res.status(400).json({ error: exMsg || "Withdrawal creation failed." });
       }
 
-      // 2. Application-Level Fallback (when RPC is not yet installed in target database)
-      if (payload.idempotency_key) {
-        const { data: existingWd } = await supabase
-          .from("withdrawals")
-          .select("*")
-          .eq("idempotency_key", payload.idempotency_key)
-          .single();
-
-        if (existingWd) {
-          if (existingWd.investor_id === payload.investor_id && Math.abs(existingWd.amount - payload.amount) < 0.01) {
-            return res.status(200).json({
-              status: "IDEMPOTENT_REPLAY",
-              withdrawal: existingWd,
-              idempotency_replay: true
-            });
-          } else {
-            return res.status(409).json({
-              error: `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH: Key ${payload.idempotency_key} conflict`
-            });
-          }
-        }
-      }
-
-      const { availableEquity } = await calculateAvailableWithdrawalEquity(payload.investor_id, effDate, {
-        accountId: payload.account_id
-      });
-
-      if (payload.amount > availableEquity) {
-        return res.status(400).json({
-          error: `WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY: Requested amount ($${payload.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}) exceeds available account equity ($${availableEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}) at effective date ${effDate}.`,
-          availableEquity,
-          requestedAmount: payload.amount,
-          effectiveDate: effDate
-        });
-      }
-
-      let insertRes = await supabase.from("withdrawals").insert([payload]).select();
-      if (insertRes.error && insertRes.error.message && insertRes.error.message.includes("effective_accounting_date")) {
-        const fallbackPayload = { ...payload };
-        delete fallbackPayload.effective_accounting_date;
-        insertRes = await supabase.from("withdrawals").insert([fallbackPayload]).select();
-      }
-      if (insertRes.error) throw insertRes.error;
-
-      return res.status(201).json({
-        status: "SUCCESS",
-        withdrawal: insertRes.data[0],
-        availableEquityBefore: availableEquity,
-        availableEquityAfter: availableEquity - payload.amount,
-        idempotency_replay: false
+      return res.status(503).json({
+        error: "PACKAGE_B_RPC_UNAVAILABLE: Unable to complete atomic withdrawal creation."
       });
     } catch (error) {
       console.error("Error creating withdrawal:", error);
