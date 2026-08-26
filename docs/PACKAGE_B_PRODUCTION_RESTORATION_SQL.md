@@ -100,7 +100,6 @@ FROM withdrawals;
 -- STONE & COMPANY FOREX FUND — PACKAGE B: CONCURRENCY-SAFE WITHDRAWAL CONTROL
 -- Status: CANDIDATE / STAGING READY (FAIL-CLOSED EQUITY & LOCK PROTOCOL)
 -- Version: 2.1.0
--- Canonical LF SHA-256: cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77
 -- =============================================================================
 
 -- 1. ADD IDEMPOTENCY KEY, CREATED_BY, UPDATED_AT TO WITHDRAWALS TABLE
@@ -172,6 +171,7 @@ BEGIN
   WHERE id = p_investor_id;
 
   IF v_inv_id IS NULL THEN
+    -- Try lookup by portal_username if ID lookup misses
     SELECT id, start_date INTO v_inv_id, v_inv_start_date
     FROM investors
     WHERE portal_username = p_investor_id
@@ -248,8 +248,10 @@ BEGIN
 
   -- D. Fail-Closed Prior Ending Balance Retrieval
   IF v_is_first_period THEN
+    -- First period uses starting_capital as the canonical opening basis
     v_prior_ending_balance := v_starting_capital;
   ELSE
+    -- Established account MUST have a recorded history row for immediately preceding month (N-1)
     SELECT ending_balance INTO v_hist_ending
     FROM investor_monthly_history
     WHERE investor_id = p_investor_id
@@ -260,6 +262,7 @@ BEGIN
     IF v_hist_ending IS NOT NULL THEN
       v_prior_ending_balance := v_hist_ending;
     ELSE
+      -- Preceding month history missing on established account -> FAIL CLOSED
       RAISE EXCEPTION 'ACCOUNTING_HISTORY_INCOMPLETE: Required prior month history (%-%) is missing for established investor %.',
         v_prior_year, v_prior_month, p_investor_id;
     END IF;
@@ -386,6 +389,7 @@ BEGIN
     LIMIT 1;
 
     IF v_existing_id IS NOT NULL THEN
+      -- If same parameters, return existing record (Idempotent Replay)
       IF v_existing_investor = p_investor_id AND v_existing_amount = p_amount AND v_existing_effective_date = p_effective_date THEN
         SELECT * INTO v_new_withdrawal FROM withdrawals WHERE id = v_existing_id;
         RETURN jsonb_build_object(
@@ -397,6 +401,7 @@ BEGIN
           'withdrawal', to_jsonb(v_new_withdrawal)
         );
       ELSE
+        -- Idempotency key conflict
         RAISE EXCEPTION 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH: Key % was already used for investor % amount $%.', 
           p_idempotency_key, v_existing_investor, v_existing_amount;
       END IF;
@@ -582,6 +587,7 @@ GRANT EXECUTE ON FUNCTION financial_lock_key(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION calculate_available_withdrawal_equity_sql(TEXT, TEXT, DATE, UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION create_withdrawal_atomic(TEXT, TEXT, NUMERIC, DATE, TEXT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION update_withdrawal_atomic(UUID, NUMERIC, TEXT, TEXT, TEXT) TO service_role;
+
 ```
 
 ---
