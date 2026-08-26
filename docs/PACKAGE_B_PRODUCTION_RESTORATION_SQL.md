@@ -194,7 +194,7 @@ BEGIN
       v_acc_open_date
     FROM investor_accounts
     WHERE investor_id = p_investor_id
-      AND (id::text = p_account_id OR account_id = p_account_id)
+      AND id::text = p_account_id
     LIMIT 1;
   ELSE
     SELECT
