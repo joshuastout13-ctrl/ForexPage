@@ -98,8 +98,13 @@ Changing `wd_e4fc9d89` from $22,000 to $20,000 is **NOT a simple Tier 2 source e
 * **Database Target:** Production Supabase (`julhldzkiqdeuuoqmvlo`)
 * **Affected Rows:** `1`
 * **Financial Delta:** `$0.00` (Zero balance or history mutation required)
-* **Package B Conflict:** `RESOLVED` (Eliminated `ACCOUNT_START_DATE_CONFLICT`)
-* **Correction Status:** **`VERIFIED_COMPLETE`** (Live Production Applied)
+* **History Audit (12 Materialized 2026 Rows):**
+  - Months 1–7 (Jan–Jul): Inert pre-opening materialization rows (`opening_balance = $75,000.00`, `deposits = $0.00`, `withdrawals = $0.00`, `gain = $0.00`, `commissions = $0.00`, `ending_balance = $75,000.00`).
+  - Zero economic compounding or investor profit in pre-opening periods.
+  - Jan–Jul visible performance is strictly `$0.00` / `0.00%`.
+  - History Classification: **`PREOPENING_MATERIALIZED_HISTORY_INERT / NO_HISTORY_MUTATION_REQUIRED`**.
+* **Package B Conflict:** `RESOLVED` (Eliminated `ACCOUNT_START_DATE_CONFLICT`; August 1 available equity = `$75,000.00`).
+* **Correction Status:** **`VERIFIED_COMPLETE`** (Live Production Applied & Certified)
 
 ---
 
