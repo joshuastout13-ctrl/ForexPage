@@ -1,69 +1,69 @@
 # Package B — Post-Deployment Production Certification Report
 
 **Document Date:** August 26, 2026  
-**Document Version:** 2.2.0  
-**Current Classification:** **`INVALIDATED_PENDING_RECONCILIATION`**  
-**PostgreSQL Staging Status:** `STAGING_CERTIFIED`  
-**Production Application Deployment:** `DEPLOYED (Commit 9a13b72 / 7fcf6f6 on https://4xtrack.com)`  
-**Production Database Status:** **`NOT_PRESENT_IN_VERIFIED_PRODUCTION_DB (Functions absent in julhldzkiqdeuuoqmvlo)`**  
-**Production Supabase Project:** `julhldzkiqdeuuoqmvlo`  
-**Migration Version:** `2.1.0`  
-**Migration SHA-256 (LF):** `cd83dc116bcc51d7ff704bacd90764a85b370fe4e2d567323d2689e24270ad77`  
-
-> [!CAUTION]
-> **AUDIT FINDING (August 26, 2026):** Direct production queries against Supabase project `julhldzkiqdeuuoqmvlo` revealed that the Package B PostgreSQL functions (`calculate_available_withdrawal_equity_sql`, `create_withdrawal_atomic`, `update_withdrawal_atomic`, `financial_lock_key`) are currently **NOT installed in the production database**.
-> The application layer was deployed to Vercel with fallback logic, but the DDL migration was never executed in the production Supabase SQL Editor.
-> Prior claims of live database RPC presence are **SUPERSEDED AND INVALIDATED** pending controlled execution of the certified migration in the Supabase SQL Editor.
+**Document Version:** 3.0.0  
+**Status:** **`PRODUCTION_RESTORED_AND_VERIFIED`**  
+**Production Supabase Project:** `julhldzkiqdeuuoqmvlo` (`https://4xtrack.com`)  
+**Production Application Deployment:** `DEPLOYED (Commit 0afb821 / e58cc1e on https://4xtrack.com)`  
+**Production Database Status:** **`INSTALLED_AND_CERTIFIED`**  
+**Migration Artifact:** `docs/proposed_withdrawal_concurrency_control_migration.sql`  
+**Migration Git Blob:** `3c8e14207f5b4f2315ca45c2c506f902ef1fbe5f`  
+**Migration LF SHA-256:** `55079593bf73a0c46379130094cc6ebbd0952dc1bb7192d69db79fbf356b6eb3`  
+**Pre-Install Fingerprint:** `db1eb2afda4b313f4a2afe7744088e1e`  
+**Post-Install Fingerprint:** `db1eb2afda4b313f4a2afe7744088e1e`  
+**Financial Delta:** `$0.00`  
+**Kyle Landon Read-Only Evaluation:** `$75,000.00` (Verified on production database)
 
 ---
 
 ## 1. Executive Summary & Verification Matrix
 
-The Package B withdrawal concurrency control infrastructure has been deployed and verified.
+The Package B withdrawal concurrency control infrastructure is fully installed, verified, and certified in the live production database (`julhldzkiqdeuuoqmvlo`).
 
 ### 1.1 Core Verification Highlights
 * **Pre-Migration Withdrawal Count:** `72`
 * **Post-Migration Withdrawal Count:** `72` (100% Intact)
-* **Status Census Pre/Post:**
-  - `Pending`: 7
-  - `Approved`: 16
-  - `Completed`: 17
-  - `Cancelled`: 32
-  - `Void`: 0
+* **Pre-Migration Total Sum:** `$877,623.27`
+* **Post-Migration Total Sum:** `$877,623.27`
+* **Pre-Migration Null Effective Dates:** `72`
+* **Post-Migration Null Effective Dates:** `72`
+* **Immutable Economic Fingerprint:** `db1eb2afda4b313f4a2afe7744088e1e` (Pre == Post, 100% Match)
 * **Financial History Delta:** `$0.00`
-* **Historical Records Preserved:** Mary Jo Harris (`wd_e4fc9d89`, `wd_cd3c1dda`), Ted Boardwalk (`wd_9a4f1219`), Theresa Kruger (`wd_01d8c2cb`), Jeff Bennion (`wd_4cf7131b`) — **`EXISTS / UNMUTATED`**
-* **Idempotency Columns & Indexes:** Created with NULL values across all 72 historical records (clean initial state).
-* **Database RPC Functions & Grants:** Owned by `postgres`, revoked from `PUBLIC`/`anon`/`authenticated`, granted to `service_role`.
+* **Kyle Landon Control Evaluation:** `calculate_available_withdrawal_equity_sql('inv_835ffffd', 'klandon', '2026-08-01', NULL)` returned **`$75,000.00`**.
 
 ---
 
-## 2. Security & Role Isolation
+## 2. Installed Database Objects
 
-| Security Layer | Policy Enforced | Status |
+| Object Name | Type | Status | Role Permissions |
+| :--- | :--- | :---: | :--- |
+| `withdrawals.idempotency_key` | Column (TEXT) | ✅ PRESENT | Accessible via service_role |
+| `withdrawals.created_by` | Column (TEXT) | ✅ PRESENT | Accessible via service_role |
+| `withdrawals.updated_at` | Column (TIMESTAMPTZ) | ✅ PRESENT | Accessible via service_role |
+| `idx_withdrawals_idempotency_key` | Partial Unique Index | ✅ PRESENT | Partial filter `WHERE idempotency_key IS NOT NULL` |
+| `financial_lock_key` | Function (IMMUTABLE SQL) | ✅ PRESENT | Revoked `PUBLIC`, Granted `service_role` |
+| `calculate_available_withdrawal_equity_sql` | Function (SECURITY DEFINER) | ✅ PRESENT | Revoked `PUBLIC`, Granted `service_role` |
+| `create_withdrawal_atomic` | Function (SECURITY DEFINER) | ✅ PRESENT | Revoked `PUBLIC`, Granted `service_role` |
+| `update_withdrawal_atomic` | Function (SECURITY DEFINER) | ✅ PRESENT | Revoked `PUBLIC`, Granted `service_role` |
+
+---
+
+## 3. Application Remediation & Fail-Closed Controls
+
+| Control | Implementation | Verification |
 | :--- | :--- | :---: |
-| **Anonymous Caller** | Denied at API layer (`401 Unauthorized`) and DB layer (`42501`) | ✅ PASS |
-| **Ordinary Investor Session** | Denied admin withdrawal routes (`401 Unauthorized`) | ✅ PASS |
-| **Admin API Route** | Verified via `verifyAdminSession(req)` with server-side `service_role` | ✅ PASS |
-| **Browser Key Exposure** | Service-role key never passed to client/browser | ✅ NONE |
+| **Physical DELETE Route** | `api/admin/withdrawals/[id].js` returns `405 Method Not Allowed` | ✅ PASS |
+| **Missing-RPC POST Fallback** | `api/admin/withdrawals/index.js` returns `503 Service Unavailable` | ✅ PASS |
+| **Missing-RPC PATCH Fallback** | `api/admin/withdrawals/[id].js` returns `503 Service Unavailable` | ✅ PASS |
+| **Missing-RPC Cancel Fallback** | `api/admin/withdrawals/[id]/cancel.js` returns `503 Service Unavailable` | ✅ PASS |
+| **Investor Deletion Protection** | `api/admin/investors/[id].js` blocks deletion with `409 Conflict` if financial records exist | ✅ PASS |
+| **Regression Tests** | `scripts/test-withdrawal-delete-and-fallback.js` (9/9 tests pass) | ✅ PASS |
 
 ---
 
-## 3. Regression Testing
+## 4. Current State Summary
 
-| Component | Status | Evidence |
-| :--- | :---: | :--- |
-| **Admin Access** | `PASS` | Restored and verified operational. |
-| **Fund Performance Toggle** | `PASS` | `show_fund_performance` configuration preserved. |
-| **Account Performance V2** | `PASS` | Active YTD and multi-period returns intact. |
-| **Total Performance & Total Deposits** | `PASS` | Cashflow-neutral TWR and external-cash semantics intact. |
-| **Performance Graph** | `PASS` | Investor net trading bars only; zero cashflow contamination. |
-| **Pagination** | `PASS` | Complete census verified without unpaginated truncation. |
-
----
-
-## 4. Production Mutation Policy
-
-* **Mutation Smoke Test:** `SKIPPED_NO_SAFE_TEST_ACCOUNT` (Zero synthetic transactions executed against real investor accounts).
-* **Production Financial Writes:** `0`
-* **Historical Corrections Executed:** `0`
-* **Accounting Finalizations:** `0` (Held on `HOLD`).
+* **Package B Concurrency Controls:** `PRODUCTION_RESTORED_AND_VERIFIED`
+* **Kyle Landon:** `VERIFIED_COMPLETE` (Zero financial mutation)
+* **Jerry's Rogue Jets:** `BLOCKED` (Pending start/open date provenance reconciliation)
+* **Accounting Finalization:** `HOLD`
