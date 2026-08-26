@@ -49,11 +49,12 @@ WHERE i.id = 'jerrys001';
 
 > [!IMPORTANT]
 > **DO NOT EXECUTE UNTIL EXPLICITLY AUTHORIZED BY USER.**  
-> Contains strict Compare-And-Swap (CAS) guardrails. Any unexpected condition will immediately abort the transaction.
+> Contains strict Compare-And-Swap (CAS) guardrails, investor advisory locking, and post-mutation assertions. Any unexpected condition will immediately abort the transaction.
 
 ```sql
 DO $$
 DECLARE
+  v_lock_key        BIGINT;
   v_inv_record      RECORD;
   v_acc_record      RECORD;
   v_mar_hist        RECORD;
@@ -64,7 +65,10 @@ DECLARE
   v_mar_apr_comms   INTEGER;
   v_rows_updated    INTEGER;
 BEGIN
-  -- 1. ACQUIRE EXCLUSIVE ROW LOCKS
+  -- 1. ACQUIRE PACKAGE B ADVISORY LOCK & EXCLUSIVE ROW LOCKS
+  v_lock_key := financial_lock_key('jerrys001');
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+
   SELECT * INTO v_inv_record
   FROM investors
   WHERE id = 'jerrys001'
@@ -97,7 +101,7 @@ BEGIN
   END IF;
 
   IF v_acc_record.open_date IS DISTINCT FROM DATE '2026-03-01' THEN
-    RAISE EXCEPTION 'CAS_FAILURE: account open_date is % (expected 2026-03-01)', v_acc_record.open_date;
+    RAISE EXCEPTION 'CAS_FAILURE: account open_date is % (expected 2026-03-01 - Already applied or modified)', v_acc_record.open_date;
   END IF;
 
   IF v_acc_record.starting_capital IS DISTINCT FROM 514124.14 THEN
@@ -108,33 +112,37 @@ BEGIN
     RAISE EXCEPTION 'CAS_FAILURE: account status is % (expected Active)', v_acc_record.status;
   END IF;
 
-  -- 3. ASSERT MARCH & APRIL HISTORY ROWS ARE INERT
+  -- 3. ASSERT MARCH & APRIL HISTORY ROWS EXIST AND ARE INERT
   SELECT * INTO v_mar_hist
   FROM investor_monthly_history
   WHERE investor_id = 'jerrys001' AND year = 2026 AND month_number = 3;
 
-  IF v_mar_hist.id IS NOT NULL THEN
-    IF v_mar_hist.opening_balance IS DISTINCT FROM 514124.14 
-       OR v_mar_hist.ending_balance IS DISTINCT FROM 514124.14
-       OR COALESCE(v_mar_hist.deposits, 0) != 0
-       OR COALESCE(v_mar_hist.withdrawals, 0) != 0 THEN
-      RAISE EXCEPTION 'CAS_FAILURE: March 2026 history row is not inert (% -> %)', 
-        v_mar_hist.opening_balance, v_mar_hist.ending_balance;
-    END IF;
+  IF v_mar_hist.id IS NULL THEN
+    RAISE EXCEPTION 'CAS_FAILURE: March 2026 history row missing for jerrys001.';
+  END IF;
+
+  IF v_mar_hist.opening_balance IS DISTINCT FROM 514124.14 
+     OR v_mar_hist.ending_balance IS DISTINCT FROM 514124.14
+     OR COALESCE(v_mar_hist.deposits, 0) != 0
+     OR COALESCE(v_mar_hist.withdrawals, 0) != 0 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: March 2026 history row is not inert (opening=%, ending=%, deps=%, wds=%)', 
+      v_mar_hist.opening_balance, v_mar_hist.ending_balance, v_mar_hist.deposits, v_mar_hist.withdrawals;
   END IF;
 
   SELECT * INTO v_apr_hist
   FROM investor_monthly_history
   WHERE investor_id = 'jerrys001' AND year = 2026 AND month_number = 4;
 
-  IF v_apr_hist.id IS NOT NULL THEN
-    IF v_apr_hist.opening_balance IS DISTINCT FROM 514124.14 
-       OR v_apr_hist.ending_balance IS DISTINCT FROM 514124.14
-       OR COALESCE(v_apr_hist.deposits, 0) != 0
-       OR COALESCE(v_apr_hist.withdrawals, 0) != 0 THEN
-      RAISE EXCEPTION 'CAS_FAILURE: April 2026 history row is not inert (% -> %)', 
-        v_apr_hist.opening_balance, v_apr_hist.ending_balance;
-    END IF;
+  IF v_apr_hist.id IS NULL THEN
+    RAISE EXCEPTION 'CAS_FAILURE: April 2026 history row missing for jerrys001.';
+  END IF;
+
+  IF v_apr_hist.opening_balance IS DISTINCT FROM 514124.14 
+     OR v_apr_hist.ending_balance IS DISTINCT FROM 514124.14
+     OR COALESCE(v_apr_hist.deposits, 0) != 0
+     OR COALESCE(v_apr_hist.withdrawals, 0) != 0 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: April 2026 history row is not inert (opening=%, ending=%, deps=%, wds=%)', 
+      v_apr_hist.opening_balance, v_apr_hist.ending_balance, v_apr_hist.deposits, v_apr_hist.withdrawals;
   END IF;
 
   -- 4. ASSERT MAY ECONOMIC HISTORY ROW EXISTS
@@ -147,27 +155,30 @@ BEGIN
   END IF;
 
   IF v_may_hist.opening_balance IS DISTINCT FROM 514124.14 
-     OR v_may_hist.withdrawals IS DISTINCT FROM 2500.00 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: May 2026 history row unexpected (opening=%, wds=%)', 
-      v_may_hist.opening_balance, v_may_hist.withdrawals;
+     OR v_may_hist.withdrawals IS DISTINCT FROM 2500.00
+     OR ROUND(v_may_hist.ending_balance, 2) IS DISTINCT FROM 523478.47 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: May 2026 history row unexpected (opening=%, wds=%, ending=%)', 
+      v_may_hist.opening_balance, v_may_hist.withdrawals, v_may_hist.ending_balance;
   END IF;
 
-  -- 5. ASSERT NO UNEXPECTED TRANSACTIONS IN MARCH/APRIL
+  -- 5. ASSERT NO ACTIVE ECONOMIC TRANSACTIONS IN MARCH/APRIL
   SELECT COUNT(*) INTO v_mar_apr_deps
   FROM deposits
   WHERE investor_id = 'jerrys001' 
+    AND (type IS NULL OR UPPER(TRIM(type)) != 'VOID')
     AND (
       (date >= '2026-03-01' AND date < '2026-05-01')
       OR (effective_accounting_date >= '2026-03-01' AND effective_accounting_date < '2026-05-01')
     );
 
   IF v_mar_apr_deps > 0 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: Found % unexpected deposits in March/April 2026.', v_mar_apr_deps;
+    RAISE EXCEPTION 'CAS_FAILURE: Found % active deposits in March/April 2026.', v_mar_apr_deps;
   END IF;
 
   SELECT COUNT(*) INTO v_mar_apr_wds
   FROM withdrawals
   WHERE investor_id = 'jerrys001' 
+    AND LOWER(TRIM(status)) IN ('pending', 'approved', 'completed')
     AND (
       (year = 2026 AND month_number IN (3, 4))
       OR (request_date >= '2026-03-01' AND request_date < '2026-05-01')
@@ -175,7 +186,7 @@ BEGIN
     );
 
   IF v_mar_apr_wds > 0 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: Found % unexpected withdrawals in March/April 2026.', v_mar_apr_wds;
+    RAISE EXCEPTION 'CAS_FAILURE: Found % active/reserving withdrawals in March/April 2026.', v_mar_apr_wds;
   END IF;
 
   SELECT COUNT(*) INTO v_mar_apr_comms
@@ -183,7 +194,7 @@ BEGIN
   WHERE recipient_id = 'jerrys001' AND year = 2026 AND month_number IN (3, 4);
 
   IF v_mar_apr_comms > 0 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: Found % unexpected commissions in March/April 2026.', v_mar_apr_comms;
+    RAISE EXCEPTION 'CAS_FAILURE: Found % commissions in March/April 2026.', v_mar_apr_comms;
   END IF;
 
   -- 6. EXECUTE EXACT SINGLE-ROW UPDATE
@@ -225,8 +236,12 @@ DO $$
 DECLARE
   v_rows_updated INTEGER;
   v_acc_record   RECORD;
+  v_lock_key     BIGINT;
 BEGIN
-  -- 1. Lock account row
+  -- 1. Acquire advisory lock & lock account row
+  v_lock_key := financial_lock_key('jerrys001');
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+
   SELECT * INTO v_acc_record
   FROM investor_accounts
   WHERE id = 'jerrys001' AND investor_id = 'jerrys001'
