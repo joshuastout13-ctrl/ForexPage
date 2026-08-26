@@ -90,11 +90,16 @@ Changing `wd_e4fc9d89` from $22,000 to $20,000 is **NOT a simple Tier 2 source e
 
 ## 6. Kyle Landon Metadata Realignment
 
-* **Current `open_date`:** `'2026-01-01'`
-* **Proposed `open_date`:** `'2026-08-01'`
-* **Financial Delta:** `$0.00` (Zero balance or history mutation required).
-* **CAS Precondition:** `open_date = '2026-01-01' AND starting_capital = 75000.00`
-* **Package Status:** `READY_FOR_APPROVAL` (Tier 1 Metadata Only)
+* **Investor ID:** `inv_835ffffd`
+* **Account ID:** `klandon`
+* **Previous `open_date`:** `'2026-07-31'`
+* **Executed `open_date`:** `'2026-08-01'`
+* **Execution Timestamp:** August 26, 2026
+* **Database Target:** Production Supabase (`julhldzkiqdeuuoqmvlo`)
+* **Affected Rows:** `1`
+* **Financial Delta:** `$0.00` (Zero balance or history mutation required)
+* **Package B Conflict:** `RESOLVED` (Eliminated `ACCOUNT_START_DATE_CONFLICT`)
+* **Correction Status:** **`VERIFIED_COMPLETE`** (Live Production Applied)
 
 ---
 
@@ -117,11 +122,12 @@ Changing `wd_e4fc9d89` from $22,000 to $20,000 is **NOT a simple Tier 2 source e
 
 ## 9. Actionable vs Blocked Package Summary
 
-* **READY_FOR_APPROVAL Packages (4):**
-  1. Kyle Landon (Tier 1 Metadata)
-  2. Gary Larson (Tier 3 Cutover/Start Date)
-  3. Michael Landon (Tier 3 Baseline with History Regeneration)
-  4. Jerry's Rogue Jets (Tier 2 Package B $2,500 Withdrawal)
+* **APPLIED / VERIFIED_COMPLETE (1):**
+  1. Kyle Landon (Tier 1 Metadata — `open_date` aligned to `2026-08-01`, $0.00 delta)
+* **READY_FOR_APPROVAL Packages (3):**
+  1. Gary Larson (Tier 3 Cutover/Start Date)
+  2. Michael Landon (Tier 3 Baseline with History Regeneration)
+  3. Jerry's Rogue Jets (Tier 2 Package B $2,500 Withdrawal)
 * **BLOCKED Packages (5):**
   1. Mary Jo Harris (Tier 4 Multi-Table RPC Required & $7k Draw Review)
   2. Michael Beck (Blocked pending Mary Jo Tier 4 execution)
