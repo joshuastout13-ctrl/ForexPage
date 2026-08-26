@@ -94,7 +94,6 @@ SELECT
   c.year,
   c.month_number,
   c.amount,
-  c.rate_pct,
   c.created_at
 FROM commission_earnings c
 LEFT JOIN investors r ON r.id = c.recipient_id
