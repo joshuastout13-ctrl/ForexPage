@@ -163,3 +163,5 @@ On August 20, 2026, Josh provided authoritative client business instructions res
 | `UI-REQ-05` | Account Graph Semantics | Graph represents investor net trading performance ONLY ($ made / % on account). Bars strictly exclude referral commissions, deposits, and withdrawals. Bottom summary table itemizes all cashflows and commissions separately. | `CERTIFIED_BY_CLIENT (2026-08-22)` |
 | `UI-REQ-06` | Withdrawal Validation | Client and server-side hard check preventing withdrawals exceeding available equity. | `STAGING_CERTIFIED (Package B)` |
 | `UI-REQ-07` | Commission Detail Regression | Full audit verification of source names, accurate post-withdrawal source balances, and rates. | `REQUIRED_REGRESSION` |
+| `UI-REQ-08` | Total Deposits Semantics | Sum of qualifying additional external cash deposits only. Excludes starting/cutover capital, commissions, and internal adjustments. | `CERTIFIED_BY_CLIENT (2026-08-26)` |
+| `UI-REQ-09` | Total Performance / Net Return | Represents canonical investor net trading gains ($) and compounded time-weighted return (%) only. Unaffected by cashflows or commissions. | `CERTIFIED_BY_CLIENT (2026-08-26)` |
