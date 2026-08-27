@@ -71,14 +71,15 @@ export default async function handler(req, res) {
       .in("source_investor_id", Array.from(sourceIdSet))
       .eq("year", targetYear);
 
-    // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, Commission Rules, and Commission Earnings (where investor is recipient)
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings} ] = await Promise.all([
+    // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, Commission Rules, Commission Earnings, and Account Cutovers
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings}, {data: cutovers} ] = await Promise.all([
       supabase.from("deposits").select("*").in("investor_id", Array.from(sourceIdSet)).not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").in("investor_id", Array.from(sourceIdSet)).in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_shares").select("*").in("source_investor_id", Array.from(sourceIdSet)),
       supabase.from("commission_rules").select("*").in("investor_id", Array.from(sourceIdSet)),
-      supabase.from("commission_earnings").select("*").in("recipient_id", Array.from(sourceIdSet)).in("year", [targetYear, targetYear - 1])
+      supabase.from("commission_earnings").select("*").in("recipient_id", Array.from(sourceIdSet)).in("year", [targetYear, targetYear - 1]),
+      supabase.from("account_cutover_adjustments").select("*").in("investor_id", Array.from(sourceIdSet)).eq("year", targetYear)
     ]);
 
     // Build unified commission rules/shares list
@@ -185,6 +186,16 @@ export default async function handler(req, res) {
       let totalWds = new Decimal(0);
 
       for (const acc of accounts) {
+        // Cutover adjustment check: If an authorized cutover exists for this account & period, override opening operating basis
+        const cutover = (cutovers || []).find(c => 
+          (c.account_id === acc.id || (!c.account_id && acc.id === accounts[0]?.id)) && 
+          Number(c.year) === targetYear && 
+          Number(c.month_number) === m
+        );
+        if (cutover) {
+          accountBalances[acc.id] = new Decimal(cutover.authorized_opening_balance);
+        }
+
         const opening = accountBalances[acc.id];
         const deps = new Decimal((depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0);
         const wds = new Decimal((wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0);
