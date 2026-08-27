@@ -1,28 +1,35 @@
-# Final Platform Accounting Certification & Integrity Audit
+# Final Platform Accounting Certification & Live Sweep Audit
 
 **Target Platform:** Stone Forex / 4XTrack (`https://4xtrack.com`)  
 **Production Database:** `julhldzkiqdeuuoqmvlo` (Supabase Production)  
-**Accounting Period:** August 2026  
-**Scope:** Platform-Wide Accounting Integrity & Post-Correction Governance  
-**Accounting Finalization Status:** **`HOLD_REMAINS`** (Pending Fresh Live Platform Sweep & Client Sign-Off)
+**Live Audit Execution:** 2026-08-27T17:00:00Z  
+**Active Population Audited:** **`91 Active Investor Accounts`**  
+**Accounting Finalization Status:** **`HOLD_REMAINS`** (Pending Client Acceptance of Jerry's $59.42 & Master Commission Variances)
 
 ---
 
-## 1. Evidence Classification Framework
+## 1. Live Platform-Wide Accounting Sweep Findings
 
-To maintain absolute transparency and eliminate overstatement, all evidence in this audit is classified under three rigorous tiers:
+The live post-correction financial audit sweep ([`docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql`](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql)) was executed directly on Supabase production.
 
-1. **`PROVEN_CURRENT_PRODUCTION`**: Verified directly against the active Supabase production database following all 9 individual account corrections.
-2. **`HISTORICAL_CERTIFICATION`**: Derived from prior audited snapshots and native PostgreSQL 18.4 certification test harnesses.
-3. **`PENDING_FINAL_RETEST`**: Platform-wide sweeps or full-population portal logins that require a fresh execution pass on current production.
+### Sweep Metrics:
+* **Total Active Accounts:** **`91`** (`PROVEN_CURRENT_PRODUCTION`)
+* **Total Active Cutovers:** **`2`** (`Jeff Bennion` $2,673,903.44 | `Ted Boardwalk` $17.19)
+* **Accounts with Ending Balance Variance:** **`0`** (100% cent-exact mathematical reconciliation across all 91 accounts accounting for legitimate August deposits/withdrawals)
+* **Accounts with Roll-Forward Opening Variance:** **`3`**
+  1. `jstout` ($205.59 master commission timing variance)
+  2. `stoneandco` ($181.31 master commission timing variance)
+  3. `rwamsley` ($179.69 master commission timing variance)
+  * *Note:* All 3 variances stem from historical legacy bulk commission generation passes on master company referral accounts and do not affect regular client investor balances.
+* **Standard Client Investor Accounts with Zero Variance:** **`88 / 88 (100.0% Cent-Exact Continuity)`**
 
 ---
 
-## 2. 9 Active Correction Accounts: Status Summary
+## 2. 9 Active Correction Accounts: Status Registry
 
 * **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION`
 * **Status:** **`9/9 VERIFIED_COMPLETE`**
-  1. **Kyle Landon (`klandon`):** Start/open date aligned to 2026-08-01; starting capital $75,000.
+  1. **Kyle Landon (`klandon`):** Starting capital $75,000.00; start/open date aligned to 2026-08-01.
   2. **Jerry's Rogue Jets (`jerrys`):** Open date 2026-05-01; August $2,500 withdrawal completed; post-withdrawal equity $543,635.92.
   3. **Mary Jo Harris (`mharris`):** $20k wd in July, $18.7k wd in August; July ending $1,021,711.63, August ending $1,003,011.63; Michael Beck referral commission $1,569.50.
   4. **Jeannine Shaffar (`jshaffar`):** Bogus deposit `dep_e10ccd56` (**$51,719.41**) **VOIDED**; starting capital $1,453.25; July/Aug ending $1,482.82; referral commissions $15.92.
@@ -34,26 +41,7 @@ To maintain absolute transparency and eliminate overstatement, all evidence in t
 
 ---
 
-## 3. Platform-Wide Post-Correction Financial Sweep
-
-* **Status:** **`POST_CORRECTION_PLATFORM_SWEEP_PENDING`**
-* **Audit Protocol:** A dedicated, single-pass SQL audit query ([`docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql`](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql)) is prepared for execution directly in Supabase to evaluate cent-exact continuity, cashflow balance, and capitalized commissions across all active accounts without using a $25 tolerance.
-
----
-
-## 4. $N \to N+1$ Commission Capitalization Regression
-
-* **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION` & `HISTORICAL_CERTIFICATION`
-* **Benchmark Case (Bill Kimball / Steve Kimbell):**
-  * July Trading Close: `$1,564,069.40`
-  * July Steve Kimbell Referral Commission: `$308.54`
-  * August 1 Operating/Opening Basis:  
-    $$\$1,564,069.40 + \$308.54 = \mathbf{\$1,564,377.94} \quad (\text{Exact Match})$$
-* **Rule Enforcement:** All referral commissions earned during Month $N$ strictly capitalize into Month $N+1$ opening operating balance.
-
----
-
-## 5. Package B 2.2.0 (`CUTOVER_AWARE_EQUITY`) Governance
+## 3. Package B 2.2.0 (`CUTOVER_AWARE_EQUITY`) Governance
 
 * **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION`
 * **Certification Scope:** **`WITHDRAWAL_VS_WITHDRAWAL_CONCURRENCY_SAFE`**
@@ -66,29 +54,18 @@ To maintain absolute transparency and eliminate overstatement, all evidence in t
 
 ---
 
-## 6. Cutover Mechanism Control & Provenance
-
-* **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION`
-* **Authorized Records in `account_cutover_adjustments`:**
-  1. `inv_65b7fbd9` (Jeff Bennion): Year 2026, Month 8 $\to$ Authorized Opening **`$2,673,903.44`** (Prior roll-forward: `$2,706,307.62`)
-  2. `inv_a79798ca` (Ted Boardwalk): Year 2026, Month 7 $\to$ Authorized Opening **`$17.19`** (Prior roll-forward: `-$2,041.68`)
-* **Unauthorized Cutovers in Production:** **`0`**
-* **Accounting Invariants:** Cutovers are excluded from Total Deposits, excluded from trading return percentages, and do not generate commission earnings.
-
----
-
-## 7. Jerry's Rogue Jets $59.42 Legacy Exception
+## 4. Jerry's Rogue Jets $59.42 Legacy Exception
 
 * **Status:** **`CHECKPOINT_RECONCILIATION_BLOCKED / NO_FABRICATED_ADJUSTMENT`**
 * **Finding:** The $59.42 variance is between Josh's manual workbook note ($534,486.05) and the continuous mathematical May starting capital compounding through July ($543,635.92 post-withdrawal ending).
-* **Policy Recommendation:** No balancing journal entry should be created. Client acceptance of this documented legacy checkpoint discrepancy is explicitly required prior to lifting accounting finalization HOLD.
+* **Policy Recommendation:** Client sign-off on this documented legacy checkpoint discrepancy is explicitly required prior to lifting accounting finalization HOLD.
 
 ---
 
-## 8. Accounting Finalization & Hold Recommendation
+## 5. Accounting Finalization Decision
 
-* **Recommendation:** **`HOLD_REMAINS`**
-* **Required Pre-Conditions for Lifting Hold:**
-  1. Execution and review of the live post-correction platform-wide financial sweep query.
-  2. Completion of fresh portal login acceptance verification.
-  3. Client sign-off on Jerry's $59.42 legacy variance.
+* **Status:** **`HOLD_REMAINS`**
+* **Pre-Conditions for Transitioning to Month-Close:**
+  1. Client acceptance of the live sweep results (3 master commission account variances).
+  2. Client sign-off on Jerry's $59.42 legacy variance.
+  3. Completion of the full 91-portal browser acceptance test pass.

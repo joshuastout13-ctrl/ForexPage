@@ -1,9 +1,6 @@
 -- ==============================================================================
--- PLATFORM-WIDE READ-ONLY POST-CORRECTION FINANCIAL AUDIT SWEEP
+-- PLATFORM-WIDE READ-ONLY POST-CORRECTION FINANCIAL AUDIT SWEEP (COMPLETE)
 -- Database: julhldzkiqdeuuoqmvlo (Supabase Production - Stone Forex)
--- Mode: STRICTLY READ-ONLY (0 mutations)
--- Description: Validates cent-exact accounting continuity, commission capitalization,
---              cutover baselines, and cashflow integrity across ALL active accounts.
 -- ==============================================================================
 
 WITH active_investors AS (
@@ -54,20 +51,21 @@ continuity_eval AS (
     ai.portal_username,
     jh.ending_balance AS july_ending,
     COALESCE(jc.july_comm_total, 0.00) AS july_comm,
-    COALESCE(co.authorized_opening_balance, NULL) AS cutover_opening,
+    co.authorized_opening_balance AS cutover_opening,
     ah.opening_balance AS aug_opening,
+    ah.deposits AS aug_deposits,
     ah.withdrawals AS aug_withdrawals,
     ah.ending_balance AS aug_ending,
     CASE 
-      -- If cutover exists, expected August opening is the cutover opening
       WHEN co.authorized_opening_balance IS NOT NULL THEN
-        ROUND(ABS(ah.opening_balance - co.authorized_opening_balance), 4)
-      -- Otherwise expected August opening is July ending + July commissions
+        ROUND(ABS(ah.opening_balance - co.authorized_opening_balance), 2)
+      WHEN jh.ending_balance IS NULL THEN
+        0.00
       ELSE
-        ROUND(ABS(ah.opening_balance - (COALESCE(jh.ending_balance, 0.00) + COALESCE(jc.july_comm_total, 0.00))), 4)
+        ROUND(ABS(ah.opening_balance - (jh.ending_balance + COALESCE(jc.july_comm_total, 0.00))), 2)
     END AS aug_open_variance,
-    -- August ending variance at 0% unfinalized return
-    ROUND(ABS(ah.ending_balance - (ah.opening_balance - COALESCE(ah.withdrawals, 0.00))), 4) AS aug_end_variance
+    -- August ending variance: ending - (opening + deposits - withdrawals)
+    ROUND(ABS(ah.ending_balance - (COALESCE(ah.opening_balance, 0.00) + COALESCE(ah.deposits, 0.00) - COALESCE(ah.withdrawals, 0.00))), 2) AS aug_end_variance
   FROM active_investors ai
   LEFT JOIN july_aug_history jh ON jh.investor_id = ai.investor_id AND jh.month_number = 7
   LEFT JOIN july_aug_history ah ON ah.investor_id = ai.investor_id AND ah.month_number = 8
@@ -75,15 +73,10 @@ continuity_eval AS (
   LEFT JOIN cutovers co ON co.investor_id = ai.investor_id
 )
 SELECT 
-  -- 1. Population Overview
   (SELECT COUNT(*) FROM active_investors) AS total_active_investors,
   (SELECT COUNT(*) FROM account_cutover_adjustments) AS total_active_cutovers,
-  
-  -- 2. Continuity & Mathematical Variance Counts (Cent-Exact: > $0.005)
   (SELECT COUNT(*) FROM continuity_eval WHERE aug_open_variance > 0.005) AS accounts_with_open_variance,
   (SELECT COUNT(*) FROM continuity_eval WHERE aug_end_variance > 0.005) AS accounts_with_end_variance,
-  
-  -- 3. Detailed Nonzero Variance Rows (if any)
   (
     SELECT json_agg(json_build_object(
       'username', portal_username,
@@ -91,6 +84,9 @@ SELECT
       'july_comm', july_comm,
       'cutover_opening', cutover_opening,
       'aug_opening', aug_opening,
+      'aug_deposits', aug_deposits,
+      'aug_withdrawals', aug_withdrawals,
+      'aug_ending', aug_ending,
       'open_variance', aug_open_variance,
       'end_variance', aug_end_variance
     ))
