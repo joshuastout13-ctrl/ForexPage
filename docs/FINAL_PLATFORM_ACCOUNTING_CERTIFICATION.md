@@ -5,8 +5,10 @@
 **Live Audit Execution:** 2026-08-27T17:15:00Z  
 **Active Population Audited:** **`91 Active Investor Accounts`**  
 **Cent-Exact Mathematical Residual:** **`$0.00 (91 OF 91 PASS)`**  
-**Client Financial Sign-Off:** **`COMPLETE (ALL EXCEPTIONS RESOLVED)`**  
-**Accounting Finalization Status:** **`LIFTED_AFTER_CLIENT_FINANCIAL_SIGNOFF`** (Feature flag `ACCOUNTING_FINALIZATION_ENABLED="true"` ready for finalization execution)
+**Financial Correction Program:** **`100% COMPLETE (9 OF 9 VERIFIED)`**  
+**Governance Correction HOLD:** **`LIFTED`**  
+**August 2026 Accounting State:** **`OPEN / NORMAL OPERATIONS IN PROGRESS`**  
+**Month-Close Status:** **`NOT_DUE_YET (SCHEDULED FOR NORMAL END-OF-MONTH CLOSE)`**
 
 ---
 
@@ -57,23 +59,9 @@ The live post-correction financial audit sweep was executed directly on Supabase
 
 ---
 
-## 4. Jerry's Rogue Jets $59.42 Client Resolution
+## 4. Current Operational Directives & Month-Close Plan
 
-* **Disposition:** **`CLIENT_ACCEPTED_LEGACY_VARIANCE (IN_JERRYS_FAVOR)`**
-* **Client Instruction Date:** `2026-08-27`
-* **Direct Instruction (Josh Stout):** *"yes let the $59.42 go to the benefits of jerry's"*
-* **Accounting Treatment:** The reconciled production ledger already holds the continuous mathematical compounding from May 1 ($514,124.14 starting capital) through August ($543,635.92 post-withdrawal ending). No balancing transaction or ledger mutation is manufactured. The legacy checkpoint note discrepancy ($534,486.05 manual note vs $534,426.63 reconstructed) is closed with explicit client authorization.
-
----
-
-## 5. Accounting Finalization Governance & Flag State
-
-* **Governance Status:** **`LIFTED_AFTER_CLIENT_FINANCIAL_SIGNOFF`**
-* **Application Representation:** Guarded by feature flag `ACCOUNTING_FINALIZATION_ENABLED="true"` in environment variables.
-* **Final Readiness Summary:**
-  1. All 9 active correction accounts are 100% verified complete.
-  2. All 3 master commission recipient accounts are aligned cent-exact ($0.00 residual).
-  3. Platform-wide live sweep across all 91 active accounts passed with 0 roll-forward and 0 ending variances.
-  4. Package B 2.2.0 concurrency and cutover-aware equity are fully certified and live.
-  5. Josh has officially resolved and accepted Jerry's $59.42 legacy variance in Jerry's favor.
-  6. Financial accounting is 100% complete and closed.
+* **August Operational State:** August 2026 is an active, open trading period. Standard deposits, withdrawals under Package B 2.2.0, and performance tracking continue normally.
+* **Month-Close Finalization Timing:** Scheduled strictly for the normal end-of-month accounting window (August 31 / September 1). Early finalization has not been authorized.
+* **Feature Flag Policy:** `ACCOUNTING_FINALIZATION_ENABLED` remains disabled / unproven until the official end-of-month finalization window.
+* **End-of-Month Runbook:** Reference [`docs/AUGUST_2026_MONTH_END_RUNBOOK.md`](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/docs/AUGUST_2026_MONTH_END_RUNBOOK.md).
