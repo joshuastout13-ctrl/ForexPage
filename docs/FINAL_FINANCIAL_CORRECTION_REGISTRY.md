@@ -35,20 +35,20 @@ All 9 accounts requiring financial reconciliation or client authorization have s
 * **Investor ID:** `jerrys001`
 * **Portal Username:** `jerrys`
 * **Account ID:** `jerrys001`
-* **Starting Capital:** `$534,486.05`
+* **Production Starting Capital:** **`$514,124.14`**
 * **Investor Start Date:** `2026-05-01`
 * **Account Open Date:** `2026-05-01`
 * **Split %:** `70.00%`
-* **Executed Corrections:**
+* **Executed Corrections & Verification:**
   1. Metadata open date aligned to `2026-05-01`.
   2. Executed authorized August 1, 2026 $2,500.00 withdrawal (`wd_jerrys_aug`).
 * **Package B Post-Withdrawal Available Equity:** **`$543,635.92`**
 * **Josh Checkpoint Variance Status:**  
-  $$\text{Josh Manual Checkpoint } (\$534,486.05) \neq \text{July Opening Baseline } (\$534,486.05 \text{ was May starting capital})$$  
-  $$\text{Unadjusted Legacy Variance } (\$59.42) = \mathbf{CLIENT\_ACCEPTED\_LEGACY\_VARIANCE} \quad (\text{IN\_JERRYS\_FAVOR})$$
+  $$\text{Josh Manual Checkpoint } (\$534,486.05) - \text{Reconstructed Checkpoint } (\$534,426.63) = \mathbf{\$59.42}$$
+  * **Final Classification:** **`CLIENT_ACCEPTED_LEGACY_VARIANCE`** (**`IN_JERRYS_FAVOR`**)
   * **Client Resolution Date:** `2026-08-27`
-  * **Client Instruction (Josh Stout):** *"yes let the $59.42 go to the benefits of jerry's"*
-  * **Ledger Treatment:** No ledger mutation or fabricated entry manufactured. The continuous production mathematical ledger ($543,635.92 August ending post-withdrawal) is authoritatively accepted.
+  * **Direct Client Instruction (Josh Stout):** *"yes let the $59.42 go to the benefits of jerry's"*
+  * **Ledger Treatment:** No ledger mutation or fabricated transaction manufactured. The continuous mathematical ledger ($543,635.92 August ending post-withdrawal) is authoritatively accepted.
 * **Status:** ✅ **`VERIFIED_COMPLETE`**
 
 ---
@@ -79,7 +79,7 @@ All 9 accounts requiring financial reconciliation or client authorization have s
 * **Investor Start Date:** `2026-07-01`
 * **Split %:** `65.00%`
 * **Executed Corrections:**
-  1. Deposit `dep_e10ccd56` (**`$51,719.41`** bogus deposit) marked **`VOID`**.
+  1. Deposit `dep_e10ccd56` (**`$51,719.41`** bogus deposit) marked **`VOID`** (not duplicate $10k).
   2. Preserved starting capital of `$1,453.25` as sole legitimate opening basis.
   3. Reconstructed July history: `$1,453.25` open $\to$ `$29.57` net gain $\to$ **`$1,482.82`** ending.
   4. August history: **`$1,482.82`** open $\to$ **`$1,482.82`** ending.
@@ -189,7 +189,7 @@ All 9 accounts requiring financial reconciliation or client authorization have s
 | # | Investor | Portal Username | Investor ID | Starting Capital | Start Date | July Ending | August Ending | Cutover Record | Production Evidence |
 |:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
 | 1 | Kyle Landon | `klandon` | `inv_835ffffd` | $75,000.00 | 2026-08-01 | — | $75,000.00 | None | PROVEN_CURRENT_PRODUCTION |
-| 2 | Jerry's Rogue Jets | `jerrys` | `jerrys001` | $534,486.05 | 2026-05-01 | $546,135.92 | $543,635.92 | None | PROVEN_CURRENT_PRODUCTION |
+| 2 | Jerry's Rogue Jets | `jerrys` | `jerrys001` | $514,124.14 | 2026-05-01 | $546,135.92 | $543,635.92 | None | PROVEN_CURRENT_PRODUCTION |
 | 3 | Mary Jo Harris | `mharris` | `inv_4c5c0ee6` | $1,000,000.00 | 2026-02-01 | $1,021,711.63 | $1,003,011.63 | None | PROVEN_CURRENT_PRODUCTION |
 | 4 | Jeannine Shaffar | `jshaffar` | `inv_3e8224ee` | $1,453.25 | 2026-07-01 | $1,482.82 | $1,482.82 | None | PROVEN_CURRENT_PRODUCTION |
 | 5 | Gary Larson | `glarson` | `inv_2093cd23` | $487,000.00 | 2026-08-01 | — | $487,000.00 | None | PROVEN_CURRENT_PRODUCTION |
