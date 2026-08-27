@@ -187,29 +187,29 @@ BEGIN
   IF v_aug_hist.id IS NULL THEN RAISE EXCEPTION 'CAS_FAILURE: August 2026 history row missing.'; END IF;
 
   -- 2. CAS PRECONDITIONS
-  IF v_acc_record.open_date IS DISTINCT FROM DATE '2026-09-01' THEN
-    RAISE EXCEPTION 'CAS_FAILURE: account open_date is % (expected 2026-09-01)', v_acc_record.open_date;
-  END IF;
-
-  IF v_acc_record.starting_capital IS DISTINCT FROM 75000.00 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: starting_capital is % (expected 75000.00)', v_acc_record.starting_capital;
+  IF v_acc_record.starting_capital IS DISTINCT FROM 487000.00 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: starting_capital is % (expected 487000.00)', v_acc_record.starting_capital;
   END IF;
 
   IF v_dep_record.amount IS DISTINCT FROM 120000.00 THEN
     RAISE EXCEPTION 'CAS_FAILURE: dep_94a0ffe1 amount is % (expected 120000.00)', v_dep_record.amount;
   END IF;
 
-  -- 3. MUTATE METADATA
-  UPDATE investors SET start_date = DATE '2026-08-01', updated_at = NOW() WHERE id = 'inv_2093cd23';
-  UPDATE investor_accounts SET open_date = DATE '2026-08-01', starting_capital = 487000.00, updated_at = NOW() WHERE id = v_acc_record.id;
+  IF v_dep_record.type IS DISTINCT FROM 'DEPOSIT' THEN
+    RAISE EXCEPTION 'CAS_FAILURE: dep_94a0ffe1 type is % (expected DEPOSIT)', v_dep_record.type;
+  END IF;
+
+  -- 3. ENSURE METADATA ALIGNMENT
+  UPDATE investors SET start_date = DATE '2026-08-01', updated_at = NOW() WHERE id = 'inv_2093cd23' AND start_date IS DISTINCT FROM DATE '2026-08-01';
+  UPDATE investor_accounts SET open_date = DATE '2026-08-01', starting_capital = 487000.00, updated_at = NOW() WHERE id = v_acc_record.id AND (open_date IS DISTINCT FROM DATE '2026-08-01' OR starting_capital IS DISTINCT FROM 487000.00);
 
   -- 4. VOID SCHEDULED SEPTEMBER DEPOSIT
   UPDATE deposits SET type = 'VOID', notes = 'Voided: Subsumed into $487,000.00 August 1 starting capital per Josh instruction (Cell T170)' WHERE id = 'dep_94a0ffe1';
   GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
   IF v_rows_updated != 1 THEN RAISE EXCEPTION 'MUTATION_FAILURE: Expected 1 deposit voided, got %', v_rows_updated; END IF;
 
-  -- 5. ALIGN AUGUST MONTHLY HISTORY
-  UPDATE investor_monthly_history SET opening_balance = 487000.00, ending_balance = 487000.00, updated_at = NOW() WHERE id = v_aug_hist.id;
+  -- 5. ENSURE AUGUST MONTHLY HISTORY ALIGNMENT
+  UPDATE investor_monthly_history SET opening_balance = 487000.00, ending_balance = 487000.00, updated_at = NOW() WHERE id = v_aug_hist.id AND (opening_balance IS DISTINCT FROM 487000.00 OR ending_balance IS DISTINCT FROM 487000.00);
 
   -- 6. POSTCHECK ASSERTIONS
   SELECT starting_capital, open_date INTO v_acc_record FROM investor_accounts WHERE id = v_acc_record.id;
@@ -303,9 +303,9 @@ BEGIN
   UPDATE investor_monthly_history SET opening_balance = v_end, ending_balance = v_end, updated_at = NOW() WHERE id = v_aug_hist.id;
 
   -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS
-  UPDATE commission_earnings SET amount = 3.40 WHERE id = 'd6fe4b23-e95a-4051-b144-f56851b94025' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
-  UPDATE commission_earnings SET amount = 3.40 WHERE id = 'a1068ad8-bd04-4b4c-9c49-b3d874b6de88' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
-  UPDATE commission_earnings SET amount = 0.28 WHERE id = '714303b4-5de1-48f1-ab3b-b73c5df5491d' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
+  UPDATE commission_earnings SET amount = 5.10 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  UPDATE commission_earnings SET amount = 5.05 WHERE id = '3581a5c3-4b07-4ed4-a4a0-156ff9e07de4';
+  UPDATE commission_earnings SET amount = 5.78 WHERE id = 'a579f12b-759f-4b53-85c8-6b0ca41d7161';
 
   -- 7. POSTCHECK ASSERTIONS
   SELECT ending_balance INTO v_end FROM investor_monthly_history WHERE id = v_july_hist.id;

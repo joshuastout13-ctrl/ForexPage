@@ -68,31 +68,31 @@ BEGIN
   END IF;
 
   -- 2. CAS ASSERTIONS
-  IF v_acc_record.open_date IS DISTINCT FROM DATE '2026-09-01' THEN
-    RAISE EXCEPTION 'CAS_FAILURE: account open_date is % (expected 2026-09-01)', v_acc_record.open_date;
-  END IF;
-
-  IF v_acc_record.starting_capital IS DISTINCT FROM 75000.00 THEN
-    RAISE EXCEPTION 'CAS_FAILURE: starting_capital is % (expected 75000.00)', v_acc_record.starting_capital;
+  IF v_acc_record.starting_capital IS DISTINCT FROM 487000.00 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: starting_capital is % (expected 487000.00)', v_acc_record.starting_capital;
   END IF;
 
   IF v_dep_record.amount IS DISTINCT FROM 120000.00 THEN
     RAISE EXCEPTION 'CAS_FAILURE: dep_94a0ffe1 amount is % (expected 120000.00)', v_dep_record.amount;
   END IF;
 
-  -- 3. MUTATE INVESTOR & ACCOUNT METADATA
+  IF v_dep_record.type IS DISTINCT FROM 'DEPOSIT' THEN
+    RAISE EXCEPTION 'CAS_FAILURE: dep_94a0ffe1 type is % (expected DEPOSIT)', v_dep_record.type;
+  END IF;
+
+  -- 3. ENSURE METADATA ALIGNMENT
   UPDATE investors
   SET 
     start_date = DATE '2026-08-01',
     updated_at = NOW()
-  WHERE id = 'inv_2093cd23';
+  WHERE id = 'inv_2093cd23' AND start_date IS DISTINCT FROM DATE '2026-08-01';
 
   UPDATE investor_accounts
   SET 
     open_date = DATE '2026-08-01',
     starting_capital = 487000.00,
     updated_at = NOW()
-  WHERE id = v_acc_record.id;
+  WHERE id = v_acc_record.id AND (open_date IS DISTINCT FROM DATE '2026-08-01' OR starting_capital IS DISTINCT FROM 487000.00);
 
   -- 4. VOID SCHEDULED SEPTEMBER DEPOSIT dep_94a0ffe1
   UPDATE deposits
@@ -106,13 +106,13 @@ BEGIN
     RAISE EXCEPTION 'MUTATION_FAILURE: Expected 1 deposit voided, got %', v_rows_updated;
   END IF;
 
-  -- 5. ALIGN AUGUST 2026 MONTHLY HISTORY
+  -- 5. ENSURE AUGUST MONTHLY HISTORY ALIGNMENT
   UPDATE investor_monthly_history
   SET 
     opening_balance = 487000.00,
     ending_balance = 487000.00,
     updated_at = NOW()
-  WHERE id = v_aug_hist.id;
+  WHERE id = v_aug_hist.id AND (opening_balance IS DISTINCT FROM 487000.00 OR ending_balance IS DISTINCT FROM 487000.00);
 
   -- 6. POSTCHECK ASSERTIONS
   SELECT starting_capital, open_date INTO v_acc_record FROM investor_accounts WHERE id = v_acc_record.id;

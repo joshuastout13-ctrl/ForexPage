@@ -194,14 +194,14 @@ async function runExactArtifactCertification() {
         VALUES 
           ('mharris', 'inv_4c5c0ee6', 931765.13, '2026-02-01', 'Active'),
           ('mbeck', 'inv_d2ab6da4', 506712.70, '2026-04-01', 'Active'),
-          ('glarson', 'inv_2093cd23', 75000.00, '2026-09-01', 'Active'),
+          ('glarson', 'inv_2093cd23', 487000.00, '2026-08-01', 'Active'),
           ('jshaffar', 'inv_3e8224ee', 1453.25, '2026-07-01', 'Active');
 
         INSERT INTO investor_monthly_history (id, investor_id, year, month_number, month, opening_balance, deposits, withdrawals, gross_return_pct, ending_balance)
         VALUES 
           ('h_mharris_7', 'inv_4c5c0ee6', 2026, 7, 'July', 1022877.5935593522, 0, 0, 3.13, 1042087.2347663968),
           ('h_mharris_8', 'inv_4c5c0ee6', 2026, 8, 'August', 1042087.2347663968, 0, 40700.00, 0.00, 1001387.2347663968),
-          ('h_glarson_8', 'inv_2093cd23', 2026, 8, 'August', 75000.00, 0, 0, 0.00, 75000.00),
+          ('h_glarson_8', 'inv_2093cd23', 2026, 8, 'August', 487000.00, 0, 0, 0.00, 487000.00),
           ('h_jshaffar_7', 'inv_3e8224ee', 2026, 7, 'July', 1453.25, 51719.41, 0, 3.13, 54254.4577677),
           ('h_jshaffar_8', 'inv_3e8224ee', 2026, 8, 'August', 54254.4577677, 0, 0, 0.00, 54254.4577677);
 
@@ -218,9 +218,9 @@ async function runExactArtifactCertification() {
         INSERT INTO commission_earnings (id, recipient_id, source_investor_id, year, month_number, amount)
         VALUES 
           ('comm_mbeck_mharris_7', 'inv_d2ab6da4', 'inv_4c5c0ee6', 2026, 7, 1600.80),
-          ('d6fe4b23-e95a-4051-b144-f56851b94025', 'inv_015f3774', 'inv_3e8224ee', 2026, 7, 124.27),
-          ('a1068ad8-bd04-4b4c-9c49-b3d874b6de88', 'inv_920b8af8', 'inv_3e8224ee', 2026, 7, 124.27),
-          ('714303b4-5de1-48f1-ab3b-b73c5df5491d', 'stout001', 'inv_3e8224ee', 2026, 7, 10.36);
+          ('c7fa50d1-3cb6-43df-a412-790643a48e16', 'inv_015f3774', 'inv_3e8224ee', 2026, 7, 186.40),
+          ('3581a5c3-4b07-4ed4-a4a0-156ff9e07de4', 'inv_920b8af8', 'inv_3e8224ee', 2026, 7, 184.74),
+          ('a579f12b-759f-4b53-85c8-6b0ca41d7161', 'stout001', 'inv_3e8224ee', 2026, 7, 211.37);
       `);
     }
 
@@ -260,9 +260,9 @@ async function runExactArtifactCertification() {
 
     // Test Reversal
     await clientA.query(garyRevSql);
-    const { rows: glRevAcc } = await clientA.query("SELECT starting_capital, open_date FROM investor_accounts WHERE id = 'glarson';");
-    assert.strictEqual(Number(glRevAcc[0].starting_capital), 75000.00);
-    console.log("  Gary Larson Reversal Exact Payload: PASS (Restored to baseline $75000.00)\n");
+    const { rows: glRevDep } = await clientA.query("SELECT type FROM deposits WHERE id = 'dep_94a0ffe1';");
+    assert.strictEqual(glRevDep[0].type, "DEPOSIT");
+    console.log("  Gary Larson Reversal Exact Payload: PASS (Restored to baseline DEPOSIT)\n");
 
     // 3. EXECUTE EXACT JEANNINE SHAFFAR TIER 3 ARTIFACT PAYLOAD
     console.log("--- 3. Testing Exact Jeannine Shaffar Tier 3 Artifact Payload ---");

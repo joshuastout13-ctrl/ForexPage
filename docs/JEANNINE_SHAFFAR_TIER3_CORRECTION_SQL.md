@@ -114,17 +114,9 @@ BEGIN
   WHERE id = v_aug_hist.id;
 
   -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS
-  UPDATE commission_earnings
-  SET amount = 3.40
-  WHERE id = 'd6fe4b23-e95a-4051-b144-f56851b94025' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
-
-  UPDATE commission_earnings
-  SET amount = 3.40
-  WHERE id = 'a1068ad8-bd04-4b4c-9c49-b3d874b6de88' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
-
-  UPDATE commission_earnings
-  SET amount = 0.28
-  WHERE id = '714303b4-5de1-48f1-ab3b-b73c5df5491d' AND source_investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 7;
+  UPDATE commission_earnings SET amount = 5.10 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  UPDATE commission_earnings SET amount = 5.05 WHERE id = '3581a5c3-4b07-4ed4-a4a0-156ff9e07de4';
+  UPDATE commission_earnings SET amount = 5.78 WHERE id = 'a579f12b-759f-4b53-85c8-6b0ca41d7161';
 
   -- 7. POSTCHECK ASSERTIONS
   SELECT ending_balance INTO v_end FROM investor_monthly_history WHERE id = v_july_hist.id;
@@ -194,16 +186,8 @@ BEGIN
     updated_at = NOW()
   WHERE investor_id = 'inv_3e8224ee' AND year = 2026 AND month_number = 8;
 
-  UPDATE commission_earnings
-  SET amount = 124.27
-  WHERE id = 'd6fe4b23-e95a-4051-b144-f56851b94025';
-
-  UPDATE commission_earnings
-  SET amount = 124.27
-  WHERE id = 'a1068ad8-bd04-4b4c-9c49-b3d874b6de88';
-
-  UPDATE commission_earnings
-  SET amount = 10.36
-  WHERE id = '714303b4-5de1-48f1-ab3b-b73c5df5491d';
+  UPDATE commission_earnings SET amount = 186.40 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  UPDATE commission_earnings SET amount = 184.74 WHERE id = '3581a5c3-4b07-4ed4-a4a0-156ff9e07de4';
+  UPDATE commission_earnings SET amount = 211.37 WHERE id = 'a579f12b-759f-4b53-85c8-6b0ca41d7161';
 END $$;
 ```
