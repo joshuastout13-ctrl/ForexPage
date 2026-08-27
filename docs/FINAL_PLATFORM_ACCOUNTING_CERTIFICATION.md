@@ -5,7 +5,8 @@
 **Live Audit Execution:** 2026-08-27T17:15:00Z  
 **Active Population Audited:** **`91 Active Investor Accounts`**  
 **Cent-Exact Mathematical Residual:** **`$0.00 (91 OF 91 PASS)`**  
-**Accounting Finalization Recommendation:** **`READY_TO_LIFT_HOLD_PENDING_JERRY_SIGNOFF`**
+**Client Financial Sign-Off:** **`COMPLETE (ALL EXCEPTIONS RESOLVED)`**  
+**Accounting Finalization Recommendation:** **`READY_TO_LIFT_HOLD`**
 
 ---
 
@@ -32,7 +33,7 @@ The live post-correction financial audit sweep was executed directly on Supabase
 * **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION`
 * **Status:** **`9/9 VERIFIED_COMPLETE`**
   1. **Kyle Landon (`klandon`):** Starting capital $75,000.00; start/open date aligned to 2026-08-01.
-  2. **Jerry's Rogue Jets (`jerrys`):** Open date 2026-05-01; August $2,500 withdrawal completed; post-withdrawal equity $543,635.92.
+  2. **Jerry's Rogue Jets (`jerrys`):** Open date 2026-05-01; August $2,500 withdrawal completed; post-withdrawal equity $543,635.92. Legacy $59.42 variance accepted by client in Jerry's favor.
   3. **Mary Jo Harris (`mharris`):** $20k wd in July, $18.7k wd in August; July ending $1,021,711.63, August ending $1,003,011.63; Michael Beck referral commission $1,569.50.
   4. **Jeannine Shaffar (`jshaffar`):** Bogus deposit `dep_e10ccd56` (**$51,719.41**) **VOIDED**; starting capital $1,453.25; July/Aug ending $1,482.82; referral commissions $15.92.
   5. **Gary Larson (`glarson`):** August 1 starting capital $487,000.00; deposit `dep_94a0ffe1` ($120k) voided as superseded by initial starting capital instruction.
@@ -56,21 +57,22 @@ The live post-correction financial audit sweep was executed directly on Supabase
 
 ---
 
-## 4. Jerry's Rogue Jets $59.42 Legacy Exception
+## 4. Jerry's Rogue Jets $59.42 Client Resolution
 
-* **Status:** **`CHECKPOINT_RECONCILIATION_BLOCKED / NO_FABRICATED_ADJUSTMENT`**
-* **Finding:** The $59.42 variance is between Josh's manual workbook note ($534,486.05) and the continuous mathematical May starting capital compounding through July ($543,635.92 post-withdrawal ending).
-* **Sign-Off Item for Josh:**
-  > *"Jerry has a remaining $59.42 difference between the old manual checkpoint and the reconciled ledger. We found no source transaction supporting a $59.42 adjustment, so we left the ledger untouched. Are you okay accepting that documented legacy variance?"*
+* **Disposition:** **`CLIENT_ACCEPTED_LEGACY_VARIANCE (IN_JERRYS_FAVOR)`**
+* **Client Instruction Date:** `2026-08-27`
+* **Direct Instruction (Josh Stout):** *"yes let the $59.42 go to the benefits of jerry's"*
+* **Accounting Treatment:** The reconciled production ledger already holds the continuous mathematical compounding from May 1 ($534,486.05 starting capital) through August ($543,635.92 post-withdrawal ending). No balancing transaction or ledger mutation is manufactured. The legacy checkpoint note discrepancy is closed with explicit client authorization.
 
 ---
 
 ## 5. Accounting Finalization & Readiness Decision
 
-* **Status:** **`READY_TO_LIFT_HOLD_PENDING_JERRY_SIGNOFF`**
-* **Readiness Evaluation:**
+* **Status:** **`READY_TO_LIFT_HOLD`**
+* **Final Readiness Summary:**
   1. All 9 active correction accounts are 100% verified complete.
   2. All 3 master commission recipient accounts are aligned cent-exact ($0.00 residual).
   3. Platform-wide live sweep across all 91 active accounts passed with 0 roll-forward and 0 ending variances.
   4. Package B 2.2.0 concurrency and cutover-aware equity are fully certified and live.
-  5. Lifting accounting HOLD and transitioning to automated month-close requires only Josh's sign-off on Jerry's $59.42 legacy note variance.
+  5. Josh has officially resolved and accepted Jerry's $59.42 legacy variance in Jerry's favor.
+  6. Accounting finalization is fully ready to lift HOLD and transition to automated month-close operations.
