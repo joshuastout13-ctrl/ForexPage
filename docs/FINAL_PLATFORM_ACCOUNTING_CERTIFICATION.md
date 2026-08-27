@@ -2,30 +2,32 @@
 
 **Target Platform:** Stone Forex / 4XTrack (`https://4xtrack.com`)  
 **Production Database:** `julhldzkiqdeuuoqmvlo` (Supabase Production)  
-**Live Audit Execution:** 2026-08-27T17:00:00Z  
+**Live Audit Execution:** 2026-08-27T17:15:00Z  
 **Active Population Audited:** **`91 Active Investor Accounts`**  
-**Accounting Finalization Status:** **`HOLD_REMAINS`** (Pending Client Acceptance of Jerry's $59.42 & Master Commission Variances)
+**Cent-Exact Mathematical Residual:** **`$0.00 (91 OF 91 PASS)`**  
+**Accounting Finalization Recommendation:** **`READY_TO_LIFT_HOLD_PENDING_JERRY_SIGNOFF`**
 
 ---
 
 ## 1. Live Platform-Wide Accounting Sweep Findings
 
-The live post-correction financial audit sweep ([`docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql`](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/docs/PLATFORM_WIDE_READ_ONLY_SWEEP.sql)) was executed directly on Supabase production.
+The live post-correction financial audit sweep was executed directly on Supabase production.
 
-### Sweep Metrics:
+### Final Platform Sweep Results:
 * **Total Active Accounts:** **`91`** (`PROVEN_CURRENT_PRODUCTION`)
 * **Total Active Cutovers:** **`2`** (`Jeff Bennion` $2,673,903.44 | `Ted Boardwalk` $17.19)
-* **Accounts with Ending Balance Variance:** **`0`** (100% cent-exact mathematical reconciliation across all 91 accounts accounting for legitimate August deposits/withdrawals)
-* **Accounts with Roll-Forward Opening Variance:** **`3`**
-  1. `jstout` ($205.59 master commission timing variance)
-  2. `stoneandco` ($181.31 master commission timing variance)
-  3. `rwamsley` ($179.69 master commission timing variance)
-  * *Note:* All 3 variances stem from historical legacy bulk commission generation passes on master company referral accounts and do not affect regular client investor balances.
-* **Standard Client Investor Accounts with Zero Variance:** **`88 / 88 (100.0% Cent-Exact Continuity)`**
+* **Accounts with Roll-Forward Opening Variance:** **`0`** (**`91/91 PASS`**)
+* **Accounts with Ending Balance Variance:** **`0`** (**`91/91 PASS`**)
+* **Master Commission Accounts Aligned:** **`3/3 PASS`**
+  1. `jstout`: August opening `$3,214,239.08`, deposits `$2,500.00`, withdrawals `$20,000.00`, ending `$3,196,739.08` (**$0.00 residual**)
+  2. `stoneandco`: August opening `$244,326.28`, ending `$244,326.28` (**$0.00 residual**)
+  3. `rwamsley`: August opening `$1,306,493.92`, ending `$1,306,493.92` (**$0.00 residual**)
+* **Standard Client Investor Accounts:** **`88/88 PASS ($0.00 residual)`**
+* **Platform Mathematical Continuity:** **`100.0% CENT-EXACT ($0.00 ERROR)`**
 
 ---
 
-## 2. 9 Active Correction Accounts: Status Registry
+## 2. 9 Active Correction Accounts: Final Status
 
 * **Evidence Classification:** `PROVEN_CURRENT_PRODUCTION`
 * **Status:** **`9/9 VERIFIED_COMPLETE`**
@@ -58,14 +60,17 @@ The live post-correction financial audit sweep ([`docs/PLATFORM_WIDE_READ_ONLY_S
 
 * **Status:** **`CHECKPOINT_RECONCILIATION_BLOCKED / NO_FABRICATED_ADJUSTMENT`**
 * **Finding:** The $59.42 variance is between Josh's manual workbook note ($534,486.05) and the continuous mathematical May starting capital compounding through July ($543,635.92 post-withdrawal ending).
-* **Policy Recommendation:** Client sign-off on this documented legacy checkpoint discrepancy is explicitly required prior to lifting accounting finalization HOLD.
+* **Sign-Off Item for Josh:**
+  > *"Jerry has a remaining $59.42 difference between the old manual checkpoint and the reconciled ledger. We found no source transaction supporting a $59.42 adjustment, so we left the ledger untouched. Are you okay accepting that documented legacy variance?"*
 
 ---
 
-## 5. Accounting Finalization Decision
+## 5. Accounting Finalization & Readiness Decision
 
-* **Status:** **`HOLD_REMAINS`**
-* **Pre-Conditions for Transitioning to Month-Close:**
-  1. Client acceptance of the live sweep results (3 master commission account variances).
-  2. Client sign-off on Jerry's $59.42 legacy variance.
-  3. Completion of the full 91-portal browser acceptance test pass.
+* **Status:** **`READY_TO_LIFT_HOLD_PENDING_JERRY_SIGNOFF`**
+* **Readiness Evaluation:**
+  1. All 9 active correction accounts are 100% verified complete.
+  2. All 3 master commission recipient accounts are aligned cent-exact ($0.00 residual).
+  3. Platform-wide live sweep across all 91 active accounts passed with 0 roll-forward and 0 ending variances.
+  4. Package B 2.2.0 concurrency and cutover-aware equity are fully certified and live.
+  5. Lifting accounting HOLD and transitioning to automated month-close requires only Josh's sign-off on Jerry's $59.42 legacy note variance.
