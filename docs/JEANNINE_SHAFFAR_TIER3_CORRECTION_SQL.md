@@ -113,9 +113,12 @@ BEGIN
     updated_at = NOW()
   WHERE id = v_aug_hist.id;
 
-  -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS
-  UPDATE commission_earnings SET amount = 5.10 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS (FIRST PRINCIPLES)
+  -- 1. Stone & Co (inv_015f3774) @ 11.20% of gross profit ($45.48671875 * 0.1120 = $5.09)
+  UPDATE commission_earnings SET amount = 5.09 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  -- 2. Rwamsley (inv_920b8af8) @ 11.10% of gross profit ($45.48671875 * 0.1110 = $5.05)
   UPDATE commission_earnings SET amount = 5.05 WHERE id = '3581a5c3-4b07-4ed4-a4a0-156ff9e07de4';
+  -- 3. JStout (stout001) @ 12.70% of gross profit ($45.48671875 * 0.1270 = $5.78)
   UPDATE commission_earnings SET amount = 5.78 WHERE id = 'a579f12b-759f-4b53-85c8-6b0ca41d7161';
 
   -- 7. POSTCHECK ASSERTIONS

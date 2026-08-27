@@ -187,6 +187,10 @@ BEGIN
   IF v_aug_hist.id IS NULL THEN RAISE EXCEPTION 'CAS_FAILURE: August 2026 history row missing.'; END IF;
 
   -- 2. CAS PRECONDITIONS
+  IF v_acc_record.open_date IS DISTINCT FROM DATE '2026-08-01' THEN
+    RAISE EXCEPTION 'CAS_FAILURE: account open_date is % (expected 2026-08-01)', v_acc_record.open_date;
+  END IF;
+
   IF v_acc_record.starting_capital IS DISTINCT FROM 487000.00 THEN
     RAISE EXCEPTION 'CAS_FAILURE: starting_capital is % (expected 487000.00)', v_acc_record.starting_capital;
   END IF;
@@ -199,34 +203,38 @@ BEGIN
     RAISE EXCEPTION 'CAS_FAILURE: dep_94a0ffe1 type is % (expected DEPOSIT)', v_dep_record.type;
   END IF;
 
-  -- 3. ENSURE METADATA ALIGNMENT
-  UPDATE investors SET start_date = DATE '2026-08-01', updated_at = NOW() WHERE id = 'inv_2093cd23' AND start_date IS DISTINCT FROM DATE '2026-08-01';
-  UPDATE investor_accounts SET open_date = DATE '2026-08-01', starting_capital = 487000.00, updated_at = NOW() WHERE id = v_acc_record.id AND (open_date IS DISTINCT FROM DATE '2026-08-01' OR starting_capital IS DISTINCT FROM 487000.00);
-
-  -- 4. VOID SCHEDULED SEPTEMBER DEPOSIT
-  UPDATE deposits SET type = 'VOID', notes = 'Voided: Subsumed into $487,000.00 August 1 starting capital per Josh instruction (Cell T170)' WHERE id = 'dep_94a0ffe1';
-  GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
-  IF v_rows_updated != 1 THEN RAISE EXCEPTION 'MUTATION_FAILURE: Expected 1 deposit voided, got %', v_rows_updated; END IF;
-
-  -- 5. ENSURE AUGUST MONTHLY HISTORY ALIGNMENT
-  UPDATE investor_monthly_history SET opening_balance = 487000.00, ending_balance = 487000.00, updated_at = NOW() WHERE id = v_aug_hist.id AND (opening_balance IS DISTINCT FROM 487000.00 OR ending_balance IS DISTINCT FROM 487000.00);
-
-  -- 6. POSTCHECK ASSERTIONS
-  SELECT starting_capital, open_date INTO v_acc_record FROM investor_accounts WHERE id = v_acc_record.id;
-  IF v_acc_record.starting_capital IS DISTINCT FROM 487000.00 OR v_acc_record.open_date IS DISTINCT FROM DATE '2026-08-01' THEN
-    RAISE EXCEPTION 'POSTCHECK_FAILURE: Account starting capital / open date not aligned.';
+  IF v_aug_hist.opening_balance IS DISTINCT FROM 487000.00 OR v_aug_hist.ending_balance IS DISTINCT FROM 487000.00 THEN
+    RAISE EXCEPTION 'CAS_FAILURE: August history is not $487,000.00 baseline';
   END IF;
 
-  RAISE NOTICE 'SUCCESS: Gary Larson Tier 3 correction completed and verified.';
+  -- 3. VOID SCHEDULED SEPTEMBER DEPOSIT dep_94a0ffe1 (ONLY MUTATION)
+  UPDATE deposits
+  SET 
+    type = 'VOID',
+    notes = 'Voided: Subsumed into $487,000.00 August 1 starting capital per Josh instruction (Cell T170)'
+  WHERE id = 'dep_94a0ffe1';
+
+  GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
+  IF v_rows_updated != 1 THEN
+    RAISE EXCEPTION 'MUTATION_FAILURE: Expected 1 deposit voided, got %', v_rows_updated;
+  END IF;
+
+  -- 4. POSTCHECK ASSERTIONS
+  SELECT type INTO v_dep_record FROM deposits WHERE id = 'dep_94a0ffe1';
+  IF v_dep_record.type IS DISTINCT FROM 'VOID' THEN
+    RAISE EXCEPTION 'POSTCHECK_FAILURE: Deposit dep_94a0ffe1 not voided.';
+  END IF;
+
+  RAISE NOTICE 'SUCCESS: Gary Larson Tier 3 deposit void completed and verified.';
 END $$;
 ```
 
 ### Step C: Read-Only Verification
 ```sql
 SELECT 
-  (SELECT json_build_object('open_date', open_date, 'starting_capital', starting_capital) FROM investor_accounts WHERE id = 'glarson' OR investor_id = 'inv_2093cd23') AS updated_acc,
+  (SELECT json_build_object('open_date', open_date, 'starting_capital', starting_capital) FROM investor_accounts WHERE id = 'glarson' OR investor_id = 'inv_2093cd23') AS verified_acc,
   (SELECT json_build_object('id', id, 'type', type, 'notes', notes) FROM deposits WHERE id = 'dep_94a0ffe1') AS voided_dep,
-  (SELECT json_build_object('opening', opening_balance, 'ending', ending_balance) FROM investor_monthly_history WHERE investor_id = 'inv_2093cd23' AND year = 2026 AND month_number = 8) AS aligned_aug_hist;
+  (SELECT json_build_object('opening', opening_balance, 'ending', ending_balance) FROM investor_monthly_history WHERE investor_id = 'inv_2093cd23' AND year = 2026 AND month_number = 8) AS verified_aug_hist;
 ```
 
 ---
@@ -302,9 +310,12 @@ BEGIN
   -- 5. ALIGN AUGUST OPENING & HISTORY
   UPDATE investor_monthly_history SET opening_balance = v_end, ending_balance = v_end, updated_at = NOW() WHERE id = v_aug_hist.id;
 
-  -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS
-  UPDATE commission_earnings SET amount = 5.10 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  -- 6. ALIGN JULY DOWNLINE COMMISSION EARNINGS ROWS (FIRST PRINCIPLES)
+  -- 1. Stone & Co (inv_015f3774) @ 11.20% ($5.09)
+  UPDATE commission_earnings SET amount = 5.09 WHERE id = 'c7fa50d1-3cb6-43df-a412-790643a48e16';
+  -- 2. Rwamsley (inv_920b8af8) @ 11.10% ($5.05)
   UPDATE commission_earnings SET amount = 5.05 WHERE id = '3581a5c3-4b07-4ed4-a4a0-156ff9e07de4';
+  -- 3. JStout (stout001) @ 12.70% ($5.78)
   UPDATE commission_earnings SET amount = 5.78 WHERE id = 'a579f12b-759f-4b53-85c8-6b0ca41d7161';
 
   -- 7. POSTCHECK ASSERTIONS

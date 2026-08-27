@@ -275,6 +275,16 @@ async function runExactArtifactCertification() {
     assert.strictEqual(Number(jsHist[0].deposits), 0.00);
     assert.strictEqual(Number(jsHist[0].ending_balance).toFixed(2), "1482.82");
     assert.strictEqual(Number(jsHist[1].ending_balance).toFixed(2), "1482.82");
+    
+    // Exact First-Principles Assertions:
+    // c7fa50d1... (Stone & Co @ 11.20%): $5.09
+    // 3581a5c3... (Rwamsley @ 11.10%): $5.05
+    // a579f12b... (JStout @ 12.70%): $5.78
+    const commMap = Object.fromEntries(jsComm.map(c => [c.id, Number(c.amount).toFixed(2)]));
+    assert.strictEqual(commMap["c7fa50d1-3cb6-43df-a412-790643a48e16"], "5.09");
+    assert.strictEqual(commMap["3581a5c3-4b07-4ed4-a4a0-156ff9e07de4"], "5.05");
+    assert.strictEqual(commMap["a579f12b-759f-4b53-85c8-6b0ca41d7161"], "5.78");
+
     console.log("  Jeannine Forward Exact Payload: PASS (Deposit: VOID, July ending: $1482.82, August ending: $1482.82)");
     console.log("  Jeannine Recipient Commissions: ", jsComm.map(c => `${c.id.substring(0,8)}...: $${c.amount}`).join(", "));
 
