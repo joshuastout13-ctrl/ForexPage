@@ -25,6 +25,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: error.message || "Failed to load dashboard" });
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || "Failed to load dashboard" });
   }
 }

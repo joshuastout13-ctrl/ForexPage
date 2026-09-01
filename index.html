@@ -624,7 +624,7 @@
     <div id="errorCard" class="card login-card hidden" style="text-align:center; padding:36px 24px; max-width:480px; margin:40px auto;">
       <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
       <h2 style="font-size:22px; margin-bottom:12px;">Unable to Load Dashboard</h2>
-      <p class="muted" style="margin-bottom:24px; line-height:1.5;">We couldn't load your dashboard. Please sign in again or contact support if the issue persists.</p>
+      <p id="errorMessage" class="muted" style="margin-bottom:24px; line-height:1.5;">We couldn't load your dashboard. Please sign in again or contact support if the issue persists.</p>
       <div style="display:flex; gap:12px; justify-content:center;">
         <button id="retryBtn" style="padding:10px 20px; background:linear-gradient(135deg,var(--accent),#2563eb);">Try Again</button>
         <button id="errorLogoutBtn" class="secondary" style="padding:10px 20px;">Sign Out</button>
@@ -1054,6 +1054,10 @@
     function showErrorState(message) {
       cachedDashboardData = null;
       showView("error");
+      const msgEl = document.getElementById("errorMessage");
+      if (msgEl) {
+        msgEl.textContent = message || "We couldn't load your dashboard. Please sign in again or contact support if the issue persists.";
+      }
       const statusEl = document.getElementById("statusText");
       if (statusEl) statusEl.textContent = message || "Dashboard error";
     }
@@ -1077,7 +1081,7 @@
         } else {
           const res = await fetch("/api/me");
 
-          if (res.status === 401) {
+          if (res.status === 401 || res.status === 404) {
             cachedDashboardData = null;
             showView("login");
             return;
@@ -1124,8 +1128,10 @@
         showView("dashboard");
 
         const firstName = (data.investor.name || "").split(' ')[0] || "Investor";
-        document.getElementById("statusText").textContent = `Welcome back, ${firstName}`;
-        document.getElementById("investorName").textContent = `Active since ${data.investor.startDate || "N/A"}`;
+        const statusTextEl = document.getElementById("statusText");
+        if (statusTextEl) statusTextEl.textContent = `Welcome back, ${firstName}`;
+        const investorNameEl = document.getElementById("investorName");
+        if (investorNameEl) investorNameEl.textContent = `Active since ${data.investor.startDate || "N/A"}`;
 
         renderSummary(data);
         renderLive(data);
@@ -1145,7 +1151,8 @@
       const ctx = document.getElementById('performanceChart').getContext('2d');
       if (perfChart) perfChart.destroy();
 
-      const fullBreakdown = data.breakdown;
+      const fullBreakdown = data.breakdown || [];
+      const currentMonthIdx = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })).getMonth() + 1;
       const labels = fullBreakdown.map(r => r.month);
       const pctData = fullBreakdown.map(r => (r.isHistoricalCompleted !== undefined ? (r.isHistoricalCompleted ? r.effectiveReturnPct : null) : (r.isProjection || r.monthNumber >= currentMonthIdx ? null : r.effectiveReturnPct)));
       const dollarGains = fullBreakdown.map(r => r.gain);
@@ -1186,7 +1193,7 @@
                   const val = context.parsed.y;
                   const gain = dollarGains[context.dataIndex];
                   return [
-                    `Return: ${val.toFixed(2)}%`,
+                    `Return: ${typeof val === 'number' && !isNaN(val) ? val.toFixed(2) : '0.00'}%`,
                     `Gain: ${money(gain)}`
                   ];
                 }
