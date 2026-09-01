@@ -987,7 +987,7 @@
         const prevRow = idx > 0 ? rows[idx - 1] : null;
         const commAdded = prevRow ? (parseFloat(prevRow.commissionsEarned) || 0) : 0;
         if (commAdded > 0) {
-          activityHtml += `<div class="green">+${money(commAdded)} Commission Added</div>`;
+          activityHtml += `<div class="green">+${money(commAdded)} Commission Added${r.isProjection ? ' (Projected)' : ''}</div>`;
         }
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
