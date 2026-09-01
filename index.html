@@ -1146,8 +1146,9 @@
       if (perfChart) perfChart.destroy();
 
       const fullBreakdown = data.breakdown;
+      const currentMonthIdx = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })).getMonth() + 1;
       const labels = fullBreakdown.map(r => r.month);
-      const pctData = fullBreakdown.map(r => r.isProjection ? null : r.effectiveReturnPct);
+      const pctData = fullBreakdown.map(r => (r.isProjection || r.monthNumber >= currentMonthIdx) ? null : r.effectiveReturnPct);
       const dollarGains = fullBreakdown.map(r => r.gain);
 
       const gradient = ctx.createLinearGradient(0, 0, 0, 400);
