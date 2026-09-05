@@ -2,6 +2,7 @@ import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
 import { calculateAccountingPeriod } from "../../../../lib/accounting-period-engine.js";
 import { loadAccountingData } from "../../../../lib/paginated-read.js";
+import { getFundAccountingDate } from "../../../../lib/month-state.js";
 
 export default async function handler(req, res) {
   try {
@@ -16,8 +17,11 @@ export default async function handler(req, res) {
     }
 
     const query = req.method === "POST" ? req.body : req.query;
-    const year = Number(query.year || new Date().getFullYear());
-    const month = Number(query.month || new Date().getMonth() + 1);
+    // Default year/month use authoritative fund accounting timezone (America/Los_Angeles)
+    const asOfDate = query.asOfDate || null;
+    const { year: fundYear, monthNumber: fundMonth } = getFundAccountingDate(asOfDate);
+    const year = Number(query.year || fundYear);
+    const month = Number(query.month || fundMonth);
     const fundReturnPctOverride = query.fundReturnPct !== undefined && query.fundReturnPct !== null
       ? Number(query.fundReturnPct)
       : null;

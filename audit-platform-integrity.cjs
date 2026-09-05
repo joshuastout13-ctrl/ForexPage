@@ -13,6 +13,7 @@ const dotenv = require('dotenv');
 const Decimal = require('decimal.js');
 const fs = require('fs');
 const path = require('path');
+const { getFundAccountingDate } = require('./lib/month-state.cjs');
 
 dotenv.config({ path: '.env.local' });
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -159,8 +160,7 @@ function auditPerformanceSemantics(data) {
     }
   }
 
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
+  const { monthNumber: currentMonth } = getFundAccountingDate();
   const lastMonthNum = currentMonth === 1 ? 12 : currentMonth - 1;
   const lastMonthReturn = fundReturns[lastMonthNum] || 0;
 
@@ -500,7 +500,7 @@ function auditMichaelBeckMaryJo(data, invMaps) {
 
   const displayCommMonthIdx = latestFundReturnMonth > 0 
     ? Math.min(latestCommMonth > 0 ? latestCommMonth : latestFundReturnMonth, latestFundReturnMonth)
-    : (new Date().getMonth() + 1);
+    : getFundAccountingDate().monthNumber;
 
   console.log(`\n    displayCommMonthIdx (month used for commission detail): ${displayCommMonthIdx}`);
 
@@ -973,8 +973,7 @@ function auditPlatformCommissionIntegrity(data, invMaps) {
     summary: {}
   };
 
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
+  const { monthNumber: currentMonth } = getFundAccountingDate();
 
   // Get latest published fund return month
   let latestFundMonth = 0;
@@ -1145,8 +1144,7 @@ function auditSourceBalanceIntegrity(data, invMaps) {
     priorityInvestors: []
   };
 
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
+  const { monthNumber: currentMonth } = getFundAccountingDate();
 
   // Get latest fund return month for displayCommMonthIdx baseline
   let latestFundMonth = 0;

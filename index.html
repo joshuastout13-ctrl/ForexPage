@@ -1351,9 +1351,12 @@
       if (perfChart) perfChart.destroy();
 
       const fullBreakdown = data.breakdown || [];
-      const currentMonthIdx = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })).getMonth() + 1;
+      // Chart renders settled (historical) months only.
+      // isHistoricalCompleted is computed authorita­tively by the backend
+      // (lib/month-state.js, America/Los_Angeles) and passed through every
+      // breakdown row — never recomputed client-side to avoid timezone drift.
       const labels = fullBreakdown.map(r => r.month);
-      const pctData = fullBreakdown.map(r => (r.isHistoricalCompleted !== undefined ? (r.isHistoricalCompleted ? r.effectiveReturnPct : null) : (r.isProjection || r.monthNumber >= currentMonthIdx ? null : r.effectiveReturnPct)));
+      const pctData = fullBreakdown.map(r => r.isHistoricalCompleted ? r.effectiveReturnPct : null);
       const dollarGains = fullBreakdown.map(r => r.gain);
 
       const gradient = ctx.createLinearGradient(0, 0, 0, 400);
