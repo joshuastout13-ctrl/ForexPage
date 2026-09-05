@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -10,6 +11,9 @@ export default async function handler(req, res) {
 
   if (req.method === "PATCH" || req.method === "PUT") {
     try {
+      await assertAuthoritativeProductionDb("update_deposit");
+      const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.updated_by, "update_deposit");
+
       const body = req.body || {};
       const updates = {};
       
@@ -40,20 +44,18 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true, deposit: updateRes.data[0] });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
+      return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });
     }
   }
 
   if (req.method === "DELETE") {
-    try {
-      const { data, error } = await supabase.from("deposits").delete().eq("id", id).select();
-      if (error) throw error;
-      return res.status(200).json({ success: true, deposit: data[0] });
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
-    }
+    res.setHeader("Allow", ["PATCH", "PUT"]);
+    return res.status(405).json({
+      error: "METHOD_NOT_ALLOWED: Physical deletion of financial deposit records is permanently disabled to preserve ledger audit integrity. Void the record via POST /api/admin/deposits/[id]/void or record an explicit ledger adjustment."
+    });
   }
 
-  res.setHeader("Allow", ["PATCH", "PUT", "DELETE"]);
+  res.setHeader("Allow", ["PATCH", "PUT"]);
   res.status(405).json({ error: "Method not allowed" });
 }

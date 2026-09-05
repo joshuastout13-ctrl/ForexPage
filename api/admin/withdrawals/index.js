@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
+import { assertAuthoritativeProductionDb, assertAuditActor, buildDeterministicIdempotencyKey } from "../../../lib/financial-mutation-guard.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -19,6 +20,10 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
+      // 0. Fail-closed Authoritative DB and Audit Actor Preconditions
+      await assertAuthoritativeProductionDb("create_withdrawal");
+      const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.created_by, "create_withdrawal");
+
       const body = req.body || {};
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -68,11 +73,25 @@ export default async function handler(req, res) {
         }
       }
 
+      const numAmount = parseFloat(body.amount);
+      let idempotencyKey = body.idempotency_key || body.idempotencyKey || null;
+
+      // Construct canonical deterministic key if correction purpose is provided and no explicit key supplied
+      if (!idempotencyKey && (body.purpose || body.is_correction)) {
+        idempotencyKey = buildDeterministicIdempotencyKey({
+          type: "withdrawal",
+          investorId: investorId || "unknown",
+          effectiveDate: effDate,
+          amountCents: Math.round(numAmount * 100),
+          purpose: body.purpose || "authorized_correction"
+        });
+      }
+
       const payload = {
         id: body.id || `wd_${crypto.randomBytes(4).toString("hex")}`,
         investor_id: investorId,
         account_id: accountId,
-        amount: parseFloat(body.amount),
+        amount: numAmount,
         request_date: body.request_date || body.requestDate || effDate,
         effective_accounting_date: effDate,
         year: year,
@@ -80,8 +99,8 @@ export default async function handler(req, res) {
         month: monthName,
         status: body.status || "Pending",
         notes: body.notes || "",
-        idempotency_key: body.idempotency_key || body.idempotencyKey || null,
-        created_by: body.created_by || (session?.adminId || "admin")
+        idempotency_key: idempotencyKey,
+        created_by: auditActor
       };
 
       if (!payload.investor_id || !payload.account_id) {
@@ -100,6 +119,7 @@ export default async function handler(req, res) {
 
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
+        const allowDuplicateAmount = Boolean(body.allow_duplicate_amount || body.allowDuplicateAmount);
         const { data: rpcData, error: rpcError } = await supabase.rpc("create_withdrawal_atomic", {
           p_investor_id: payload.investor_id,
           p_account_id: payload.account_id,
@@ -108,10 +128,23 @@ export default async function handler(req, res) {
           p_status: payload.status,
           p_notes: payload.notes,
           p_idempotency_key: payload.idempotency_key,
-          p_created_by: payload.created_by
+          p_created_by: payload.created_by,
+          p_allow_duplicate_amount: allowDuplicateAmount
         });
 
         if (!rpcError && rpcData) {
+          if (rpcData.status === "DUPLICATE_ECONOMIC_TRANSACTION") {
+            return res.status(409).json({
+              error: rpcData.error || "DUPLICATE_ECONOMIC_TRANSACTION: Duplicate active withdrawal already exists for this investor and effective date.",
+              code: "DUPLICATE_ECONOMIC_TRANSACTION",
+              existing_withdrawal_id: rpcData.existing_withdrawal_id,
+              existing_withdrawal_status: rpcData.existing_withdrawal_status,
+              existing_idempotency_key: rpcData.existing_idempotency_key,
+              amount: rpcData.amount,
+              effective_accounting_date: rpcData.effective_accounting_date
+            });
+          }
+
           const isReplay = rpcData.status === "IDEMPOTENT_REPLAY";
           return res.status(isReplay ? 200 : 201).json({
             status: rpcData.status,
@@ -125,6 +158,9 @@ export default async function handler(req, res) {
         // Map RPC error codes to safe HTTP responses
         if (rpcError) {
           const msg = rpcError.message || "";
+          if (msg.includes("DUPLICATE_ECONOMIC_TRANSACTION")) {
+            return res.status(409).json({ error: msg, code: "DUPLICATE_ECONOMIC_TRANSACTION" });
+          }
           if (msg.includes("WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY") ||
               msg.includes("INVALID_EFFECTIVE_DATE") ||
               msg.includes("INVALID_AMOUNT") ||
@@ -177,7 +213,8 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       console.error("Error creating withdrawal:", error);
-      return res.status(400).json({ error: error.message || "Withdrawal creation failed." });
+      const isAuthDbUnavailable = String(error?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
+      return res.status(isAuthDbUnavailable ? 503 : 400).json({ error: error.message || "Withdrawal creation failed." });
     }
   }
 

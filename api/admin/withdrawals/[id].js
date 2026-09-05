@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
+import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -10,6 +11,9 @@ export default async function handler(req, res) {
 
   if (req.method === "PATCH" || req.method === "PUT") {
     try {
+      await assertAuthoritativeProductionDb("update_withdrawal");
+      const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.updated_by, "update_withdrawal");
+
       const body = req.body || {};
       const updates = {};
       if (body.amount !== undefined) updates.amount = parseFloat(body.amount);
@@ -33,7 +37,7 @@ export default async function handler(req, res) {
           p_amount: updates.amount !== undefined ? updates.amount : null,
           p_status: updates.status !== undefined ? updates.status : null,
           p_notes: updates.notes !== undefined ? updates.notes : null,
-          p_updated_by: body.updated_by || (session?.adminId || "admin")
+          p_updated_by: auditActor
         });
 
         if (!rpcError && rpcData) {
@@ -94,7 +98,8 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       console.error("Error updating withdrawal:", error);
-      return res.status(400).json({ error: error.message || "Withdrawal update failed." });
+      const isAuthDbUnavailable = String(error?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
+      return res.status(isAuthDbUnavailable ? 503 : 400).json({ error: error.message || "Withdrawal update failed." });
     }
   }
 

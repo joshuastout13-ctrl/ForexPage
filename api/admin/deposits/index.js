@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -18,6 +19,9 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
+      await assertAuthoritativeProductionDb("create_deposit");
+      const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.created_by, "create_deposit");
+
       const body = req.body || {};
       const entryDate = body.date || new Date().toISOString().split('T')[0];
       let effDate = body.effectiveAccountingDate || body.effective_accounting_date;
@@ -84,7 +88,8 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true, deposit: insertRes.data[0] });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
+      return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });
     }
   }
 

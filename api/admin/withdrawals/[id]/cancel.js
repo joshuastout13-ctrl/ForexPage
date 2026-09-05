@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
+import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../../lib/financial-mutation-guard.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -10,6 +11,9 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
+      await assertAuthoritativeProductionDb("cancel_withdrawal");
+      const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.updated_by, "cancel_withdrawal");
+
       if (!supabase) {
         return res.status(503).json({
           error: "PACKAGE_B_RPC_UNAVAILABLE: Database client is not configured. Raw status mutation blocked."
@@ -21,8 +25,8 @@ export default async function handler(req, res) {
         p_withdrawal_id: id,
         p_amount: null,
         p_status: "Cancelled",
-        p_notes: "Cancelled via admin portal action",
-        p_updated_by: session?.adminId || "admin"
+        p_notes: req.body?.notes || "Cancelled via admin portal action",
+        p_updated_by: auditActor
       });
 
       if (!rpcError && rpcData) {
