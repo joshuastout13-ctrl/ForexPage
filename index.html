@@ -521,7 +521,7 @@
     @media (max-width: 640px) {
       .wrap { padding: 16px 12px; }
       .card {
-        padding: 16px;
+        padding: 16px 12px;
         margin-bottom: 16px;
         border-radius: 18px;
       }
@@ -533,132 +533,155 @@
         overflow-x: visible;
       }
 
-      /* Mobile Breakdown Table -> Stacked Cards */
+      /* Mobile Breakdown Table -> Restored Josh's Compact Multi-Column Format */
       #breakdownTable {
-        display: block;
+        display: table;
         width: 100%;
-        border-spacing: 0;
+        border-collapse: separate;
+        border-spacing: 0 4px;
+        table-layout: fixed;
       }
       #breakdownTable thead {
-        display: none;
+        display: table-header-group;
       }
       #breakdownTable tbody {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        width: 100%;
+        display: table-row-group;
+      }
+      #breakdownTable th {
+        padding: 6px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      #breakdownTable th.breakdown-th-month {
+        width: 25%;
+        text-align: left;
+      }
+      #breakdownTable th.breakdown-th-balance {
+        width: 37%;
+        text-align: left;
+      }
+      #breakdownTable th.breakdown-th-perf {
+        width: 38%;
+        text-align: right;
       }
       #breakdownTable tr.breakdown-row {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        background: rgba(255, 255, 255, 0.025);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 16px;
-        padding: 16px;
+        display: table-row;
         box-sizing: border-box;
-        margin: 0;
       }
-      #breakdownTable tr.breakdown-row:hover {
+      #breakdownTable tr.breakdown-row:hover td {
         background: rgba(255, 255, 255, 0.04);
       }
       #breakdownTable td {
-        display: block;
-        width: 100%;
-        padding: 0;
-        border: none;
-        background: none;
+        display: table-cell;
+        vertical-align: top;
+        padding: 8px 4px;
+        background: rgba(255, 255, 255, 0.02);
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         box-sizing: border-box;
       }
+      #breakdownTable td:first-child {
+        border-left: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 10px 0 0 10px;
+        padding-left: 6px;
+      }
+      #breakdownTable td:last-child {
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0 10px 10px 0;
+        padding-right: 6px;
+      }
 
-      /* 1. Month Header */
+      /* 1. Month Cell */
       .breakdown-cell-month {
-        display: flex !important;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 12px;
-        padding-bottom: 8px !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        width: 25%;
+        text-align: left;
       }
       .breakdown-cell-month .breakdown-month-title {
-        font-size: 16px;
+        font-size: 13px;
         font-weight: 700;
         color: var(--text);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
+        line-height: 1.2;
       }
       .breakdown-cell-month .breakdown-projection-tag {
-        margin-top: 0;
+        font-size: 9px;
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-top: 3px;
+        display: inline-block;
       }
 
-      /* 2. Starting Balance Section */
+      /* 2. Starting Balance Cell */
       .breakdown-cell-balance {
-        margin-bottom: 12px;
+        width: 37%;
+        text-align: left;
       }
       .breakdown-mobile-label {
-        display: block;
-        color: var(--muted);
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 3px;
+        display: none !important;
       }
       .breakdown-balance-val {
-        font-size: 20px;
-        font-weight: 700;
+        font-size: 12.5px;
+        font-weight: 600;
         color: var(--text);
         font-family: 'Outfit', sans-serif;
         line-height: 1.2;
+        white-space: nowrap;
       }
 
-      /* 3. Performance Block */
+      /* 3. Performance Cell */
       .breakdown-cell-perf {
-        display: flex !important;
-        flex-direction: column;
-        gap: 10px;
+        width: 38%;
+        text-align: right;
       }
       .breakdown-perf-group {
         display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 12px;
-        padding: 10px 14px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        flex-direction: column;
+        gap: 2px;
+        align-items: flex-end;
+        background: none;
+        border: none;
+        padding: 0;
+        border-radius: 0;
       }
       .breakdown-perf-item {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 2px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        white-space: nowrap;
       }
       .breakdown-perf-item:last-child {
-        align-items: flex-end;
+        align-items: center;
       }
       .breakdown-perf-label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
+        font-size: 10.5px;
+        color: var(--muted);
+        text-transform: none;
+        letter-spacing: normal;
       }
       .breakdown-perf-val {
-        font-size: 16px;
+        font-size: 11px;
         font-weight: 700;
+        font-family: 'Outfit', sans-serif;
       }
 
       /* 4. Activity Section */
       .breakdown-activity-wrap {
         border-top: 1px solid rgba(255, 255, 255, 0.05);
-        padding-top: 10px;
-        margin-top: 2px;
+        padding-top: 4px;
+        margin-top: 4px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 2px;
         text-align: right;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 600;
-        line-height: 1.4;
+        line-height: 1.3;
       }
 
       /* Chart Responsiveness */
@@ -1170,9 +1193,9 @@
       const head = `
         <thead>
           <tr>
-            <th>Month</th>
-            <th>Starting Balance</th>
-            <th style="text-align:right;">Performance & Activity</th>
+            <th class="breakdown-th-month">Month</th>
+            <th class="breakdown-th-balance">Starting Balance</th>
+            <th class="breakdown-th-perf" style="text-align:right;">Performance & Activity</th>
           </tr>
         </thead>
       `;
@@ -1202,7 +1225,6 @@
               ${r.isProjection ? '<span class="breakdown-projection-tag">Projection</span>' : ""}
             </td>
             <td class="breakdown-cell-balance">
-              <div class="breakdown-mobile-label">Starting Balance</div>
               <div class="breakdown-balance-val">${money(r.adjustedStartingBalance)}</div>
             </td>
             <td class="breakdown-cell-perf">
