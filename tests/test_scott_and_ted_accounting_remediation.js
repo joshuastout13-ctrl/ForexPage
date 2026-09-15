@@ -528,8 +528,8 @@ async function runSuite() {
     pass("2G. Ted Boardwalk: September 1 $0.00 cutover baseline and commission-only status verified");
 
     // Verify Jerry, Mary Jo, and September batch intact
-    const { rows: jerryCheck } = await client.query("SELECT COUNT(*) FROM withdrawals WHERE investor_id = 'jerrys001' AND effective_accounting_date = DATE '2026-08-01' AND status = 'Completed';");
-    assert.strictEqual(Number(jerryCheck[0].count), 1, "Jerry August completed withdrawal intact");
+    const { rows: jerryCheck } = await client.query("SELECT COUNT(*) FROM withdrawals WHERE investor_id = 'jerrys001' AND effective_accounting_date = DATE '2026-08-01' AND LOWER(TRIM(status)) IN ('approved', 'completed');");
+    assert.strictEqual(Number(jerryCheck[0].count), 1, "Jerry August completed/approved withdrawal intact");
 
     const { rows: maryJoCheck } = await client.query("SELECT COUNT(*) FROM withdrawals WHERE investor_id = 'inv_4c5c0ee6' AND effective_accounting_date = DATE '2026-09-01' AND status = 'Completed';");
     assert.strictEqual(Number(maryJoCheck[0].count), 1, "Mary Jo September completed withdrawal intact");

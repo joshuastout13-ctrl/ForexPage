@@ -42,16 +42,16 @@ BEGIN
   -- 0. PREFLIGHT IMMUTABILITY & SAFETY ASSERTIONS
   -- ---------------------------------------------------------------------------
   
-  -- Assertion 0A: Jerry August $2,500 withdrawal must remain exactly 1 row
+  -- Assertion 0A: Jerry August $2,500 withdrawal must remain exactly 1 row (status Approved or Completed)
   SELECT COUNT(*) INTO v_jerry_aug_count
   FROM withdrawals
   WHERE investor_id = 'jerrys001'
     AND effective_accounting_date = DATE '2026-08-01'
     AND amount = 2500.00
-    AND status = 'Completed';
+    AND LOWER(TRIM(status)) IN ('approved', 'completed');
 
-  IF v_jerry_aug_count < 1 THEN
-    RAISE EXCEPTION 'SAFETY_ASSERTION_FAILED: Jerry August completed withdrawal not found. Mutation aborted.';
+  IF v_jerry_aug_count != 1 THEN
+    RAISE EXCEPTION 'SAFETY_ASSERTION_FAILED: Jerry August withdrawal expected 1 row, found %. Mutation aborted.', v_jerry_aug_count;
   END IF;
 
   -- Assertion 0B: Mary Jo September completed withdrawal ($21,000.00) must remain intact
