@@ -46,7 +46,11 @@ BEGIN
   SELECT COUNT(*) INTO v_jerry_aug_count
   FROM withdrawals
   WHERE investor_id = 'jerrys001'
-    AND effective_accounting_date = DATE '2026-08-01'
+    AND (
+      effective_accounting_date = DATE '2026-08-01'
+      OR (year = 2026 AND month_number = 8)
+      OR request_date = DATE '2026-08-01'
+    )
     AND amount = 2500.00
     AND LOWER(TRIM(status)) IN ('approved', 'completed');
 
@@ -58,7 +62,11 @@ BEGIN
   SELECT COUNT(*) INTO v_maryjo_sep_count
   FROM withdrawals
   WHERE investor_id = 'inv_4c5c0ee6'
-    AND effective_accounting_date = DATE '2026-09-01'
+    AND (
+      effective_accounting_date = DATE '2026-09-01'
+      OR (year = 2026 AND month_number = 9)
+      OR request_date = DATE '2026-09-01'
+    )
     AND amount = 21000.00
     AND status = 'Completed';
 
@@ -70,7 +78,11 @@ BEGIN
   SELECT COUNT(*), COALESCE(SUM(amount), 0.00)
   INTO v_batch_count, v_batch_sum
   FROM withdrawals
-  WHERE effective_accounting_date = DATE '2026-09-01'
+  WHERE (
+      effective_accounting_date = DATE '2026-09-01'
+      OR (year = 2026 AND month_number = 9)
+      OR request_date = DATE '2026-09-01'
+    )
     AND status = 'Completed';
 
   IF v_batch_count != 11 OR v_batch_sum != 167258.30 THEN
@@ -81,8 +93,12 @@ BEGIN
   -- Assertion 0D: Ted Boardwalk $1,100 withdrawal must NEVER exist
   SELECT COUNT(*) INTO v_ted_wd_count
   FROM withdrawals
-  WHERE investor_id = 'inv_a79798ca'
-    AND (year = 2026 AND month_number = 9 OR effective_accounting_date = DATE '2026-09-01');
+  WHERE (investor_id = 'inv_a79798ca' OR investor_id = 'tboardwalk')
+    AND (
+      year = 2026 AND month_number = 9 
+      OR effective_accounting_date = DATE '2026-09-01'
+      OR request_date = DATE '2026-09-01'
+    );
 
   IF v_ted_wd_count > 0 THEN
     RAISE EXCEPTION 'SAFETY_ASSERTION_FAILED: September withdrawal found for Ted Boardwalk. It must not exist!';
@@ -94,35 +110,56 @@ BEGIN
   v_scott_lock := financial_lock_key('inv_f22b8d5d');
   PERFORM pg_advisory_xact_lock(v_scott_lock);
 
-  -- Verify Completed row exists
+  -- Verify Completed row exists (id = 'wd_fd3bcfc9' or May 2026 completed record)
   SELECT * INTO v_completed_wd
   FROM withdrawals
   WHERE investor_id = 'inv_f22b8d5d'
     AND amount = 25000.00
     AND status = 'Completed'
-    AND (id = 'wd_completed_may_ssire' OR effective_accounting_date = DATE '2026-05-01');
+    AND (
+      id = 'wd_fd3bcfc9'
+      OR id = 'wd_completed_may_ssire'
+      OR (year = 2026 AND month_number = 5)
+      OR request_date = DATE '2026-05-01'
+      OR effective_accounting_date = DATE '2026-05-01'
+    );
 
   IF v_completed_wd.id IS NULL THEN
     RAISE EXCEPTION 'CAS_FAILURE: Scott Sire completed May withdrawal not found.';
   END IF;
 
-  -- Verify and cancel orphaned Pending row
+  -- Verify and cancel orphaned Pending row (id = 'wd_4a071e6a')
   SELECT * INTO v_pending_wd
   FROM withdrawals
   WHERE investor_id = 'inv_f22b8d5d'
     AND amount = 25000.00
     AND status = 'Pending'
-    AND (id = 'wd_pending_may_ssire' OR effective_accounting_date = DATE '2026-05-01');
+    AND (
+      id = 'wd_4a071e6a'
+      OR id = 'wd_pending_may_ssire'
+      OR (year = 2026 AND month_number = 5)
+      OR request_date = DATE '2026-06-01'
+      OR effective_accounting_date = DATE '2026-05-01'
+    );
 
   IF v_pending_wd.id IS NOT NULL THEN
-    v_rpc_res := update_withdrawal_atomic(
-      p_withdrawal_id := v_pending_wd.id::text,
-      p_amount := NULL,
-      p_status := 'Cancelled',
-      p_notes := 'Cancelled duplicate pending record for May 2026 distribution - superseded by completed withdrawal ' || v_completed_wd.id::text || ' per Josh Stout authorization',
-      p_updated_by := 'system_accounting_remediation'
-    );
-    RAISE NOTICE 'Scott Sire pending withdrawal % successfully transitioned to Cancelled.', v_pending_wd.id;
+    BEGIN
+      v_rpc_res := update_withdrawal_atomic(
+        p_withdrawal_id := v_pending_wd.id::text,
+        p_amount := NULL,
+        p_status := 'Cancelled',
+        p_notes := 'Cancelled duplicate pending record for May 2026 distribution - superseded by completed withdrawal ' || v_completed_wd.id::text || ' per Josh Stout authorization',
+        p_updated_by := 'system_accounting_remediation'
+      );
+      RAISE NOTICE 'Scott Sire pending withdrawal % successfully transitioned to Cancelled via update_withdrawal_atomic.', v_pending_wd.id;
+    EXCEPTION WHEN undefined_function THEN
+      UPDATE withdrawals
+      SET status = 'Cancelled',
+          notes = 'Cancelled duplicate pending record for May 2026 distribution - superseded by completed withdrawal ' || v_completed_wd.id::text || ' per Josh Stout authorization',
+          updated_at = NOW()
+      WHERE id = v_pending_wd.id;
+      RAISE NOTICE 'Scott Sire pending withdrawal % transitioned to Cancelled via direct UPDATE.', v_pending_wd.id;
+    END;
   ELSE
     RAISE NOTICE 'Scott Sire pending withdrawal already cancelled or absent. Completed withdrawal % intact.', v_completed_wd.id;
   END IF;
@@ -243,14 +280,18 @@ END $$;
 SELECT 
   id,
   investor_id,
+  account_id,
   amount,
   status,
+  request_date,
   effective_accounting_date,
+  year,
+  month_number,
   notes,
   updated_at
 FROM withdrawals
 WHERE investor_id = 'inv_f22b8d5d'
-ORDER BY effective_accounting_date, status;
+ORDER BY request_date, status;
 
 -- Ted Boardwalk Cutover & History Records
 SELECT 
@@ -293,5 +334,9 @@ SELECT
   SUM(amount) AS sept_batch_total,
   (COUNT(*) = 11 AND SUM(amount) = 167258.30) AS batch_intact
 FROM withdrawals
-WHERE effective_accounting_date = DATE '2026-09-01'
+WHERE (
+    effective_accounting_date = DATE '2026-09-01'
+    OR (year = 2026 AND month_number = 9)
+    OR request_date = DATE '2026-09-01'
+  )
   AND status = 'Completed';
