@@ -1602,9 +1602,20 @@ let state = {
                 fbEl.style.color = '#34d399';
                 fbEl.textContent = '✓ Available Account Equity: $' + avail.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               }
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              fbEl.style.display = 'block';
+              fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
+              fbEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+              fbEl.style.color = '#f87171';
+              fbEl.textContent = '⚠️ Unable to verify available equity: ' + (errData.error || ('HTTP ' + res.status));
             }
           } catch (err) {
-            // Silently ignore preview network errors
+            fbEl.style.display = 'block';
+            fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
+            fbEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            fbEl.style.color = '#f87171';
+            fbEl.textContent = '⚠️ Unable to verify available equity: Network error';
           }
         };
 
