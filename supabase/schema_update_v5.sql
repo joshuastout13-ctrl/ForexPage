@@ -39,10 +39,10 @@ BEGIN
 END $$;
 
 -- 2. ACCOUNTING TREATMENT COLUMN
---    Distinguishes NEW_CASH (balance-affecting) from HISTORICAL_PROVENANCE
---    (provenance-only, balance already represented in cutover/starting history).
---    Default: 'NEW_CASH' (preserves existing behavior for all legacy rows)
-ALTER TABLE deposits ADD COLUMN IF NOT EXISTS accounting_treatment TEXT DEFAULT 'NEW_CASH';
+--    Distinguishes NEW_CASH (balance-affecting), HISTORICAL_PROVENANCE
+--    (provenance-only), and UNVERIFIED_LEGACY (pre-v5 unverified rows).
+--    Default: 'UNVERIFIED_LEGACY' (ensures unproven rows do not count as proven cash)
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS accounting_treatment TEXT DEFAULT 'UNVERIFIED_LEGACY';
 
 DO $$
 BEGIN
@@ -50,7 +50,7 @@ BEGIN
     SELECT 1 FROM pg_constraint WHERE conname = 'deposits_accounting_treatment_check'
   ) THEN
     ALTER TABLE deposits ADD CONSTRAINT deposits_accounting_treatment_check
-      CHECK (accounting_treatment IN ('NEW_CASH', 'HISTORICAL_PROVENANCE'));
+      CHECK (accounting_treatment IN ('NEW_CASH', 'HISTORICAL_PROVENANCE', 'UNVERIFIED_LEGACY'));
   END IF;
 END $$;
 

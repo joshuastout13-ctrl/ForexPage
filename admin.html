@@ -1189,13 +1189,22 @@ let state = {
         bd.innerHTML = d.map(i => {
           const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
           const treatment = (i.accounting_treatment || 'NEW_CASH').toUpperCase();
-          const treatmentLabel = treatment === 'HISTORICAL_PROVENANCE' ? 'Hist. Provenance' : 'New Cash';
-          const treatmentClass = treatment === 'HISTORICAL_PROVENANCE' ? 'pending' : 'active';
+          const treatmentLabel = treatment === 'HISTORICAL_PROVENANCE' 
+            ? 'Hist. Provenance' 
+            : (treatment === 'UNVERIFIED_LEGACY' ? 'Unverified Legacy' : 'New Cash');
+          const treatmentClass = treatment === 'HISTORICAL_PROVENANCE' 
+            ? 'pending' 
+            : (treatment === 'UNVERIFIED_LEGACY' ? 'inactive' : 'active');
+          const treatmentTitle = treatment === 'HISTORICAL_PROVENANCE'
+            ? 'Provenance only — does NOT affect accounting balance'
+            : (treatment === 'UNVERIFIED_LEGACY'
+                ? 'Unverified Legacy row — preserves monthly balance continuity but excluded from Total Deposits until verified'
+                : 'Balance-affecting — adds to accounting balance');
           const statusLabel = isVoid ? (i.status || i.type) : (i.status || 'confirmed');
           const effMonth = i.effective_accounting_date ? i.effective_accounting_date.slice(0, 7) : (i.date ? i.date.slice(0, 7) : '—');
           return `<tr>
             <td><span class="badge ${isVoid ? 'inactive' : 'active'}">${statusLabel}</span></td>
-            <td><span class="badge ${treatmentClass}" title="${treatment === 'HISTORICAL_PROVENANCE' ? 'Provenance only — does NOT affect accounting balance' : 'Balance-affecting — adds to accounting balance'}">${treatmentLabel}</span></td>
+            <td><span class="badge ${treatmentClass}" title="${treatmentTitle}">${treatmentLabel}</span></td>
             <td style="font-size:11px;color:var(--muted)">${i.id}</td>
             <td>${i.investor_id}<br><span style="font-size:11px;color:var(--muted)">${i.account_id}</span></td>
             <td style="font-weight:600">${money(i.amount)}</td>
@@ -1453,7 +1462,11 @@ let state = {
         }).join('');
         const typeOptions = ['Wire', 'Check', 'Internal Transfer', 'Cash', 'Deposit'].map(t => `<option value="${t}" ${item && item.type === t ? 'selected' : ''}>${t}</option>`).join('');
         const currentTreatment = item ? (item.accounting_treatment || 'NEW_CASH').toUpperCase() : 'NEW_CASH';
+        const mutationToken = (item && item.idempotency_key) 
+          ? item.idempotency_key 
+          : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('mut_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10)));
         html = `
+          <input type="hidden" id="field_mutation_id" value="${mutationToken}" />
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
           <div class="form-group"><label>Deposit Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Actual Funding Date <span style="color:var(--muted);font-weight:400;font-size:12px">(date the cash was received)</span></label><input id="field_date" type="date" value="${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
@@ -1712,6 +1725,7 @@ let state = {
           // Read accounting_treatment from radio group
           const selectedTreatmentEl = document.querySelector('input[name="field_accounting_treatment"]:checked');
           const accountingTreatment = selectedTreatmentEl ? selectedTreatmentEl.value : 'NEW_CASH';
+          const mutationId = document.getElementById('field_mutation_id')?.value;
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
@@ -1721,7 +1735,8 @@ let state = {
             date: document.getElementById('field_date')?.value,
             type: document.getElementById('field_type')?.value || 'Wire',
             accounting_treatment: accountingTreatment,
-            notes: document.getElementById('field_notes')?.value || ''
+            notes: document.getElementById('field_notes')?.value || '',
+            idempotency_key: mutationId || undefined
           };
         } else if (tab === 'withdrawals') {
           const accId = document.getElementById('field_account_id')?.value;

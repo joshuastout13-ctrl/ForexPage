@@ -167,10 +167,10 @@ async function runPostgresMigrationCertification() {
     const depVoid = legacyRows.find(r => r.id === "dep_legacy_void");
 
     assert.strictEqual(dep1.status, "confirmed", "Legacy active deposit status must default to 'confirmed'");
-    assert.strictEqual(dep1.accounting_treatment, "NEW_CASH", "Legacy active deposit accounting_treatment must default to 'NEW_CASH'");
+    assert.strictEqual(dep1.accounting_treatment, "UNVERIFIED_LEGACY", "Legacy active deposit accounting_treatment must safely default to 'UNVERIFIED_LEGACY'");
     assert.strictEqual(dep2.status, "confirmed", "Legacy active deposit 2 status must default to 'confirmed'");
     assert.strictEqual(depVoid.status, "void", "Legacy type='VOID' deposit must be safely backfilled to status='void'");
-    pass("6. Legacy rows safe defaults & VOID backfill verified: active rows='confirmed'+'NEW_CASH', VOID rows='void'");
+    pass("6. Legacy rows safe defaults & VOID backfill verified: active rows='confirmed'+'UNVERIFIED_LEGACY', VOID rows='void'");
 
     // ─── STEP D: IDEMPOTENCY CHECK (RUN SCHEMA_UPDATE_V5.SQL SECOND TIME) ───
     await client.query(v5Sql);
@@ -270,6 +270,7 @@ async function runPostgresMigrationCertification() {
         COUNT(*) AS total_deposits,
         COUNT(*) FILTER (WHERE accounting_treatment = 'NEW_CASH') AS new_cash,
         COUNT(*) FILTER (WHERE accounting_treatment = 'HISTORICAL_PROVENANCE') AS historical_provenance,
+        COUNT(*) FILTER (WHERE accounting_treatment = 'UNVERIFIED_LEGACY') AS unverified_legacy,
         COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed,
         COUNT(*) FILTER (WHERE status = 'void') AS voided,
         COUNT(*) FILTER (WHERE idempotency_key IS NOT NULL) AS with_idempotency_key
@@ -280,7 +281,84 @@ async function runPostgresMigrationCertification() {
     assert.strictEqual(Number(r.total_deposits), 6); // 2 legacy + 1 legacy void + 1 prov + 2 null
     assert.strictEqual(Number(r.voided), 2); // legacy void + prov void
     assert.strictEqual(Number(r.confirmed), 4); // 2 legacy + 2 null
+    assert.strictEqual(Number(r.unverified_legacy), 5); // 5 unverified legacy rows
     pass("13. Verification query executed and matches expected distribution");
+
+    // ─── STEP I: RUN SCHEMA_UPDATE_V5_1.SQL (LEGACY ISOLATION & IDEMPOTENCY) ─
+    const v51SqlPath = path.resolve(__dirname, "../supabase/schema_update_v5_1.sql");
+    const v51Sql = fs.readFileSync(v51SqlPath, "utf8");
+    await client.query(v51Sql);
+    pass("14. schema_update_v5_1.sql executed cleanly on PostgreSQL");
+
+    // Verify legacy rows were safely transitioned to UNVERIFIED_LEGACY
+    const { rows: postV51Rows } = await client.query(`
+      SELECT id, accounting_treatment, idempotency_key
+      FROM deposits
+      WHERE id IN ('dep_legacy_001', 'dep_legacy_002', 'dep_null_001', 'dep_null_002')
+      ORDER BY id;
+    `);
+    for (const row of postV51Rows) {
+      assert.strictEqual(
+        row.accounting_treatment,
+        "UNVERIFIED_LEGACY",
+        `Row ${row.id} must be reclassified to UNVERIFIED_LEGACY (got ${row.accounting_treatment})`
+      );
+      assert(
+        row.idempotency_key !== null && row.idempotency_key.length > 0,
+        `Row ${row.id} must have a non-null idempotency_key (got ${row.idempotency_key})`
+      );
+    }
+    pass("15. Verified pre-existing legacy rows isolated to UNVERIFIED_LEGACY and received non-null idempotency keys");
+
+    // Verify 0 rows in deposits have NULL idempotency_key
+    const { rows: nullCheckRows } = await client.query(`
+      SELECT COUNT(*) AS null_count FROM deposits WHERE idempotency_key IS NULL;
+    `);
+    assert.strictEqual(Number(nullCheckRows[0].null_count), 0, "Zero rows in deposits table can have NULL idempotency_key");
+    pass("16. Confirmed 0 deposits with NULL idempotency_key after v5.1 migration");
+
+    // ─── STEP J: CONCURRENT INSERT COLLISION REGRESSION TEST ──────────────────
+    // Simulate two concurrent clients submitting the same mutation token
+    const clientPool2 = new Pool({ host: "127.0.0.1", port, user, password, database: dbName });
+    const clientA = await clientPool2.connect();
+    const clientB = await clientPool2.connect();
+
+    const concurrentMutationKey = "mut_uuid_pg_concurrency_test_12345";
+    const insertSql = `
+      INSERT INTO deposits (id, investor_id, account_id, date, amount, accounting_treatment, status, idempotency_key)
+      VALUES ($1, 'inv_test_001', 'acc_test_001', '2026-09-01', 5000.00, 'NEW_CASH', 'confirmed', $2);
+    `;
+
+    const concurrentResults = await Promise.allSettled([
+      clientA.query(insertSql, ["dep_conc_a", concurrentMutationKey]),
+      clientB.query(insertSql, ["dep_conc_b", concurrentMutationKey])
+    ]);
+
+    clientA.release();
+    clientB.release();
+    await clientPool2.end();
+
+    const fulfilled = concurrentResults.filter(r => r.status === "fulfilled");
+    const rejected = concurrentResults.filter(r => r.status === "rejected");
+
+    assert.strictEqual(fulfilled.length, 1, "Exactly 1 concurrent insert must succeed in PostgreSQL");
+    assert.strictEqual(rejected.length, 1, "Exactly 1 concurrent insert must be rejected with unique constraint violation");
+    assert.strictEqual(rejected[0].reason.code, "23505", "PostgreSQL error code must be 23505 unique_violation");
+    pass("17. Native PostgreSQL concurrency collision certified: 2 simultaneous inserts with same mutation key produce 1 row & 1 code 23505");
+
+    // ─── STEP K: LEGITIMATE DISTINCT DEPOSITS WITH SAME PARAMS SUCCEED ───────
+    // Two intentional deposits for same investor, date, and amount with different mutation keys
+    const mutKey1 = "mut_uuid_distinct_deposit_1";
+    const mutKey2 = "mut_uuid_distinct_deposit_2";
+
+    await client.query(insertSql, ["dep_dist_1", mutKey1]);
+    await client.query(insertSql, ["dep_dist_2", mutKey2]);
+
+    const { rows: distRows } = await client.query(`
+      SELECT id, amount, idempotency_key FROM deposits WHERE id IN ('dep_dist_1', 'dep_dist_2');
+    `);
+    assert.strictEqual(distRows.length, 2, "Both legitimate distinct deposits must exist in the database");
+    pass("18. Legitimate distinct deposits with same investor/amount/date both succeed with distinct mutation UUIDs");
 
   } catch (err) {
     fail("PostgreSQL migration certification error", err);

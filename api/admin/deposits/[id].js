@@ -62,7 +62,7 @@ export default async function handler(req, res) {
 
       // ── accounting_treatment validation ───────────────────────────────────
       if (body.accounting_treatment !== undefined || body.accountingTreatment !== undefined) {
-        const ALLOWED_TREATMENTS = ["NEW_CASH", "HISTORICAL_PROVENANCE"];
+        const ALLOWED_TREATMENTS = ["NEW_CASH", "HISTORICAL_PROVENANCE", "UNVERIFIED_LEGACY"];
         const rawTreatment = String(
           body.accounting_treatment || body.accountingTreatment || "NEW_CASH"
         ).toUpperCase();

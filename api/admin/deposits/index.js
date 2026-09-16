@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       const body = req.body || {};
 
       // ── Validate accounting_treatment ─────────────────────────────────────
-      const ALLOWED_TREATMENTS = ["NEW_CASH", "HISTORICAL_PROVENANCE"];
+      const ALLOWED_TREATMENTS = ["NEW_CASH", "HISTORICAL_PROVENANCE", "UNVERIFIED_LEGACY"];
       const rawTreatment = String(body.accounting_treatment || body.accountingTreatment || "NEW_CASH").toUpperCase();
       if (!ALLOWED_TREATMENTS.includes(rawTreatment)) {
         return res.status(400).json({
@@ -134,9 +134,12 @@ export default async function handler(req, res) {
       const amountCents = Math.round(amount * 100);
 
       // ── Idempotency key ───────────────────────────────────────────────────
+      // Every deposit (including NEW_CASH) MUST receive a non-null idempotency_key
+      // so the database unique index idx_deposits_idempotency_key atomically
+      // prevents duplicate economic inserts on concurrent/retried submissions.
       let idempotencyKey = body.idempotency_key || body.idempotencyKey || null;
       if (idempotencyKey) {
-        // Normalize caller-provided key
+        // Normalize caller-provided key (e.g. client mutation UUID preserved across retries)
         idempotencyKey = String(idempotencyKey).trim().slice(0, 255);
       } else if (rawTreatment === "HISTORICAL_PROVENANCE") {
         // Historical provenance records MUST be idempotent — build deterministic key
@@ -151,6 +154,9 @@ export default async function handler(req, res) {
         } catch (keyErr) {
           return res.status(400).json({ error: `IDEMPOTENCY_KEY_ERROR: ${keyErr.message}` });
         }
+      } else {
+        // Fail-safe: NEVER allow ANY deposit row to have a NULL idempotency_key.
+        idempotencyKey = `dep_mut_${crypto.randomUUID()}`;
       }
 
       // ── Build payload ─────────────────────────────────────────────────────
@@ -167,7 +173,7 @@ export default async function handler(req, res) {
         notes: body.notes || "",
         created_by: auditActor,
         updated_at: new Date().toISOString(),
-        idempotency_key: idempotencyKey || null
+        idempotency_key: idempotencyKey
       };
 
       // ── Insert with idempotency duplicate detection ───────────────────────

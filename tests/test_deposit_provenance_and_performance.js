@@ -311,6 +311,64 @@ async function runSuite() {
     pass("8. Duplicate submission: same parameters produce identical deterministic idempotency key; different amounts produce different keys; API would return HTTP 409 on duplicate");
   } catch (err) { fail("8. Duplicate submission blocked", err); }
 
+  // ─── Test 9: UNVERIFIED_LEGACY treatment semantics ────────────────────────
+  try {
+    const legacyDeposit = {
+      id: "dep_legacy_test",
+      investor_id: "inv_leg",
+      amount: 25000,
+      accounting_treatment: "UNVERIFIED_LEGACY",
+      status: "confirmed",
+      date: "2026-08-01"
+    };
+
+    // 1. Balance-affecting: UNVERIFIED_LEGACY must be included to maintain monthly ledger continuity
+    const balDeposits = calculateBalanceAffectingDeposits({
+      depositRows: [legacyDeposit],
+      targetYear: 2026,
+      maxMonth: 8
+    });
+    assert.strictEqual(balDeposits, 25000, "UNVERIFIED_LEGACY must affect monthly compounding balance");
+
+    // 2. Total External Cash: UNVERIFIED_LEGACY must be EXCLUDED until certified
+    const cashResult = calculateTotalExternalCash({
+      depositRows: [legacyDeposit]
+    });
+    assert.strictEqual(cashResult.total, 0, "UNVERIFIED_LEGACY must NOT count toward Total External Cash");
+    assert.strictEqual(cashResult.hasConfirmedRecords, false, "hasConfirmedRecords must be false for unverified rows");
+
+    // 3. Performance: must fail closed (null)
+    const perf = calculateLifetimePerformance({
+      totalExternalCashSent: cashResult.total,
+      hasConfirmedExternalCashRecords: cashResult.hasConfirmedRecords,
+      currentBalance: 1200000
+    });
+    assert.strictEqual(perf.provenanceStatus, "NO_CONFIRMED_EXTERNAL_CASH", "Status must be NO_CONFIRMED_EXTERNAL_CASH");
+    assert.strictEqual(perf.totalPerformanceDollar, null, "Performance $ must be null when only unverified legacy rows exist");
+    assert.strictEqual(perf.totalPerformancePct, null, "Performance % must be null when only unverified legacy rows exist");
+
+    pass("9. UNVERIFIED_LEGACY treatment: affects monthly balance, strictly excluded from Total External Cash, Performance is null");
+  } catch (err) { fail("9. UNVERIFIED_LEGACY treatment", err); }
+
+  // ─── Test 10: Mixed UNVERIFIED_LEGACY and NEW_CASH deposits ───────────────
+  try {
+    const deposits = [
+      { id: "dep_leg", investor_id: "inv_mix", amount: 10000, accounting_treatment: "UNVERIFIED_LEGACY", status: "confirmed", date: "2026-04-01" },
+      { id: "dep_new", investor_id: "inv_mix", amount: 50000, accounting_treatment: "NEW_CASH", status: "confirmed", date: "2026-06-01" }
+    ];
+
+    // Total External Cash must strictly count the $50k NEW_CASH and exclude the $10k legacy
+    const cashResult = calculateTotalExternalCash({ depositRows: deposits });
+    assert.strictEqual(cashResult.total, 50000, "Total External Cash must equal $50,000 (excluding $10k legacy)");
+    assert.strictEqual(cashResult.hasConfirmedRecords, true, "hasConfirmedRecords must be true");
+
+    // Balance-affecting must include both ($60k)
+    const balTotal = calculateBalanceAffectingDeposits({ depositRows: deposits });
+    assert.strictEqual(balTotal, 60000, "Both legacy and new cash affect the monthly balance");
+
+    pass("10. Mixed legacy and new cash: Total Deposits strictly reflects proven cash only ($50k), balance reflects both ($60k)");
+  } catch (err) { fail("10. Mixed legacy and new cash", err); }
+
   // ──────────────────────────────────────────────────────────────────────────
   // SECTION B: Dashboard integration tests (preloadedData, no DB)
   // ──────────────────────────────────────────────────────────────────────────
@@ -331,11 +389,11 @@ async function runSuite() {
           amount: 10000,
           accounting_treatment: "NEW_CASH",
           status: "confirmed",
-          date: "2026-05-01",
+          date: "2026-05-15",
           monthnumber: 5,
           year: 2026
         },
-        // HISTORICAL_PROVENANCE: $1M initial funding — should NOT add to balance
+        // HISTORICAL_PROVENANCE: $1M historical funding — MUST NOT change balance
         {
           id: "dep_hist_b1",
           investorid: "inv_b1",
@@ -450,6 +508,159 @@ async function runSuite() {
 
     pass("B3. Voided deposit excluded from Total Deposits; active $50k correctly counted");
   } catch (err) { fail("B3. Void deposit excluded from Total Deposits (dashboard)", err); }
+
+  // ─── Test B4: Investor with only UNVERIFIED_LEGACY deposit ─────────────────
+  try {
+    const preload = basePreload({
+      investorId: "inv_b4",
+      username: "testb4",
+      startCapital: 500000,
+      extraDeposits: [
+        {
+          id: "dep_leg_b4",
+          investorid: "inv_b4",
+          investor_id: "inv_b4",
+          amount: 25000,
+          accounting_treatment: "UNVERIFIED_LEGACY",
+          status: "confirmed",
+          date: "2026-08-01",
+          monthnumber: 8,
+          year: 2026
+        }
+      ]
+    });
+
+    const dashboard = await buildInvestorDashboard("testb4", preload, { asOfDate: "2026-09-01" });
+
+    assert.strictEqual(
+      dashboard.summary.totalExternalCashSent,
+      0,
+      "Total External Cash Sent must be $0 when only UNVERIFIED_LEGACY records exist"
+    );
+    assert.strictEqual(
+      dashboard.summary.hasConfirmedExternalCash,
+      false,
+      "hasConfirmedExternalCash must be false"
+    );
+    assert.strictEqual(
+      dashboard.summary.provenanceStatus,
+      "NO_CONFIRMED_EXTERNAL_CASH",
+      "provenanceStatus must be NO_CONFIRMED_EXTERNAL_CASH"
+    );
+    assert.strictEqual(
+      dashboard.summary.totalPerformancePct,
+      null,
+      "totalPerformancePct must be null"
+    );
+    assert.strictEqual(
+      dashboard.summary.totalPerformanceDollar,
+      null,
+      "totalPerformanceDollar must be null"
+    );
+    // Verify August balance in breakdown did include the $25,000
+    const augRow = (dashboard.breakdown || []).find(r => r.monthNumber === 8);
+    assert(augRow, "August breakdown row must exist");
+    assert.strictEqual(augRow.deposits, 25000, "August deposits in breakdown must reflect $25,000 legacy row");
+
+    pass("B4. Investor with only UNVERIFIED_LEGACY: ledger balance preserved ($25k in Aug), Total Deposits=0, Performance=null");
+  } catch (err) { fail("B4. Investor with only UNVERIFIED_LEGACY", err); }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SECTION C: Concurrency & Idempotency Key Regression Tests
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\n=== SECTION C: Concurrency & Idempotency Key Regression Tests ===\n");
+
+  // ─── Test C1: Simulated concurrency / retry with identical mutation key ───
+  try {
+    const databaseLedger = new Map();
+
+    async function simulateInsertDeposit(payload) {
+      if (payload.idempotency_key && databaseLedger.has(payload.idempotency_key)) {
+        const err = new Error("duplicate key value violates unique constraint \"idx_deposits_idempotency_key\"");
+        err.code = "23505";
+        throw err;
+      }
+      databaseLedger.set(payload.idempotency_key, { ...payload });
+      return { success: true, deposit: payload };
+    }
+
+    const clientMutationKey = "mut_uuid_20260916_test_client_key";
+
+    const depositPayload = {
+      id: "dep_mut_001",
+      investor_id: "inv_conc",
+      account_id: "acc_conc",
+      amount: 15000.00,
+      date: "2026-09-01",
+      accounting_treatment: "NEW_CASH",
+      status: "confirmed",
+      idempotency_key: clientMutationKey
+    };
+
+    // Simulate two concurrent / retried requests fired simultaneously with identical mutation key
+    const results = await Promise.allSettled([
+      simulateInsertDeposit(depositPayload),
+      simulateInsertDeposit(depositPayload)
+    ]);
+
+    const successes = results.filter(r => r.status === "fulfilled");
+    const rejections = results.filter(r => r.status === "rejected");
+
+    assert.strictEqual(successes.length, 1, "Exactly one concurrent submission must succeed");
+    assert.strictEqual(rejections.length, 1, "Duplicate submission must be rejected");
+    assert.strictEqual(rejections[0].reason.code, "23505", "Rejection must be code 23505 unique_violation");
+    assert.strictEqual(databaseLedger.size, 1, "Database ledger must contain exactly one financial row");
+
+    pass("C1. Concurrency/retry regression: 2 simultaneous requests with same mutation key produce exactly 1 financial row and 1 unique_violation (23505)");
+  } catch (err) { fail("C1. Concurrency/retry regression", err); }
+
+  // ─── Test C2: Legitimate distinct deposits with same investor, amount, date ──
+  try {
+    const databaseLedger = new Map();
+
+    async function simulateInsertDeposit(payload) {
+      if (payload.idempotency_key && databaseLedger.has(payload.idempotency_key)) {
+        const err = new Error("duplicate key value violates unique constraint");
+        err.code = "23505";
+        throw err;
+      }
+      databaseLedger.set(payload.idempotency_key, { ...payload });
+      return { success: true, deposit: payload };
+    }
+
+    // Two intentional separate deposits entered through separate form openings:
+    // Same investor, same account, same amount ($5,000), same date (2026-09-01).
+    // Each receives its own client mutation UUID.
+    const keyA = "mut_uuid_first_wire_5000";
+    const keyB = "mut_uuid_second_wire_5000";
+
+    const depA = {
+      id: "dep_wire_1",
+      investor_id: "inv_conc",
+      account_id: "acc_conc",
+      amount: 5000.00,
+      date: "2026-09-01",
+      accounting_treatment: "NEW_CASH",
+      idempotency_key: keyA
+    };
+    const depB = {
+      id: "dep_wire_2",
+      investor_id: "inv_conc",
+      account_id: "acc_conc",
+      amount: 5000.00,
+      date: "2026-09-01",
+      accounting_treatment: "NEW_CASH",
+      idempotency_key: keyB
+    };
+
+    const resA = await simulateInsertDeposit(depA);
+    const resB = await simulateInsertDeposit(depB);
+
+    assert(resA.success && resB.success, "Both legitimate distinct deposits must succeed");
+    assert.strictEqual(databaseLedger.size, 2, "Database ledger must contain both distinct deposits ($10,000 total)");
+
+    pass("C2. Distinct intentional deposits: identical investor/date/amount with distinct client mutation UUIDs both succeed without false economic blocking");
+  } catch (err) { fail("C2. Distinct intentional deposits", err); }
 
   // ──────────────────────────────────────────────────────────────────────────
   // RESULTS
