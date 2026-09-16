@@ -122,10 +122,15 @@ async function testSection7OpenMonthSeptember3() {
   assert(Math.abs(dash.summary.totalGain - completedGainsSum) < 0.01, `Total Gain YTD (${dash.summary.totalGain}) must equal sum of completed months (${completedGainsSum})`);
   console.log(`    ✓ Total Gain YTD Excludes September Gain: $${dash.summary.totalGain.toFixed(2)}`);
 
-  // Total Performance check
-  assert(dash.summary.totalPerformanceDollar > 0, "Total Performance Dollar must be > 0");
-  assert(typeof dash.summary.totalPerformancePct === 'number', "Total Performance Pct must be numeric");
-  console.log(`    ✓ Total Performance Excludes September Gain: $${dash.summary.totalPerformanceDollar.toFixed(2)} (${dash.summary.totalPerformancePct.toFixed(2)}%)`);
+  // Total Performance check (AUTHORITATIVE FAIL-CLOSED CONTRACT — Josh Sep 2026)
+  // This test investor has depositsSheet: [] — no confirmed external cash records.
+  // Per the authoritative contract, performance must be null/UNKNOWN, not fabricated
+  // from starting_capital or any guessed baseline.
+  assert.strictEqual(dash.summary.totalPerformanceDollar, null, "Total Performance Dollar must be null when no confirmed external cash records exist (fail-closed, no starting_capital fallback)");
+  assert.strictEqual(dash.summary.totalPerformancePct, null, "Total Performance Pct must be null when no confirmed external cash records exist (fail-closed, never fabricated 0%)");
+  assert.strictEqual(dash.summary.provenanceStatus, "NO_CONFIRMED_EXTERNAL_CASH", "provenanceStatus must be NO_CONFIRMED_EXTERNAL_CASH when depositsSheet is empty");
+  assert.strictEqual(dash.summary.hasConfirmedExternalCash, false, "hasConfirmedExternalCash must be false when depositsSheet is empty");
+  console.log(`    ✓ Total Performance: null/UNKNOWN (no confirmed external cash records — fail-closed, no starting_capital fabrication)`);
 
   // Chart selection check
   const currentMonthIdx = 9;
