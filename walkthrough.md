@@ -1,5 +1,42 @@
 # FOREXPAGE — Production Accounting & Ledger Remediation Walkthrough
 
+## Summary of Accomplishments (September 18, 2026) — P0 Production Withdrawal Edit Fix
+
+### Diagnosis & Resolution of Jerry's Rogue Jets August Withdrawal Edit
+Josh reported a P0 issue when editing Jerry's Rogue Jets (`jerrys001`) existing $2,500 August 2026 withdrawal to `Completed`:
+The Admin UI displayed available equity of `$549,068.73`, but clicking "Save Changes" failed with:
+`WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY: Requested amount ($2,500.00) exceeds available account equity ($0.00) at effective date 2026-01-01.`
+
+### Architectural Root Cause
+1. **Frontend Dropped Date Fields:** `admin.html` submitted `{ investorId, accountId, amount, month: "August", year: 2026, status: "Completed" }` but omitted canonical `effective_accounting_date` and `month_number`.
+2. **Modal Month Preselection Defect:** In `openModal()`, the dropdown selected month via `item.month === m`. Because `item.month` was NULL in Jerry's row, the dropdown defaulted to `MONTHS[0]` ("January") unless manually noticed and changed.
+3. **Month Name Abbreviation Mismatch in API:** In `api/admin/withdrawals/index.js`, `monthNames` only had 3-letter abbreviations `["Jan", "Feb", ... "Dec"]`. `monthNames.indexOf("August")` evaluated to `-1`, falling back to month index `1` (January) and constructing `2026-01-01`.
+4. **Edit Route Discarded Dates:** In `api/admin/withdrawals/[id].js`, period parameters were never extracted or forwarded to the database RPC.
+5. **Database RPC Lacked Period Parameters:** `update_withdrawal_atomic` had only 5 parameters `(p_withdrawal_id, p_amount, p_status, p_notes, p_updated_by)` and evaluated available equity using `COALESCE(v_current_wd.effective_accounting_date, v_current_wd.request_date)`. If the row had `2026-01-01` (from create path) or if an admin changed the month, equity was evaluated at `2026-01-01`.
+6. **Pre-start Boundary Defense Triggered:** Because Jerry's account opened on `2026-05-01`, evaluating equity at `2026-01-01` returned `$0.00` by design (pre-start boundary).
+
+### Changes Implemented
+1. **[lib/withdrawal-validation.js](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/lib/withdrawal-validation.js):**
+   - Created `canonicalizeWithdrawalPeriod()` supporting full month names, 3-letter abbreviations, numeric values (1-12), and ISO strings (`YYYY-MM-01`).
+   - Ensures any selection of August 2026 canonicalizes to `effectiveDate: "2026-08-01"`, `year: 2026`, `monthNumber: 8`, `monthName: "August"`.
+2. **[api/admin/withdrawals/index.js](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/api/admin/withdrawals/index.js):**
+   - Integrated `canonicalizeWithdrawalPeriod()` for robust, fail-closed period extraction.
+3. **[api/admin/withdrawals/[id].js](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/api/admin/withdrawals/[id].js):**
+   - Extracted period updates and forwarded `p_effective_date`, `p_year`, `p_month_number`, `p_month` to `update_withdrawal_atomic`.
+   - Added graceful fallback to legacy 5-param signature if extended params are missing in target database.
+4. **[admin.html](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/admin.html) & [build-admin.js](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/build-admin.js):**
+   - Fixed month dropdown preselection: resolves month from `item.month || item.month_number || item.effective_accounting_date`.
+   - Updated form submit handler to send `effective_accounting_date`, `effectiveDate`, `month_number`, `month`, and `year`.
+   - Fixed withdrawal table display to fall back to `month_number` or `effective_accounting_date` when `item.month` is null.
+5. **[scripts/migrations/20260918_support_effective_date_in_update_withdrawal_atomic.sql](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/scripts/migrations/20260918_support_effective_date_in_update_withdrawal_atomic.sql):**
+   - Updated `update_withdrawal_atomic` signature to accept `p_effective_date DATE`, `p_year INT`, `p_month_number INT`, `p_month TEXT`.
+   - Re-evaluates available equity at `v_target_effective_date` while strictly self-excluding `p_withdrawal_id`.
+   - Updates `effective_accounting_date`, `request_date`, `year`, `month_number`, `month`, `amount`, `status`, `notes`, `updated_by`.
+6. **[tests/test_withdrawal_edit_canonical_date.js](file:///c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/tests/test_withdrawal_edit_canonical_date.js):**
+   - 16 native PostgreSQL 18.4 regression tests covering pure logic invariants, exact Josh scenario, self-exclusion, pre-start protection, and backward compatibility. All 16 passed.
+
+---
+
 ## Summary of Accomplishments (September 15, 2026)
 
 Josh confirmed the fundamental business rule for ForexPage accounting:
