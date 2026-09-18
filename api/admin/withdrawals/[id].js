@@ -62,35 +62,6 @@ export default async function handler(req, res) {
 
         let { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", rpcArgs);
 
-        // Graceful fallback to legacy 5-param signature if extended params are not recognized by DB RPC
-        if (rpcError && period && (
-          rpcError.message?.includes("parameter") ||
-          rpcError.message?.includes("function") ||
-          rpcError.code === "42883" ||
-          rpcError.code === "PGRST202"
-        )) {
-          const legacyArgs = {
-            p_withdrawal_id: id,
-            p_amount: updates.amount !== undefined ? updates.amount : null,
-            p_status: updates.status !== undefined ? updates.status : null,
-            p_notes: updates.notes !== undefined ? updates.notes : null,
-            p_updated_by: auditActor
-          };
-          const legacyAttempt = await supabase.rpc("update_withdrawal_atomic", legacyArgs);
-          if (!legacyAttempt.error && legacyAttempt.data) {
-            rpcData = legacyAttempt.data;
-            rpcError = null;
-            // Apply period metadata update to the row
-            await supabase.from("withdrawals").update({
-              effective_accounting_date: period.effectiveDate,
-              request_date: period.effectiveDate,
-              year: period.year,
-              month_number: period.monthNumber,
-              month: period.monthName
-            }).eq("id", id);
-          }
-        }
-
         if (!rpcError && rpcData) {
           return res.status(200).json({
             status: "SUCCESS",
@@ -117,12 +88,13 @@ export default async function handler(req, res) {
             msg.includes("does not exist") || 
             msg.includes("schema cache") || 
             msg.includes("Could not find the function") || 
+            msg.includes("parameter") || 
             rpcError.code === "42883" || 
             rpcError.code === "PGRST202";
 
           if (isMissingRpc) {
             return res.status(503).json({
-              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial update is blocked."
+              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked."
             });
           }
 
@@ -133,12 +105,13 @@ export default async function handler(req, res) {
         const isMissingRpc = exMsg.includes("does not exist") || 
           exMsg.includes("schema cache") || 
           exMsg.includes("Could not find the function") || 
+          exMsg.includes("parameter") || 
           rpcEx.code === "42883" || 
           rpcEx.code === "PGRST202";
 
         if (isMissingRpc) {
           return res.status(503).json({
-            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable in the target database. Raw financial update is blocked."
+            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked."
           });
         }
 
