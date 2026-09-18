@@ -1,6 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
-import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
+import { calculateAvailableWithdrawalEquity, canonicalizeWithdrawalPeriod } from "../../../lib/withdrawal-validation.js";
 import { assertAuthoritativeProductionDb, assertAuditActor, buildDeterministicIdempotencyKey } from "../../../lib/financial-mutation-guard.js";
 import crypto from "node:crypto";
 
@@ -25,35 +25,17 @@ export default async function handler(req, res) {
       const auditActor = assertAuditActor(session?.adminId || session?.userId || req.body?.created_by, "create_withdrawal");
 
       const body = req.body || {};
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-      let monthIdx = 1;
-      let monthName = "Jan";
-      if (typeof body.month === 'string') {
-        monthName = body.month;
-        const found = monthNames.indexOf(body.month);
-        monthIdx = found !== -1 ? found + 1 : 1;
-      } else if (typeof body.month === 'number') {
-        monthIdx = body.month;
-        monthName = monthNames[monthIdx - 1] || "Jan";
+      let period;
+      try {
+        period = canonicalizeWithdrawalPeriod(body);
+      } catch (dateErr) {
+        return res.status(400).json({ error: dateErr.message || "INVALID_EFFECTIVE_DATE" });
       }
 
-      const year = parseInt(body.year, 10) || new Date().getFullYear();
-      let rawEffDate = body.effective_accounting_date || body.effectiveAccountingDate || body.effectiveDate;
-      if (rawEffDate) {
-        const parts = String(rawEffDate).slice(0, 10).split('-');
-        if (parts.length === 3) {
-          rawEffDate = `${parts[0]}-${parts[1].padStart(2, '0')}-01`;
-        }
-      }
-      const effDate = rawEffDate || `${year}-${String(monthIdx).padStart(2, '0')}-01`;
-
-      // Validate Effective Date: Must be strictly first-of-month (YYYY-MM-01)
-      if (!effDate || !/^\d{4}-\d{2}-01$/.test(effDate)) {
-        return res.status(400).json({
-          error: `INVALID_EFFECTIVE_DATE: Effective date must be the first day of the month ('YYYY-MM-01'). Received: ${effDate}`
-        });
-      }
+      const effDate = period.effectiveDate;
+      const year = period.year;
+      const monthIdx = period.monthNumber;
+      const monthName = period.monthName;
 
       let investorId = body.investor_id || body.investorId;
       let accountId = body.account_id || body.accountId;

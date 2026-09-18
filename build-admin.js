@@ -1180,28 +1180,51 @@ let state = {
             </td>
           </tr>\`).join('');
       } else if (state.tab === 'deposits') {
-        hd.innerHTML = \`<tr><th>Type</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr>\`;
+        hd.innerHTML = \`<tr><th>Type</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
-            <td><span class="badge \${i.type==='VOID'?'inactive':'active'}">\${i.type}</span></td>
-            <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td>
-            <td>\${i.date}</td>
+        bd.innerHTML = d.map(i => {
+          const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
+          const treatment = (i.accounting_treatment || 'NEW_CASH').toUpperCase();
+          const treatmentLabel = treatment === 'HISTORICAL_PROVENANCE' 
+            ? 'Hist. Provenance' 
+            : (treatment === 'UNVERIFIED_LEGACY' ? 'Unverified Legacy' : 'New Cash');
+          const treatmentClass = treatment === 'HISTORICAL_PROVENANCE' 
+            ? 'pending' 
+            : (treatment === 'UNVERIFIED_LEGACY' ? 'inactive' : 'active');
+          const treatmentTitle = treatment === 'HISTORICAL_PROVENANCE'
+            ? 'Provenance only — does NOT affect accounting balance'
+            : (treatment === 'UNVERIFIED_LEGACY'
+                ? 'Unverified Legacy row — preserves monthly balance continuity but excluded from Total Deposits until verified'
+                : 'Balance-affecting — adds to accounting balance');
+          const statusLabel = isVoid ? (i.status || i.type) : (i.status || 'confirmed');
+          const effMonth = i.effective_accounting_date ? i.effective_accounting_date.slice(0, 7) : (i.date ? i.date.slice(0, 7) : '—');
+          return \`<tr>
+            <td><span class="badge \${isVoid ? 'inactive' : 'active'}">\${statusLabel}</span></td>
+            <td><span class="badge \${treatmentClass}" title="\${treatmentTitle}">\${treatmentLabel}</span></td>
+            <td style="font-size:11px;color:var(--muted)">\${i.id}</td>
+            <td>\${i.investor_id}<br><span style="font-size:11px;color:var(--muted)">\${i.account_id}</span></td>
+            <td style="font-weight:600">\${money(i.amount)}</td>
+            <td>\${i.date || '—'}</td>
+            <td>\${effMonth}</td>
             <td>
               <div class="btn-group">
-                <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
-                \${i.type!=='VOID'? \`<button class="btn-action btn-action-delete action-btn" data-action="void" data-id="\${i.id}">Void</button>\` : ''}
+                \${!isVoid ? \`<button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>\` : ''}
+                \${!isVoid ? \`<button class="btn-action btn-action-delete action-btn" data-action="void" data-id="\${i.id}">Void</button>\` : '<span style="color:var(--muted);font-size:12px">Voided</span>'}
               </div>
             </td>
-          </tr>\`).join('');
+          </tr>\`;
+        }).join('');
       } else if (state.tab === 'withdrawals') {
         hd.innerHTML = \`<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
+          const displayMonth = i.month || (i.month_number && MONTHS[i.month_number - 1]) || (i.effective_accounting_date && MONTHS[parseInt(i.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
+          const displayYear = i.year || (i.effective_accounting_date ? i.effective_accounting_date.slice(0, 4) : '');
           return \`<tr>
             <td><span class="badge \${cls}">\${i.status}</span></td>
             <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.account_id}</td><td>\${money(i.amount)}</td>
-            <td>\${i.month} \${i.year}</td>
+            <td>\${displayMonth} \${displayYear}</td>
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
@@ -1435,11 +1458,34 @@ let state = {
           return \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${escapeHtml(label)}</option>\`;
         }).join('');
         const typeOptions = ['Wire', 'Check', 'Internal Transfer', 'Cash', 'Deposit'].map(t => \`<option value="\${t}" \${item && item.type === t ? 'selected' : ''}>\${t}</option>\`).join('');
+        const currentTreatment = item ? (item.accounting_treatment || 'NEW_CASH').toUpperCase() : 'NEW_CASH';
+        const mutationToken = (item && item.idempotency_key) 
+          ? item.idempotency_key 
+          : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('mut_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10)));
         html = \`
+          <input type="hidden" id="field_mutation_id" value="\${mutationToken}" />
           <div class="form-group"><label>Account</label><select id="field_account_id" required>\${accOptions}</select></div>
           <div class="form-group"><label>Deposit Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : ''}" required /></div>
-          <div class="form-group"><label>Effective Date</label><input id="field_date" type="date" value="\${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
-          <div class="form-group"><label>Type</label><select id="field_type">\${typeOptions}</select></div>
+          <div class="form-group"><label>Actual Funding Date <span style="color:var(--muted);font-weight:400;font-size:12px">(date the cash was received)</span></label><input id="field_date" type="date" value="\${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
+          <div class="form-group"><label>Payment Method</label><select id="field_type">\${typeOptions}</select></div>
+          <div style="margin:16px 0; padding:14px 16px; border-radius:12px; border:2px solid var(--warning,#f59e0b); background:rgba(245,158,11,0.07);">
+            <div style="font-weight:700; font-size:13px; color:var(--warning,#f59e0b); margin-bottom:10px;">⚠ ACCOUNTING TREATMENT — Required</div>
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; margin-bottom:12px; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:\${currentTreatment==='NEW_CASH'?'rgba(34,197,94,0.08)':'transparent'}">
+              <input type="radio" id="field_treatment_new" name="field_accounting_treatment" value="NEW_CASH" \${currentTreatment==='NEW_CASH'?'checked':''} style="width:auto;margin-top:3px;" />
+              <div>
+                <div style="font-weight:700; font-size:13px; color:var(--text);">NEW CASH — Adds to accounting balance</div>
+                <div style="font-size:12px; color:var(--muted); margin-top:3px;">Cash received now, or historical cash that has <strong>NOT</strong> yet been reflected in this account's imported balance history. This deposit will <strong>increase</strong> the accounting balance.</div>
+              </div>
+            </label>
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:\${currentTreatment==='HISTORICAL_PROVENANCE'?'rgba(251,191,36,0.08)':'transparent'}">
+              <input type="radio" id="field_treatment_hist" name="field_accounting_treatment" value="HISTORICAL_PROVENANCE" \${currentTreatment==='HISTORICAL_PROVENANCE'?'checked':''} style="width:auto;margin-top:3px;" />
+              <div>
+                <div style="font-weight:700; font-size:13px; color:var(--text);">HISTORICAL PROVENANCE — Establishes cash record only</div>
+                <div style="font-size:12px; color:var(--muted); margin-top:3px;">External cash Josh confirms was received historically, but whose economic effect is <strong>ALREADY present</strong> in the imported or cutover balance history. Records this cash in Total Deposits <strong>without adding to the balance a second time</strong>. Use this for funding that was present at account migration.</div>
+              </div>
+            </label>
+          </div>
+          <div class="form-group"><label>Reference / Notes <span style="color:var(--muted);font-weight:400;font-size:12px">(optional)</span></label><input id="field_notes" type="text" value="\${item ? escapeHtml(item.notes || '') : ''}" placeholder="Wire ref #, confirmation, context..." /></div>
         \`;
       } else if (tab === 'withdrawals') {
         const accOptions = (state.data.accounts || []).map(acc => {
@@ -1448,12 +1494,22 @@ let state = {
           const label = invName ? \`\${invName} (\${acc.id})\` : \`\${acc.name || acc.id} (\${acc.id})\`;
           return \`<option value="\${acc.id}" \${item && item.account_id === acc.id ? 'selected' : ''}>\${escapeHtml(label)}</option>\`;
         }).join('');
-        const monthOptions = MONTHS.map(m => \`<option value="\${m}" \${item && item.month === m ? 'selected' : ''}>\${m}</option>\`).join('');
+        const selectedMonth = item ? (
+          item.month ||
+          (item.month_number && MONTHS[item.month_number - 1]) ||
+          (item.effective_accounting_date && MONTHS[parseInt(item.effective_accounting_date.slice(5, 7), 10) - 1]) ||
+          MONTHS[new Date().getMonth()]
+        ) : MONTHS[new Date().getMonth()];
+        const selectedYear = item ? (
+          item.year ||
+          (item.effective_accounting_date ? parseInt(item.effective_accounting_date.slice(0, 4), 10) : new Date().getFullYear())
+        ) : new Date().getFullYear();
+        const monthOptions = MONTHS.map(m => \`<option value="\${m}" \${selectedMonth === m ? 'selected' : ''}>\${m}</option>\`).join('');
         html = \`
           <div class="form-group"><label>Account</label><select id="field_account_id" required>\${accOptions}</select></div>
           <div class="form-group"><label>Withdrawal Amount ($)</label><input id="field_amount" type="number" step="0.01" value="\${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month" required>\${monthOptions}</select></div>
-          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="\${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="\${selectedYear}" required /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" \${item && item.status==='Pending'?'selected':''}>Pending</option><option value="Approved" \${item && item.status==='Approved'?'selected':''}>Approved</option><option value="Completed" \${item && item.status==='Completed'?'selected':''}>Completed</option><option value="Cancelled" \${item && item.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
           <div id="withdrawalEquityFeedback" style="display:none; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;"></div>
         \`;
@@ -1598,9 +1654,20 @@ let state = {
                 fbEl.style.color = '#34d399';
                 fbEl.textContent = '✓ Available Account Equity: $' + avail.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               }
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              fbEl.style.display = 'block';
+              fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
+              fbEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+              fbEl.style.color = '#f87171';
+              fbEl.textContent = '⚠️ Unable to verify available equity: ' + (errData.error || ('HTTP ' + res.status));
             }
           } catch (err) {
-            // Silently ignore preview network errors
+            fbEl.style.display = 'block';
+            fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
+            fbEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            fbEl.style.color = '#f87171';
+            fbEl.textContent = '⚠️ Unable to verify available equity: Network error';
           }
         };
 
@@ -1661,6 +1728,9 @@ let state = {
           const accId = document.getElementById('field_account_id')?.value;
           const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
           const invId = targetAcc?.investor_id || '';
+          const selectedTreatmentEl = document.querySelector('input[name="field_accounting_treatment"]:checked');
+          const accountingTreatment = selectedTreatmentEl ? selectedTreatmentEl.value : 'NEW_CASH';
+          const mutationId = document.getElementById('field_mutation_id')?.value;
           endpoint = action === 'edit' ? \`/api/admin/deposits/\${id}\` : '/api/admin/deposits';
           method = action === 'edit' ? 'PATCH' : 'POST';
           body = {
@@ -1668,7 +1738,10 @@ let state = {
             accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             date: document.getElementById('field_date')?.value,
-            type: document.getElementById('field_type')?.value || 'Deposit'
+            type: document.getElementById('field_type')?.value || 'Wire',
+            accounting_treatment: accountingTreatment,
+            notes: document.getElementById('field_notes')?.value || '',
+            idempotency_key: mutationId || undefined
           };
         } else if (tab === 'withdrawals') {
           const accId = document.getElementById('field_account_id')?.value;
@@ -1676,12 +1749,20 @@ let state = {
           const invId = targetAcc?.investor_id || '';
           endpoint = action === 'edit' ? \`/api/admin/withdrawals/\${id}\` : '/api/admin/withdrawals';
           method = action === 'edit' ? 'PATCH' : 'POST';
+          const selMonth = document.getElementById('field_month')?.value || 'January';
+          const selYear = Number(document.getElementById('field_year')?.value || new Date().getFullYear());
+          const selMonthIdx = MONTHS.indexOf(selMonth) + 1 || 1;
+          const canonicalEffDate = \`\${selYear}-\${String(selMonthIdx).padStart(2, '0')}-01\`;
           body = {
             investorId: invId,
             accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
-            month: document.getElementById('field_month')?.value,
-            year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
+            month: selMonth,
+            month_number: selMonthIdx,
+            monthNumber: selMonthIdx,
+            year: selYear,
+            effective_accounting_date: canonicalEffDate,
+            effectiveDate: canonicalEffDate,
             status: document.getElementById('field_status')?.value || 'Pending'
           };
         } else if (tab === 'returns') {

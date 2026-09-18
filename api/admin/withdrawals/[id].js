@@ -1,6 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
-import { calculateAvailableWithdrawalEquity } from "../../../lib/withdrawal-validation.js";
+import { calculateAvailableWithdrawalEquity, canonicalizeWithdrawalPeriod } from "../../../lib/withdrawal-validation.js";
 import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
 
 export default async function handler(req, res) {
@@ -24,6 +24,19 @@ export default async function handler(req, res) {
       if (body.accountId !== undefined || body.account_id !== undefined) updates.account_id = body.accountId || body.account_id;
       if (body.investorId !== undefined || body.investor_id !== undefined) updates.investor_id = body.investorId || body.investor_id;
 
+      let period = null;
+      const hasPeriodUpdate = body.month !== undefined || body.year !== undefined ||
+                              body.effective_accounting_date !== undefined || body.effectiveAccountingDate !== undefined ||
+                              body.effectiveDate !== undefined || body.month_number !== undefined;
+
+      if (hasPeriodUpdate) {
+        try {
+          period = canonicalizeWithdrawalPeriod(body);
+        } catch (dateErr) {
+          return res.status(400).json({ error: dateErr.message || "INVALID_EFFECTIVE_DATE" });
+        }
+      }
+
       if (!supabase) {
         return res.status(503).json({
           error: "PACKAGE_B_RPC_UNAVAILABLE: Database client is not configured. Raw financial mutation blocked."
@@ -32,13 +45,51 @@ export default async function handler(req, res) {
 
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", {
+        const rpcArgs = {
           p_withdrawal_id: id,
           p_amount: updates.amount !== undefined ? updates.amount : null,
           p_status: updates.status !== undefined ? updates.status : null,
           p_notes: updates.notes !== undefined ? updates.notes : null,
           p_updated_by: auditActor
-        });
+        };
+
+        if (period) {
+          rpcArgs.p_effective_date = period.effectiveDate;
+          rpcArgs.p_year = period.year;
+          rpcArgs.p_month_number = period.monthNumber;
+          rpcArgs.p_month = period.monthName;
+        }
+
+        let { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", rpcArgs);
+
+        // Graceful fallback to legacy 5-param signature if extended params are not recognized by DB RPC
+        if (rpcError && period && (
+          rpcError.message?.includes("parameter") ||
+          rpcError.message?.includes("function") ||
+          rpcError.code === "42883" ||
+          rpcError.code === "PGRST202"
+        )) {
+          const legacyArgs = {
+            p_withdrawal_id: id,
+            p_amount: updates.amount !== undefined ? updates.amount : null,
+            p_status: updates.status !== undefined ? updates.status : null,
+            p_notes: updates.notes !== undefined ? updates.notes : null,
+            p_updated_by: auditActor
+          };
+          const legacyAttempt = await supabase.rpc("update_withdrawal_atomic", legacyArgs);
+          if (!legacyAttempt.error && legacyAttempt.data) {
+            rpcData = legacyAttempt.data;
+            rpcError = null;
+            // Apply period metadata update to the row
+            await supabase.from("withdrawals").update({
+              effective_accounting_date: period.effectiveDate,
+              request_date: period.effectiveDate,
+              year: period.year,
+              month_number: period.monthNumber,
+              month: period.monthName
+            }).eq("id", id);
+          }
+        }
 
         if (!rpcError && rpcData) {
           return res.status(200).json({
@@ -54,6 +105,7 @@ export default async function handler(req, res) {
           if (msg.includes("WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY") ||
               msg.includes("INVALID_WITHDRAWAL_STATUS") ||
               msg.includes("INVALID_STATUS_TRANSITION") ||
+              msg.includes("INVALID_EFFECTIVE_DATE") ||
               msg.includes("INVALID_AMOUNT")) {
             return res.status(400).json({ error: msg });
           }

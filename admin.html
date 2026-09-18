@@ -1184,7 +1184,7 @@ let state = {
             </td>
           </tr>`).join('');
       } else if (state.tab === 'deposits') {
-        hd.innerHTML = `<tr><th>Status</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Amount</th><th>Funding Date</th><th>Acctg Month</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Type</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
@@ -1218,16 +1218,17 @@ let state = {
             </td>
           </tr>`;
         }).join('');
-
       } else if (state.tab === 'withdrawals') {
         hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
+          const displayMonth = i.month || (i.month_number && MONTHS[i.month_number - 1]) || (i.effective_accounting_date && MONTHS[parseInt(i.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
+          const displayYear = i.year || (i.effective_accounting_date ? i.effective_accounting_date.slice(0, 4) : '');
           return `<tr>
             <td><span class="badge ${cls}">${i.status}</span></td>
             <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
-            <td>${i.month} ${i.year}</td>
+            <td>${displayMonth} ${displayYear}</td>
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
@@ -1490,7 +1491,6 @@ let state = {
           </div>
           <div class="form-group"><label>Reference / Notes <span style="color:var(--muted);font-weight:400;font-size:12px">(optional)</span></label><input id="field_notes" type="text" value="${item ? escapeHtml(item.notes || '') : ''}" placeholder="Wire ref #, confirmation, context..." /></div>
         `;
-
       } else if (tab === 'withdrawals') {
         const accOptions = (state.data.accounts || []).map(acc => {
           const inv = (state.data.investors || []).find(i => String(i.id).toLowerCase() === String(acc.investor_id).toLowerCase() || String(i.portal_username || '').toLowerCase() === String(acc.investor_id).toLowerCase());
@@ -1498,12 +1498,22 @@ let state = {
           const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
           return `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
         }).join('');
-        const monthOptions = MONTHS.map(m => `<option value="${m}" ${item && item.month === m ? 'selected' : ''}>${m}</option>`).join('');
+        const selectedMonth = item ? (
+          item.month ||
+          (item.month_number && MONTHS[item.month_number - 1]) ||
+          (item.effective_accounting_date && MONTHS[parseInt(item.effective_accounting_date.slice(5, 7), 10) - 1]) ||
+          MONTHS[new Date().getMonth()]
+        ) : MONTHS[new Date().getMonth()];
+        const selectedYear = item ? (
+          item.year ||
+          (item.effective_accounting_date ? parseInt(item.effective_accounting_date.slice(0, 4), 10) : new Date().getFullYear())
+        ) : new Date().getFullYear();
+        const monthOptions = MONTHS.map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`).join('');
         html = `
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
           <div class="form-group"><label>Withdrawal Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month" required>${monthOptions}</select></div>
-          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${item ? item.year : new Date().getFullYear()}" required /></div>
+          <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${selectedYear}" required /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${item && item.status==='Pending'?'selected':''}>Pending</option><option value="Approved" ${item && item.status==='Approved'?'selected':''}>Approved</option><option value="Completed" ${item && item.status==='Completed'?'selected':''}>Completed</option><option value="Cancelled" ${item && item.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
           <div id="withdrawalEquityFeedback" style="display:none; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;"></div>
         `;
@@ -1722,7 +1732,6 @@ let state = {
           const accId = document.getElementById('field_account_id')?.value;
           const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
           const invId = targetAcc?.investor_id || '';
-          // Read accounting_treatment from radio group
           const selectedTreatmentEl = document.querySelector('input[name="field_accounting_treatment"]:checked');
           const accountingTreatment = selectedTreatmentEl ? selectedTreatmentEl.value : 'NEW_CASH';
           const mutationId = document.getElementById('field_mutation_id')?.value;
@@ -1744,12 +1753,20 @@ let state = {
           const invId = targetAcc?.investor_id || '';
           endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
           method = action === 'edit' ? 'PATCH' : 'POST';
+          const selMonth = document.getElementById('field_month')?.value || 'January';
+          const selYear = Number(document.getElementById('field_year')?.value || new Date().getFullYear());
+          const selMonthIdx = MONTHS.indexOf(selMonth) + 1 || 1;
+          const canonicalEffDate = `${selYear}-${String(selMonthIdx).padStart(2, '0')}-01`;
           body = {
             investorId: invId,
             accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
-            month: document.getElementById('field_month')?.value,
-            year: Number(document.getElementById('field_year')?.value || new Date().getFullYear()),
+            month: selMonth,
+            month_number: selMonthIdx,
+            monthNumber: selMonthIdx,
+            year: selYear,
+            effective_accounting_date: canonicalEffDate,
+            effectiveDate: canonicalEffDate,
             status: document.getElementById('field_status')?.value || 'Pending'
           };
         } else if (tab === 'returns') {
