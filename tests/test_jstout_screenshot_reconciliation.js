@@ -95,9 +95,8 @@ async function verifyJstoutExactScreenshot() {
   const d = await buildInvestorDashboard("jstout", preloaded);
 
   console.log("Current Balance:           $", d.summary.currentBalance.toLocaleString('en-US', { minimumFractionDigits: 2 }));
-  console.log("Total Gain YTD:            $", d.summary.totalGain.toLocaleString('en-US', { minimumFractionDigits: 2 }));
-  console.log("Total Performance Dollar:  $", d.summary.totalPerformanceDollar.toLocaleString('en-US', { minimumFractionDigits: 2 }));
-  console.log("Total Performance %:       ", d.summary.totalPerformancePct.toFixed(2) + "%");
+  console.log("Total Performance Dollar:  $", d.summary.totalPerformanceDollar != null ? d.summary.totalPerformanceDollar.toLocaleString('en-US', { minimumFractionDigits: 2 }) : "null (PARTIAL / Pending certification)");
+  console.log("Total Performance %:       ", d.summary.totalPerformancePct != null ? d.summary.totalPerformancePct.toFixed(2) + "%" : "null (PARTIAL / Pending certification)");
   console.log("Live 'This Month' Net Return:", d.accountPerformance.month.netReturnPct + "%");
   console.log("Live 'This Month' Net Dollar: $", d.accountPerformance.month.netDollar.toLocaleString('en-US', { minimumFractionDigits: 2 }));
   console.log("Commission Card Label:     Comm.", d.summary.commMonthName);

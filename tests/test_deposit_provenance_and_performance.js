@@ -117,9 +117,22 @@ async function runSuite() {
     assert.strictEqual(extCash.total, 10000, "Total external cash must equal $10,000");
     assert.strictEqual(extCash.hasConfirmedRecords, true, "Must report hasConfirmedRecords=true");
 
+    // When status is PARTIAL (or omitted): must NOT calculate performance
+    const perfPartial = calculateLifetimePerformance({
+      totalExternalCashSent: extCash.total,
+      hasConfirmedExternalCashRecords: extCash.hasConfirmedRecords,
+      provenanceCompletenessStatus: 'PARTIAL',
+      currentBalance: 30000
+    });
+    assert.strictEqual(perfPartial.isProven, false, "PARTIAL status must have isProven=false");
+    assert.strictEqual(perfPartial.totalPerformanceDollar, null, "PARTIAL status must return null performance $");
+    assert.strictEqual(perfPartial.totalPerformancePct, null, "PARTIAL status must return null performance %");
+
+    // When status is explicitly COMPLETE: calculate lifetime performance
     const perf = calculateLifetimePerformance({
       totalExternalCashSent: extCash.total,
       hasConfirmedExternalCashRecords: extCash.hasConfirmedRecords,
+      provenanceCompletenessStatus: 'COMPLETE',
       currentBalance: 30000
     });
 
@@ -127,7 +140,7 @@ async function runSuite() {
     assert.strictEqual(perf.totalExternalCashSent, 10000);
     assert.strictEqual(perf.totalPerformanceDollar, 20000);
     assert.strictEqual(Math.round(perf.totalPerformancePct * 100) / 100, 200.00, "Performance should be 200%");
-    pass("1. New $10,000 external deposit: Total Deposits +$10k; performance calculation correct");
+    pass("1. New $10,000 external deposit: Total Deposits +$10k; performance calculation gated on COMPLETE");
   } catch (err) { fail("1. New $10,000 external deposit", err); }
 
   // ─── Test 2: Historical $1M provenance (already in cutover baseline) ──────
@@ -150,10 +163,11 @@ async function runSuite() {
     assert.strictEqual(extCash.total, 1000000, "HISTORICAL_PROVENANCE must count in Total External Cash ($1M)");
     assert.strictEqual(extCash.hasConfirmedRecords, true);
 
-    // Performance: based on $1M confirmed cash
+    // Performance: based on $1M confirmed cash with explicit COMPLETE status
     const perf = calculateLifetimePerformance({
       totalExternalCashSent: extCash.total,
       hasConfirmedExternalCashRecords: extCash.hasConfirmedRecords,
+      provenanceCompletenessStatus: 'COMPLETE',
       currentBalance: 3000000
     });
 
@@ -198,6 +212,7 @@ async function runSuite() {
     const perf = calculateLifetimePerformance({
       totalExternalCashSent: extCash.total,
       hasConfirmedExternalCashRecords: extCash.hasConfirmedRecords,
+      provenanceCompletenessStatus: 'COMPLETE',
       currentBalance
     });
 

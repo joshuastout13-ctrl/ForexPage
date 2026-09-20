@@ -72,50 +72,68 @@ export default async function handler(req, res) {
         }
 
         if (rpcError) {
+          console.error("[api/admin/withdrawals/[id]] RPC execution error:", JSON.stringify(rpcError));
           const msg = rpcError.message || "";
+          const code = rpcError.code || "";
+
           if (msg.includes("WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY") ||
               msg.includes("INVALID_WITHDRAWAL_STATUS") ||
               msg.includes("INVALID_STATUS_TRANSITION") ||
               msg.includes("INVALID_EFFECTIVE_DATE") ||
               msg.includes("INVALID_AMOUNT")) {
-            return res.status(400).json({ error: msg });
+            return res.status(400).json({ error: msg, code });
           }
           if (msg.includes("WITHDRAWAL_NOT_FOUND")) {
-            return res.status(404).json({ error: msg });
+            return res.status(404).json({ error: msg, code });
           }
 
-          const isMissingRpc = !msg || 
-            msg.includes("does not exist") || 
-            msg.includes("schema cache") || 
-            msg.includes("Could not find the function") || 
-            msg.includes("parameter") || 
-            rpcError.code === "42883" || 
-            rpcError.code === "PGRST202";
-
-          if (isMissingRpc) {
-            return res.status(503).json({
-              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked."
+          if (code === "42501") {
+            return res.status(403).json({
+              error: `PERMISSION_DENIED: Database role lacks execute permission on update_withdrawal_atomic (${msg})`,
+              code
             });
           }
 
-          return res.status(400).json({ error: msg });
+          if (code === "42725") {
+            return res.status(500).json({
+              error: `OVERLOAD_AMBIGUITY: Multiple conflicting signatures for update_withdrawal_atomic (${msg})`,
+              code
+            });
+          }
+
+          const isMissingRpc = code === "42883" || 
+            code === "PGRST202" || 
+            msg.includes("Could not find the function") ||
+            (msg.includes("schema cache") && msg.includes("function"));
+
+          if (isMissingRpc) {
+            return res.status(503).json({
+              error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked.",
+              code,
+              details: rpcError.details || null
+            });
+          }
+
+          return res.status(400).json({ error: msg, code, details: rpcError.details, hint: rpcError.hint });
         }
       } catch (rpcEx) {
+        console.error("[api/admin/withdrawals/[id]] RPC exception:", rpcEx);
         const exMsg = rpcEx.message || "";
-        const isMissingRpc = exMsg.includes("does not exist") || 
-          exMsg.includes("schema cache") || 
-          exMsg.includes("Could not find the function") || 
-          exMsg.includes("parameter") || 
-          rpcEx.code === "42883" || 
-          rpcEx.code === "PGRST202";
+        const exCode = rpcEx.code || "";
+        const isMissingRpc = exCode === "42883" || 
+          exCode === "PGRST202" || 
+          exMsg.includes("Could not find the function") ||
+          (exMsg.includes("schema cache") && exMsg.includes("function"));
 
         if (isMissingRpc) {
           return res.status(503).json({
-            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked."
+            error: "PACKAGE_B_RPC_UNAVAILABLE: Database concurrency control function (update_withdrawal_atomic) is not installed or unavailable with required parameter support in the target database. Raw financial update is blocked.",
+            code: exCode,
+            details: rpcEx.details || null
           });
         }
 
-        return res.status(400).json({ error: exMsg || "Withdrawal update failed." });
+        return res.status(400).json({ error: exMsg || "Withdrawal update failed.", code: exCode });
       }
 
       return res.status(503).json({

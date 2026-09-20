@@ -1164,21 +1164,30 @@ let state = {
           </tr>\`;
         }).join('');
       } else if (state.tab === 'accounts') {
+        hd.innerHTML = \`<tr><th>Status</th><th>Provenance</th><th>ID</th><th>Investor</th><th>Name</th><th>Balance</th><th>Comm</th><th>Open Date</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.name}\`.toLowerCase().includes(s));
-        bd.innerHTML = d.map(i => \`<tr>
+        bd.innerHTML = d.map(i => {
+          const provStatus = (i.external_cash_provenance_status || 'UNKNOWN').toUpperCase();
+          const provBadgeClass = provStatus === 'COMPLETE' ? 'active' : (provStatus === 'PARTIAL' ? 'pending' : 'inactive');
+          const isComplete = provStatus === 'COMPLETE';
+          const title = i.provenance_certified_at ? \`Certified \${i.provenance_certified_at.slice(0, 10)} by \${i.provenance_certified_by || 'admin'}\` : 'Basis Incomplete / Verification in Progress';
+          return \`<tr>
             <td><span class="badge \${i.status==='Active'?'active':'inactive'}">\${i.status}</span></td>
+            <td><span class="badge \${provBadgeClass}" title="\${escapeHtml(title)}">\${provStatus}</span></td>
             <td>\${i.id}</td><td>\${i.investor_id}</td><td>\${i.name}</td>
             <td>
               <div style="font-weight:600">\${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
               <div class="muted" style="font-size:11px">Start: \${money(i.starting_capital)}</div>
             </td>
-            <td>\${i.is_commission ? '✅' : ''}</td><td>\${i.open_date}</td>
+            <td>\${i.is_commission ? '✅' : ''}</td><td>\${i.open_date || '—'}</td>
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="\${i.id}">Edit</button>
+                \${!isComplete ? \`<button class="btn-action action-btn" style="background:#0284c7; color:#fff;" data-action="certify_provenance" data-id="\${i.id}" title="Certify Complete Lifetime External Cash Basis">Certify Basis</button>\` : \`<button class="btn-action action-btn" style="background:rgba(255,255,255,0.06); color:var(--muted);" data-action="decertify_provenance" data-id="\${i.id}" title="Revoke Certification">Revoke</button>\`}
               </div>
             </td>
-          </tr>\`).join('');
+          </tr>\`;
+        }).join('');
       } else if (state.tab === 'deposits') {
         hd.innerHTML = \`<tr><th>Type</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>\`;
         d = d.filter(i => !s || \`\${i.id} \${i.investor_id} \${i.account_id}\`.toLowerCase().includes(s));
@@ -1865,7 +1874,7 @@ let state = {
 
       if (action === 'edit' && id) {
         openModal(state.tab, 'edit', id);
-      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd', 'commission_deactivate', 'commission_reactivate'].includes(action) && id) {
+      } else if (['deactivate', 'reactivate', 'delete_user', 'void', 'cancel_wd', 'commission_deactivate', 'commission_reactivate', 'certify_provenance', 'decertify_provenance'].includes(action) && id) {
         state.targetContext = state.tab;
         state.targetAction = action;
         state.targetId = id;
@@ -1873,7 +1882,15 @@ let state = {
         const modalTitle = document.getElementById('statusModalTitle');
         const modalDesc = document.getElementById('statusModalDesc');
         if (modalTitle) modalTitle.textContent = action.replace('_', ' ').toUpperCase();
-        if (modalDesc) modalDesc.textContent = \`Are you sure you want to \${action.replace('_', ' ')} item ID: \${id}?\`;
+        if (modalDesc) {
+          if (action === 'certify_provenance') {
+            modalDesc.textContent = \`Are you sure you want to certify the complete lifetime external cash basis for account ID: \${id}? Total Performance $ and % will be unlocked for this account.\`;
+          } else if (action === 'decertify_provenance') {
+            modalDesc.textContent = \`Are you sure you want to revoke completeness certification for account ID: \${id}? Provenance status will revert to PARTIAL and Total Performance will be hidden.\`;
+          } else {
+            modalDesc.textContent = \`Are you sure you want to \${action.replace('_', ' ')} item ID: \${id}?\`;
+          }
+        }
 
         document.getElementById('statusModal').classList.remove('hidden');
       }
@@ -1961,8 +1978,16 @@ let state = {
          else if (action === 'cancel_wd') endpoint = \`/api/admin/withdrawals/\${id}/cancel\`;
          else if (action === 'commission_deactivate') endpoint = \`/api/admin/commission-shares/\${id}/deactivate\`;
          else if (action === 'commission_reactivate') endpoint = \`/api/admin/commission-shares/\${id}/reactivate\`;
+         else if (action === 'certify_provenance') endpoint = \`/api/admin/accounts/\${id}/certify-provenance\`;
+         else if (action === 'decertify_provenance') endpoint = \`/api/admin/accounts/\${id}/certify-provenance\`;
 
-         await api.request(endpoint, { method, body: JSON.stringify({ action }) });
+         const payloadBody = (action === 'certify_provenance')
+           ? { status: 'COMPLETE', notes: 'Certified complete by admin via admin portal' }
+           : (action === 'decertify_provenance'
+               ? { status: 'PARTIAL', notes: 'Certification revoked by admin' }
+               : { action });
+
+         await api.request(endpoint, { method, body: JSON.stringify(payloadBody) });
          document.getElementById('statusModal')?.classList.add('hidden');
          loadTab(tab);
        } catch(ex) { alert('Action Failed: ' + ex.message); } 

@@ -883,6 +883,7 @@
     };
 
     function money(n) {
+      if (n === null || n === undefined || isNaN(Number(n))) return "—";
       return Number(n || 0).toLocaleString(undefined, {
         style: "currency",
         currency: "USD",
@@ -892,6 +893,7 @@
     }
 
     function pct(n) {
+      if (n === null || n === undefined || isNaN(Number(n))) return "—";
       const v = Number(n || 0);
       return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
     }
@@ -999,16 +1001,40 @@
 
       const summary = data.summary || {};
       const investor = data.investor || {};
+      const isPartial = summary.provenanceCompletenessStatus === 'PARTIAL';
+      const isComplete = summary.provenanceCompletenessStatus === 'COMPLETE';
+
+      const totalDepositsVal = money(summary.totalExternalCashSent ?? summary.totalCashIn);
+      const totalDepositsSubvalue = isPartial ? "Verification in progress" : null;
+
+      let perfValue = "—";
+      let perfSubvalue = null;
+      let perfClass = "";
+
+      if (isComplete && summary.totalPerformancePct !== null && summary.totalPerformancePct !== undefined) {
+        perfValue = pct(summary.totalPerformancePct);
+        perfSubvalue = money(summary.totalPerformanceDollar);
+        perfClass = summary.totalPerformancePct >= 0 ? 'success' : 'warning';
+      } else if (isPartial) {
+        perfValue = "Pending verification";
+        perfSubvalue = "Lifetime basis incomplete";
+        perfClass = "";
+      } else {
+        perfValue = "—";
+        perfSubvalue = "Not established";
+        perfClass = "";
+      }
+
       const metrics = [
         { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
         { label: "Total Gain YTD", value: money(summary.totalGain ?? summary.total_gain), icon: ICONS.gain, class: 'success' },
-        { label: "Total Deposits", value: money(summary.totalCashIn), icon: ICONS.cashin },
+        { label: "Total Deposits", value: totalDepositsVal, subvalue: totalDepositsSubvalue, icon: ICONS.cashin },
         { 
           label: "Total Performance", 
-          value: pct(summary.totalPerformancePct), 
-          subvalue: money(summary.totalPerformanceDollar),
+          value: perfValue, 
+          subvalue: perfSubvalue,
           icon: ICONS.performance,
-          class: 'success'
+          class: perfClass
         },
         { label: "Withdrawals", value: money(summary.totalWithdrawals ?? summary.total_withdrawals), icon: ICONS.withdrawal, class: 'warning' },
         { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
