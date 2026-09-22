@@ -1036,7 +1036,7 @@
           icon: ICONS.performance,
           class: perfClass
         },
-        { label: "Withdrawals", value: money(summary.totalWithdrawals ?? summary.total_withdrawals), icon: ICONS.withdrawal, class: 'warning' },
+        { label: "Total Withdrawals", value: money(summary.totalWithdrawals ?? summary.total_withdrawals), icon: ICONS.withdrawal, class: 'warning' },
         { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
       ];
 
