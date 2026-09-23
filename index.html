@@ -1001,11 +1001,10 @@
 
       const summary = data.summary || {};
       const investor = data.investor || {};
-      const isPartial = summary.provenanceCompletenessStatus === 'PARTIAL';
       const isComplete = summary.provenanceCompletenessStatus === 'COMPLETE';
 
       const totalDepositsVal = money(summary.totalExternalCashSent ?? summary.totalCashIn);
-      const totalDepositsSubvalue = isPartial ? "Verification in progress" : null;
+      const totalDepositsSubvalue = null;
 
       let perfValue = "—";
       let perfSubvalue = null;
@@ -1015,13 +1014,9 @@
         perfValue = pct(summary.totalPerformancePct);
         perfSubvalue = money(summary.totalPerformanceDollar);
         perfClass = summary.totalPerformancePct >= 0 ? 'success' : 'warning';
-      } else if (isPartial) {
-        perfValue = "Pending verification";
-        perfSubvalue = "Lifetime basis incomplete";
-        perfClass = "";
       } else {
         perfValue = "—";
-        perfSubvalue = "Not established";
+        perfSubvalue = null;
         perfClass = "";
       }
 
