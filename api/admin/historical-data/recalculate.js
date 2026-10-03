@@ -1,5 +1,7 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { evaluateMonthState, MonthState, isHistoricalSettled, getFundAccountingDate } from "../../../lib/month-state.js";
+import { getApplicableCommissionShares } from "../../../lib/commission-utils.js";
 import Decimal from "decimal.js";
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
@@ -15,11 +17,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { investorId, year, startMonthNumber } = req.body;
+    const { investorId, year, startMonthNumber, asOfDate: customAsOfDate, allowHistoricalCommissionCorrection = false, auditReason = null } = req.body || {};
     if (!investorId) return res.status(400).json({ error: "Missing investorId" });
 
     const startMonth = Number(startMonthNumber || 1);
     const targetYear = Number(year || new Date().getFullYear());
+    const effectiveAsOfDate = customAsOfDate || null;
+    const isExplicitAuditedCorrection = allowHistoricalCommissionCorrection === true && Boolean(auditReason);
+
     let currentBalance = new Decimal(0);
 
     // 1. Get Investor split, draw, and start date
@@ -64,12 +69,12 @@ export default async function handler(req, res) {
       .order("month_number", { ascending: true });
     if (histErr) throw histErr;
 
-    // 3. Delete existing commission_earnings where this investor is the SOURCE for the target year
-    await supabase
-      .from("commission_earnings")
-      .delete()
-      .in("source_investor_id", Array.from(sourceIdSet))
-      .eq("year", targetYear);
+    // 3. Commission Protection: Settled commission months must NEVER be deleted globally!
+    if (isExplicitAuditedCorrection) {
+      console.log(`[Recalc] Audited commission correction for ${investorId}: ${auditReason}`);
+    } else {
+      console.log(`[Recalc] Preserving immutable settled commission rows for ${investorId}. Zero deletions performed.`);
+    }
 
     // 4. Fetch all Deposits, Withdrawals, Fund Returns, Commission Shares, Commission Rules, Commission Earnings, and Account Cutovers
     const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, {data: commEarnings}, {data: cutovers} ] = await Promise.all([
@@ -169,12 +174,11 @@ export default async function handler(req, res) {
       const isStarted = !startDate || (targetYear > startDate.getUTCFullYear()) || 
                         (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
 
-      const existing = history.find(h => h.month_number === m);
+      const existing = (history || []).find(h => h.month_number === m);
       const earnedPrevMonth = (m > 1)
         ? new Decimal(commEarningsByM[`${targetYear}_${m - 1}`] || 0)
         : new Decimal(commEarningsByM[`${targetYear - 1}_12`] || 0);
       
-      // Add commissions to the FIRST commission account found, or just the first account
       const commAcc = accounts.find(a => a.is_commission) || accounts[0];
       if (commAcc && earnedPrevMonth.gt(0)) {
         accountBalances[commAcc.id] = accountBalances[commAcc.id].add(earnedPrevMonth);
@@ -184,6 +188,12 @@ export default async function handler(req, res) {
       let totalGain = new Decimal(0);
       let totalDeps = new Decimal(0);
       let totalWds = new Decimal(0);
+
+      // Authoritative Month State (America/Los_Angeles)
+      const monthState = evaluateMonthState(targetYear, m, effectiveAsOfDate);
+      const isHistoricalCompleted = (monthState === MonthState.HISTORICAL_SETTLED);
+      const isOpenMonth = (monthState === MonthState.CURRENT_OPEN);
+      const isFutureMonth = (monthState === MonthState.FUTURE);
 
       for (const acc of accounts) {
         // Cutover adjustment check: If an authorized cutover exists for this account & period, override opening operating basis
@@ -199,62 +209,62 @@ export default async function handler(req, res) {
         const opening = accountBalances[acc.id];
         const deps = new Decimal((depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0);
         const wds = new Decimal((wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0);
-        
-        // Zero out grossPct for future projected months unless manual
-        const ptString = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
-        const now = new Date(ptString);
-        const currentMonthIdx = now.getMonth() + 1;
-        const currentYearIdx = now.getFullYear();
-        const isPastOrCurrent = (targetYear < currentYearIdx) || (targetYear === currentYearIdx && m <= currentMonthIdx);
-        
+        const adjStart = opening.add(deps).sub(wds);
+
         let grossPct = isStarted ? new Decimal(fundRetByM[m] || 0) : new Decimal(0);
-        if (!isPastOrCurrent && !(existing && existing.is_manual)) {
-          grossPct = new Decimal(0);
+        let gain = new Decimal(0);
+        let totalProfit = new Decimal(0);
+
+        if (isHistoricalCompleted) {
+          if (existing && existing.manual_gain_amount !== null && existing.manual_gain_amount !== undefined) {
+            gain = new Decimal(existing.manual_gain_amount);
+            totalProfit = gain;
+          } else {
+            const returnPct = (existing && existing.manual_return_pct !== null && existing.manual_return_pct !== undefined)
+              ? new Decimal(existing.manual_return_pct)
+              : grossPct;
+            const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? new Decimal(acc.split_pct).div(100) : investorSplit;
+            totalProfit = adjStart.mul(returnPct.div(100));
+            gain = totalProfit.mul(split);
+          }
+          accountBalances[acc.id] = adjStart.add(gain);
+        } else if (isOpenMonth) {
+          // CURRENT_OPEN Month:
+          // Unclosed trading gains contribute $0 to settled balances and MUST NOT roll into future months.
+          if (existing && existing.is_manual) {
+            if (existing.manual_gain_amount !== null && existing.manual_gain_amount !== undefined) {
+              gain = new Decimal(existing.manual_gain_amount);
+            } else if (existing.manual_return_pct !== null && existing.manual_return_pct !== undefined) {
+              gain = adjStart.mul(new Decimal(existing.manual_return_pct).div(100)).mul(investorSplit);
+            }
+            accountBalances[acc.id] = adjStart.add(gain);
+          } else {
+            gain = new Decimal(0);
+            accountBalances[acc.id] = adjStart;
+          }
+        } else {
+          // FUTURE Month:
+          gain = new Decimal(0);
+          accountBalances[acc.id] = adjStart;
         }
 
-        const split = (acc.split_pct !== undefined && acc.split_pct !== null) ? new Decimal(acc.split_pct).div(100) : investorSplit;
-        
-        const adjStart = opening.add(deps).sub(wds);
-        const totalProfit = adjStart.mul(grossPct.div(100));
-        const gain = totalProfit.mul(split);
-
-        // Process commissions for this account
-        const monthStart = new Date(Date.UTC(targetYear, m - 1, 1, 0, 0, 0));
-        const monthEnd = new Date(Date.UTC(targetYear, m, 0, 23, 59, 59));
-        
-        const activeShares = (unifiedCommRules || []).filter(share => {
-          if (share.status === 'cancelled' || share.status === 'void') return false;
-          
-          if (share.source_account_id) {
-            const sAcc = String(share.source_account_id).trim().toLowerCase();
-            const aAcc = String(acc.id).trim().toLowerCase();
-            const aName = String(acc.name || '').trim().toLowerCase();
-            if (sAcc !== aAcc && sAcc !== aName) return false;
-          }
-          
-          let shareStart = null;
-          if (share.effective_start_date) {
-            const parts = String(share.effective_start_date).split('T')[0].split('-');
-            if (parts.length === 3) {
-              shareStart = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0));
+        // Commission processing strictly restricted to explicit audited correction
+        if (isExplicitAuditedCorrection && isHistoricalCompleted && totalProfit.gt(0)) {
+          const activeShares = getApplicableCommissionShares({
+            shares: unifiedCommRules,
+            year: targetYear,
+            month: m,
+            sourceIdSet
+          }).filter(share => {
+            if (share.source_account_id) {
+              const sAcc = String(share.source_account_id).trim().toLowerCase();
+              const aAcc = String(acc.id).trim().toLowerCase();
+              const aName = String(acc.name || '').trim().toLowerCase();
+              if (sAcc !== aAcc && sAcc !== aName) return false;
             }
-          }
-          
-          let shareEnd = null;
-          if (share.effective_end_date) {
-            const parts = String(share.effective_end_date).split('T')[0].split('-');
-            if (parts.length === 3) {
-              shareEnd = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59));
-            }
-          }
+            return true;
+          });
 
-          const isStartValid = !shareStart || shareStart <= monthEnd;
-          const isEndValid = !shareEnd || shareEnd >= monthStart;
-          
-          return isStartValid && isEndValid;
-        });
-
-        if (totalProfit.gt(0) && activeShares.length > 0) {
           for (const share of activeShares) {
             const commAmount = totalProfit.mul(new Decimal(share.commission_percent).div(100));
             commissionsToInsert.push({
@@ -271,9 +281,6 @@ export default async function handler(req, res) {
         totalGain = totalGain.add(gain);
         totalDeps = totalDeps.add(deps);
         totalWds = totalWds.add(wds);
-
-        // Update balance for next month (compounding)
-        accountBalances[acc.id] = adjStart.add(gain);
       }
 
       // Handle monthly draw
@@ -288,6 +295,10 @@ export default async function handler(req, res) {
       
       const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       
+      const settledGrossPctForHistory = isHistoricalCompleted
+        ? (fundRetByM[m] || 0)
+        : (existing && existing.is_manual ? Number(existing.manual_return_pct || 0) : 0);
+
       const rowPayload = {
         investor_id: inv.id,
         year: targetYear,
@@ -296,7 +307,7 @@ export default async function handler(req, res) {
         opening_balance: totalOpening.toNumber(),
         deposits: totalDeps.toNumber(),
         withdrawals: totalWds.toNumber(),
-        gross_return_pct: fundRetByM[m] || 0,
+        gross_return_pct: settledGrossPctForHistory,
         manual_gain_amount: existing ? existing.manual_gain_amount : null,
         manual_return_pct: existing ? existing.manual_return_pct : null,
         recurring_draw: currentDraw.toNumber(),
@@ -322,8 +333,8 @@ export default async function handler(req, res) {
       currentBalance = ending;
     }
     
-    // Bulk insert commissions
-    if (commissionsToInsert.length > 0) {
+    // Bulk insert commissions only if explicit audited correction
+    if (isExplicitAuditedCorrection && commissionsToInsert.length > 0) {
       const { error: commErr } = await supabase.from("commission_earnings").insert(commissionsToInsert);
       if (commErr) {
         console.error("[Recalc ERROR] Failed to insert commissions:", commErr.message);
@@ -333,7 +344,7 @@ export default async function handler(req, res) {
 
     console.log(`[Recalc] Successfully updated ${updatedRows.length} months for ${investorId}`);
 
-    return res.status(200).json({ success: true, updatedCount: updatedRows.length });
+    return res.status(200).json({ success: true, updatedCount: updatedRows.length, commsCount: commissionsToInsert.length });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });

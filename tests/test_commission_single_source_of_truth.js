@@ -114,7 +114,8 @@ async function runCommissionSingleSourceOfTruthTests() {
       month: "+0.19%",
       lastMonth: "+3.03%",
       year: "+29.82%"
-    }
+    },
+    asOfDate: "2026-09-20T12:00:00Z"
   };
 
   const d = await buildInvestorDashboard("jstout", preloaded);

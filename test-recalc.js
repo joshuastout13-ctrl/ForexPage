@@ -187,14 +187,8 @@ export async function handler(req, res) {
       }
     }
 
-    // Perform batched DB operations
-    // 1. Delete all commissions for targetYear
-    await supabase.from("commission_earnings").delete().eq("year", targetYear);
-    
-    // 2. Insert new commissions (chunked if > 1000, though unlikely here)
-    if (commissionsToInsert.length > 0) {
-      await supabase.from("commission_earnings").insert(commissionsToInsert);
-    }
+    // Commission safety guard: never delete settled commission earnings globally
+    console.log("[test-recalc] Preserving immutable settled commission_earnings ledger. Zero destructive deletions.");
     
     // 3. Upsert history
     if (historyToUpsert.length > 0) {
