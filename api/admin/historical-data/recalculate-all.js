@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       supabase.from("investor_accounts").select("*").eq("status", "Active"),
       paginatedRead('investor_monthly_history', { queryModifier: q => q.eq('year', targetYear) })
     ]);
-    const commEarningsData = commEarnings || [];
+    const commEarningsData = (commEarnings || []).filter(r => !r.status || String(r.status).trim().toUpperCase() !== 'SUPERSEDED');
     const allHistoryData = allHistory || [];
 
     // Build unified commission rules/shares list

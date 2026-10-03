@@ -156,7 +156,8 @@ export default async function handler(req, res) {
     const fundRetByM = {}; allReturns?.forEach(r => {
       fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
     });
-    const commEarningsByM = {}; commEarnings?.forEach(e => {
+    const commEarningsByM = {}; 
+    (commEarnings || []).filter(e => !e.status || String(e.status).trim().toUpperCase() !== 'SUPERSEDED').forEach(e => {
       const key = `${e.year}_${e.month_number}`;
       commEarningsByM[key] = (commEarningsByM[key] || 0) + Number(e.amount || 0);
     });
