@@ -18,12 +18,13 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { year, asOfDate: customAsOfDate, allowHistoricalCommissionCorrection = false, auditReason = null } = req.body || {};
+    const { year, asOfDate: customAsOfDate, allowHistoricalCommissionCorrection = false, allowLockedHistoryOverride = false, auditReason = null } = req.body || {};
     const targetYear = Number(year || new Date().getFullYear());
     const effectiveAsOfDate = customAsOfDate || null;
 
-    // Audited correction guard: Settled commission months must never be globally regenerated or deleted.
+    // Audited correction guards
     const isExplicitAuditedCorrection = allowHistoricalCommissionCorrection === true && Boolean(auditReason);
+    const isExplicitAuditedHistoryCorrection = (allowLockedHistoryOverride === true || allowHistoricalCommissionCorrection === true) && Boolean(auditReason);
 
     // 1. Fetch all investors
     const { data: investors, error: invErr } = await supabase
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
     if (invErr) throw invErr;
 
     // 2. Fetch all required data globally
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, commEarnings, {data: allAccounts}, allHistory ] = await Promise.all([
+    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, commEarnings, {data: allAccounts}, allHistory, {data: cutovers} ] = await Promise.all([
       supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
       supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
@@ -40,7 +41,8 @@ export default async function handler(req, res) {
       supabase.from("commission_rules").select("*"),
       paginatedRead('commission_earnings', { queryModifier: q => q.in('year', [targetYear, targetYear - 1]) }),
       supabase.from("investor_accounts").select("*").eq("status", "Active"),
-      paginatedRead('investor_monthly_history', { queryModifier: q => q.eq('year', targetYear) })
+      paginatedRead('investor_monthly_history', { queryModifier: q => q.eq('year', targetYear) }),
+      supabase.from("account_cutover_adjustments").select("*").eq("year", targetYear)
     ]);
     const commEarningsData = (commEarnings || []).filter(r => !r.status || String(r.status).trim().toUpperCase() !== 'SUPERSEDED');
     const allHistoryData = allHistory || [];
@@ -81,7 +83,11 @@ export default async function handler(req, res) {
 
     // Group returns by month
     const fundRetByM = {};
-    allReturns?.forEach(r => { fundRetByM[r.month_number] = Number(r.gross_return_pct || 0); });
+    const fundRetLockedByM = {};
+    allReturns?.forEach(r => { 
+      fundRetByM[r.month_number] = Number(r.gross_return_pct || 0); 
+      fundRetLockedByM[r.month_number] = (r.locked === true || String(r.locked).toLowerCase() === 'true');
+    });
 
     let historyToUpsert = [];
     let commissionsToInsert = [];
@@ -175,6 +181,16 @@ export default async function handler(req, res) {
         const isFutureMonth = (monthState === MonthState.FUTURE);
 
         for (const acc of accounts) {
+          // Cutover adjustment check: If an authorized cutover exists for this account & period, override opening operating basis
+          const cutover = (cutovers || []).find(c => 
+            (c.account_id === acc.id || (!c.account_id && acc.id === accounts[0]?.id)) && 
+            Number(c.year) === targetYear && 
+            Number(c.month_number) === m
+          );
+          if (cutover) {
+            accountBalances[acc.id] = new Decimal(cutover.authorized_opening_balance);
+          }
+
           const opening = accountBalances[acc.id];
           const deps = new Decimal((depsByMAcc[m] && depsByMAcc[m][acc.id]) || 0);
           const wds = new Decimal((wdsByMAcc[m] && wdsByMAcc[m][acc.id]) || 0);
@@ -262,6 +278,24 @@ export default async function handler(req, res) {
 
         const ending = accounts.length > 0 ? Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0)) : new Decimal(0);
         
+        // LOCKED-PERIOD IMMUTABILITY GUARD:
+        // A locked/finalized investor_monthly_history period or locked monthly_returns period
+        // must not be modified by routine recalculation. Only an explicit audited correction workflow
+        // may alter locked historical accounting.
+        const isPeriodLocked = (
+          isHistoricalCompleted || 
+          (existing && (existing.locked === true || String(existing.locked).toLowerCase() === 'true')) ||
+          fundRetLockedByM[m] === true
+        );
+
+        if (isPeriodLocked && !isExplicitAuditedHistoryCorrection) {
+          if (existing && existing.ending_balance !== null && existing.ending_balance !== undefined && accounts.length > 0) {
+            const sumAcc = Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0));
+            accountBalances[accounts[0].id] = accountBalances[accounts[0].id].add(new Decimal(existing.ending_balance).sub(sumAcc));
+          }
+          continue; // Skip upserting this locked month!
+        }
+
         const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         
         const settledGrossPctForHistory = isHistoricalCompleted

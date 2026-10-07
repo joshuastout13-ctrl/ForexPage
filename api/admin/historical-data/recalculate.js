@@ -17,13 +17,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { investorId, year, startMonthNumber, asOfDate: customAsOfDate, allowHistoricalCommissionCorrection = false, auditReason = null } = req.body || {};
+    const { investorId, year, startMonthNumber, asOfDate: customAsOfDate, allowHistoricalCommissionCorrection = false, allowLockedHistoryOverride = false, auditReason = null } = req.body || {};
     if (!investorId) return res.status(400).json({ error: "Missing investorId" });
 
     const startMonth = Number(startMonthNumber || 1);
     const targetYear = Number(year || new Date().getFullYear());
     const effectiveAsOfDate = customAsOfDate || null;
     const isExplicitAuditedCorrection = allowHistoricalCommissionCorrection === true && Boolean(auditReason);
+    const isExplicitAuditedHistoryCorrection = (allowLockedHistoryOverride === true || allowHistoricalCommissionCorrection === true) && Boolean(auditReason);
 
     let currentBalance = new Decimal(0);
 
@@ -294,6 +295,31 @@ export default async function handler(req, res) {
 
       const ending = Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0));
       
+      // LOCKED-PERIOD IMMUTABILITY GUARD:
+      // A locked/finalized investor_monthly_history period or locked monthly_returns period
+      // must not be modified by routine recalculation. Only an explicit audited correction workflow
+      // may alter locked historical accounting.
+      const retObj = allReturns?.find(r => r.month_number === m);
+      const isPeriodLocked = (
+        isHistoricalCompleted || 
+        (existing && (existing.locked === true || String(existing.locked).toLowerCase() === 'true')) ||
+        (retObj && (retObj.locked === true || String(retObj.locked).toLowerCase() === 'true'))
+      );
+
+      if (isPeriodLocked && !isExplicitAuditedHistoryCorrection) {
+        console.log(`[Recalc] Preserving locked/settled month ${m} for ${inv.id}. Immutability enforced.`);
+        if (existing && existing.ending_balance !== null && existing.ending_balance !== undefined) {
+          if (accounts.length > 0) {
+            const sumAcc = Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0));
+            accountBalances[accounts[0].id] = accountBalances[accounts[0].id].add(new Decimal(existing.ending_balance).sub(sumAcc));
+          }
+          currentBalance = new Decimal(existing.ending_balance);
+        } else {
+          currentBalance = ending;
+        }
+        continue; // Skip upserting this locked month!
+      }
+
       const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       
       const settledGrossPctForHistory = isHistoricalCompleted
