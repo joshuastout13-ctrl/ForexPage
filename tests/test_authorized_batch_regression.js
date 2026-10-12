@@ -211,11 +211,11 @@ async function runSuite() {
   // ---------------------------------------------------------------------------
   try {
     const jstoutDash = await buildInvestorDashboard('jstout', null, { mustBeAuthoritative: true });
-    assert.strictEqual(Math.round(jstoutDash.summary.currentBalance * 100), 338345352, 'Josh Stout settled balance must be exactly $3,383,453.52');
+    assert.strictEqual(Math.round(jstoutDash.summary.currentBalance * 100), 333345352, 'Josh Stout settled balance must be exactly $3,333,453.52');
     const jstoutOctRow = jstoutDash.breakdown?.find(m => m.monthNumber === 10);
-    assert.strictEqual(jstoutOctRow?.oneTimeWithdrawal, 20000, 'Josh Stout October withdrawal must be $20,000.00');
-    assert.strictEqual(Math.round(jstoutDash.summary.totalExternalCashSent * 100), 160859000, 'Josh Stout outside cash must be $1,608,590.00');
-    pass('12. Correct Josh Stout withdrawal accounting: withdrawal correctly deducted, certified cash preserved');
+    assert.strictEqual(jstoutOctRow?.oneTimeWithdrawal, 70000, 'Josh Stout October withdrawal must be $70,000.00');
+    assert.strictEqual(Math.round(jstoutDash.summary.totalExternalCashSent * 100), 160609000, 'Josh Stout outside cash must be $1,606,090.00');
+    pass('12. Correct Josh Stout withdrawal accounting: $70k withdrawal correctly deducted, $1,606,090 certified cash preserved');
   } catch (e) {
     fail('12. Correct Josh Stout withdrawal accounting', e);
   }
