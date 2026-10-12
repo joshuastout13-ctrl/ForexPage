@@ -146,9 +146,9 @@ All 8 transactions approved in `docs/OCTOBER_2026_JOSH_TRANSACTION_BATCH_RECONCI
 3. **Dale Waite (`inv_60ed0c32`):** $6,500.00 October deposit (`dep_dwaite_20261001_6500`). Settled balance: **`$244,700.15`**.
 4. **Josh Stout (`stout001`):** $70,000.00 October withdrawal settled once. Settled balance: **`$3,333,453.52`**.
 5. **Glenn Maddocks (`inv_5a509c6a`):** $568,277.00 October deposit (`dep_gmaddocks_20261001_568277`). Settled balance: **`$718,680.50`**.
-6. **Josh Oviatt (`inv_c84a867c`):** $795.00 September withdrawal (`wd_joviatt_20260901_795`). September ending and October opening: **`$28,506.74`**.
-7. **Whit Miller (`inv_14b216ec`):** $700.00 September withdrawal (`wd_wmiller_20260901_700`). September ending and October opening: **`$21,795.00`**.
-8. **Jean Harder (`inv_bc1bcb0c`):** $1,500.00 September withdrawal (`wd_jharder_20260901_1500`). September ending and October opening: **`$51,691.07`**.
+6. **Josh Oviatt (`inv_ce0675be` / `joviatt`):** $795.00 September withdrawal (`wd_josh_auth_joviatt_795`). September ending and October settled balance: **`$52,578.68`**.
+7. **Whit Miller (`inv_ea8b4eba` / `wmiller`):** $700.00 September withdrawal (`wd_josh_auth_wmiller_700`). September ending and October settled balance: **`$118,957.05`**.
+8. **Jean Harder (`inv_bc1bcb0c` / `jharder`):** $1,500.00 September withdrawal (`wd_josh_auth_jharder_1500`). September ending and October settled balance: **`$115,603.28`**.
 
 All 8 transactions are active, correctly dated, settled once, and verified with zero duplication.
 
