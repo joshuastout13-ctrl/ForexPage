@@ -133,6 +133,73 @@ export default async function handler(req, res) {
       }
       const amountCents = Math.round(amount * 100);
 
+      // ── Prevention 1: Internal Transfer Misclassification Guard ──────────
+      if (rawTreatment === "NEW_CASH") {
+        const typeStr = String(body.type || "").trim().toLowerCase();
+        const notesStr = String(body.notes || "").toLowerCase();
+        const isTransferType = typeStr === "transfer" || typeStr === "internal_transfer";
+        const isTransferNote = notesStr.includes("internal transfer") || notesStr.includes("transfer from") || notesStr.includes("transfer to");
+        if (isTransferType || isTransferNote) {
+          return res.status(400).json({
+            error: "INTERNAL_TRANSFER_MISCLASSIFIED: Internal transfers between investor accounts must not be posted as NEW_CASH deposits. Use the dedicated internal transfer workflow to maintain balanced debit and credit legs and preserve certified outside cash."
+          });
+        }
+      }
+
+      // ── Prevention 2: Embedded Starting Capital Duplicate Guard ──────────
+      const { data: accRecord } = await supabase
+        .from("investor_accounts")
+        .select("id, starting_capital, open_date, name")
+        .eq("id", accountId)
+        .single();
+
+      if (accRecord && rawTreatment === "NEW_CASH") {
+        const startCap = Number(accRecord.starting_capital || 0);
+        const openDateStr = accRecord.open_date ? String(accRecord.open_date).slice(0, 10) : "";
+        const entryMonth = entryDate.slice(0, 7);
+        const openMonth = openDateStr.slice(0, 7);
+
+        const isSameAmount = startCap > 0 && Math.abs(startCap - amount) < 0.001;
+        const isSamePeriod = openDateStr && (entryDate === openDateStr || effDate === `${openMonth}-01` || entryMonth === openMonth);
+
+        if (isSameAmount && isSamePeriod) {
+          const hasExplicitConfirm = Boolean(body.confirm_additional_to_starting_capital || body.confirm_additional_funding);
+          if (!hasExplicitConfirm) {
+            return res.status(409).json({
+              error: `EMBEDDED_STARTING_CAPITAL_DUPLICATE: This deposit amount ($${amount.toFixed(2)}) and date (${entryDate}) match the account's initial starting capital ($${startCap.toFixed(2)}) and opening date (${openDateStr}). The economic effect of this funding is already embedded in the account opening balance. Posting this as NEW_CASH would duplicate the investor's balance. If this is a distinct additional external contribution beyond the starting capital, administrator confirmation is required (set confirm_additional_to_starting_capital: true). If certifying provenance of the initial capital, use accounting_treatment: 'HISTORICAL_PROVENANCE'.`,
+              accountStartingCapital: startCap,
+              accountOpenDate: openDateStr
+            });
+          }
+        }
+      }
+
+      // ── Prevention 3: Pre-Existing Confirmed Economic Duplicate Check ────
+      const { data: existingDupes } = await supabase
+        .from("deposits")
+        .select("id, amount, date, effective_accounting_date, status, accounting_treatment, notes")
+        .eq("investor_id", investorId)
+        .eq("account_id", accountId)
+        .eq("amount", amount)
+        .eq("status", "confirmed")
+        .eq("accounting_treatment", rawTreatment);
+
+      if (existingDupes && existingDupes.length > 0) {
+        const hasDateMatch = existingDupes.some(d => {
+          const dDate = String(d.date || "").slice(0, 10);
+          const dEff = String(d.effective_accounting_date || "").slice(0, 10);
+          return dDate === entryDate || dEff === effDate;
+        });
+
+        if (hasDateMatch && !body.confirm_duplicate_economic_deposit) {
+          const matchedDupe = existingDupes[0];
+          return res.status(409).json({
+            error: `DUPLICATE_ECONOMIC_DEPOSIT: An active ${rawTreatment} deposit of $${amount.toFixed(2)} on ${entryDate} (effective ${effDate}) already exists for this account (Deposit ID: ${matchedDupe.id}). If this is a separate legitimate transaction, administrator confirmation is required (set confirm_duplicate_economic_deposit: true).`,
+            existingDepositId: matchedDupe.id
+          });
+        }
+      }
+
       // ── Idempotency key ───────────────────────────────────────────────────
       // Every deposit (including NEW_CASH) MUST receive a non-null idempotency_key
       // so the database unique index idx_deposits_idempotency_key atomically
@@ -155,8 +222,24 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `IDEMPOTENCY_KEY_ERROR: ${keyErr.message}` });
         }
       } else {
-        // Fail-safe: NEVER allow ANY deposit row to have a NULL idempotency_key.
-        idempotencyKey = `dep_mut_${crypto.randomUUID()}`;
+        // Deterministic economic key for NEW_CASH to prevent accidental double-posting
+        const purposeSuffix = body.confirm_duplicate_economic_deposit
+          ? `confirmed_addition_${crypto.randomBytes(4).toString("hex")}`
+          : (body.transaction_reference
+              ? `ref_${String(body.transaction_reference).toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`
+              : `new_cash_${String(accountId).toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`);
+
+        try {
+          idempotencyKey = buildDeterministicIdempotencyKey({
+            type: "deposit",
+            investorId,
+            effectiveDate: effDate,
+            amountCents,
+            purpose: purposeSuffix
+          });
+        } catch (keyErr) {
+          idempotencyKey = `dep_mut_${investorId}_${effDate}_${amountCents}_${purposeSuffix}`;
+        }
       }
 
       // ── Build payload ─────────────────────────────────────────────────────
