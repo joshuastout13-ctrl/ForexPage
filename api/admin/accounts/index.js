@@ -29,7 +29,7 @@ export default async function handler(req, res) {
           supabase.from("withdrawals").select("*"),
           supabase.from("investor_monthly_history").select("*"),
           supabase.from("commission_earnings").select("*"),
-          getMyfxbookLive()
+          getMyfxbookLive({ skipScraper: true })
         ]);
         
         const preloadedData = {

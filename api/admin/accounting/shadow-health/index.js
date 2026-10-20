@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     let returnSource = "MYFXBOOK_LIVE";
 
     try {
-      myfxbookLive = await getMyfxbookLive();
+      myfxbookLive = await getMyfxbookLive({ skipScraper: true });
       if (myfxbookLive?.month) {
         fundReturnPct = Number(myfxbookLive.month);
       }

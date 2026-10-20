@@ -91,7 +91,7 @@ export async function runProductionFinancialAudit() {
     paginatedRead('deposits'),
     paginatedRead('withdrawals'),
     paginatedRead('account_cutover_adjustments').catch(() => []),
-    getMyfxbookLive()
+    getMyfxbookLive({ skipScraper: true })
   ]);
 
   console.log(`  Investors: ${rawInvestors.length}`);

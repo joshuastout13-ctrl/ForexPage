@@ -163,9 +163,8 @@ async function runTestSuite() {
   check(backupRes.getData()?.skipped === true, "3.2. Backup execution flags skipped: true");
   check(backupRes.getData()?.reason === "BACKUP_SKIPPED_PRIMARY_SUCCEEDED", "3.3. Backup skip reason is BACKUP_SKIPPED_PRIMARY_SUCCEEDED");
 
-  // Clean up synthetic test row
+  // Clean up synthetic test claim (leave audit_runs immutable)
   await supabase.from("myfxbook_sync_claims").delete().eq("pacific_date", testPacificDate);
-  await supabase.from("audit_runs").delete().eq("admin_id", "myfxbook_daily_sync").eq("year", 2099);
 
   // ---------------------------------------------------------------------------
   // TEST 4: Accounting Immutability & Reconciled Balances

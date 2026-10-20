@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
   // 2. Check Myfxbook
   try {
-    const live = await getMyfxbookLive();
+    const live = await getMyfxbookLive({ skipScraper: true });
     result.checks.myfxbook = { 
       ok: true, 
       source: live.source, 
