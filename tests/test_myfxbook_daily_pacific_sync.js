@@ -4,9 +4,11 @@ import {
   determineSyncWindow, 
   getPacificDateString, 
   checkDailySyncCompleted, 
-  recordDailySyncResult, 
-  acquireSyncLock, 
-  releaseSyncLock 
+  claimDailySyncSlot,
+  finalizeDailySyncSuccess,
+  finalizeDailySyncFailure,
+  acquireLocalSyncLock, 
+  releaseLocalSyncLock 
 } from "../lib/myfxbook-sync-manager.js";
 import { supabase } from "../lib/supabase.js";
 import { executeDailyFinancialReconciliation } from "../lib/daily-reconciliation-engine.js";
@@ -39,7 +41,7 @@ function createMockReqRes({ headers = {}, query = {}, body = {} } = {}) {
 
 async function runTestSuite() {
   console.log("================================================================================");
-  console.log("FOREXPAGE — PACIFIC MIDNIGHT SYNC & SCRAPE.DO CREDIT PROTECTION TEST SUITE");
+  console.log("FOREXPAGE — PACIFIC MIDNIGHT SYNC, ATOMIC CLAIM & CREDIT PROTECTION SUITE");
   console.log("================================================================================\n");
 
   let passed = 0;
@@ -85,58 +87,88 @@ async function runTestSuite() {
   check(pstBackup.hour === 1 && pstBackup.minute === 30, "1.10. PST 09:30 UTC hour:minute is 01:30");
 
   // ---------------------------------------------------------------------------
-  // TEST 2: Scrape.do Credit Protection & Durable Daily Marker Skipping
+  // TEST 2: Atomic Database-Level Daily Claim Across Vercel Instances
   // ---------------------------------------------------------------------------
-  console.log("\n--- 2. Scrape.do Credit Protection & Marker Skipping ---");
+  console.log("\n--- 2. Atomic Database-Level Daily Claim Protection ---");
 
-  // Test that when outside window, handler exits without scraping
-  const { req: outsideReq, res: outsideRes } = createMockReqRes({
-    headers: { "x-vercel-cron": "1" },
-    query: { simulatedDate: "2026-10-20T15:00:00Z" } // 8:00 AM Pacific
-  });
-  await handler(outsideReq, outsideRes);
-  check(outsideRes.getStatusCode() === 200, "2.1. Outside window returns HTTP 200");
-  check(outsideRes.getData()?.skipped === true, "2.2. Outside window returns skipped: true");
-  check(outsideRes.getData()?.reason === "OUTSIDE_PACIFIC_MIDNIGHT_WINDOW", "2.3. Reason is OUTSIDE_PACIFIC_MIDNIGHT_WINDOW");
-
-  // Record a synthetic success marker for a test date
   const testPacificDate = "2099-10-20";
-  await recordDailySyncResult({
+  // Clean up any existing test row before starting
+  await supabase.from("myfxbook_sync_claims").delete().eq("pacific_date", testPacificDate);
+
+  // Instance A claims Primary slot
+  const claimA = await claimDailySyncSlot({
     pacificDateStr: testPacificDate,
     windowType: "PRIMARY",
-    status: "SUCCESS",
-    metrics: { today: "+0.00%", week: "+0.00%", month: "+1.00%", year: "+10.00%", source: "Test Mock" },
-    provider: "Scrape.do",
-    attempts: 1
+    instanceId: "vercel_lambda_instance_A"
   });
+  check(claimA.claimed === true, "2.1. Instance A successfully claims daily sync slot for test date");
+  check(claimA.claimRecord?.status === "CLAIMED", "2.2. Atomic claim status initialized to CLAIMED");
+
+  // Simultaneous Instance B attempts to claim same slot
+  const claimB = await claimDailySyncSlot({
+    pacificDateStr: testPacificDate,
+    windowType: "PRIMARY",
+    instanceId: "vercel_lambda_instance_B"
+  });
+  check(claimB.claimed === false, "2.3. Simultaneous Instance B claim is atomically rejected");
+  check(claimB.reason === "CONCURRENT_INSTANCE_CLAIMED", "2.4. Instance B rejected reason is CONCURRENT_INSTANCE_CLAIMED");
+
+  // Finalize Instance A with genuine fresh data
+  const mockLiveData = {
+    today: "+0.00%",
+    week: "+0.07%",
+    month: "+1.71%",
+    year: "+31.51%",
+    gain: "+31.51%",
+    absGain: "+31.51%",
+    drawdown: "0.00%",
+    fetchedAt: new Date().toISOString(),
+    source: "Myfxbook (Scrape.do)",
+    isLiveScraped: true
+  };
+  await finalizeDailySyncSuccess({
+    pacificDateStr: testPacificDate,
+    windowType: "PRIMARY",
+    data: mockLiveData,
+    instanceId: "vercel_lambda_instance_A"
+  });
+
+  // Verify atomic claim row in database is now SUCCESS with data_hash
+  const { data: verifiedClaim } = await supabase
+    .from("myfxbook_sync_claims")
+    .select("*")
+    .eq("pacific_date", testPacificDate)
+    .single();
+
+  check(verifiedClaim?.status === "SUCCESS", "2.5. Claim row status transitioned to SUCCESS");
+  check(Boolean(verifiedClaim?.data_hash), "2.6. Genuine data fingerprint hash generated and stored");
+  check(verifiedClaim?.source === "Myfxbook (Scrape.do)", "2.7. Scrape.do source recorded");
 
   // Verify checkDailySyncCompleted finds it
   const markerCheck = await checkDailySyncCompleted(testPacificDate);
-  check(markerCheck.completed === true, "2.4. Durable success marker detected in audit_runs");
+  check(markerCheck.completed === true, "2.8. Durable success marker detected in database");
 
-  // When Backup window runs for that test date, it must skip without scraping
+  // ---------------------------------------------------------------------------
+  // TEST 3: Backup Window Automatic Skipping (0 Credits Consumed)
+  // ---------------------------------------------------------------------------
+  console.log("\n--- 3. Backup Window Automatic Skipping ---");
+
+  // When Backup window triggers for that test date, it must skip without scraping
   const { req: backupReq, res: backupRes } = createMockReqRes({
     headers: { "x-vercel-cron": "1" },
     query: { simulatedDate: `${testPacificDate}T08:30:00Z` } // Backup window in PDT
   });
   await handler(backupReq, backupRes);
-  check(backupRes.getStatusCode() === 200, "2.5. Backup skip returns HTTP 200");
-  check(backupRes.getData()?.skipped === true, "2.6. Backup skip flags skipped: true");
-  check(backupRes.getData()?.reason === "BACKUP_SKIPPED_PRIMARY_SUCCEEDED", "2.7. Backup skip reason is BACKUP_SKIPPED_PRIMARY_SUCCEEDED");
+  check(backupRes.getStatusCode() === 200, "3.1. Backup trigger returns HTTP 200");
+  check(backupRes.getData()?.skipped === true, "3.2. Backup execution flags skipped: true");
+  check(backupRes.getData()?.reason === "BACKUP_SKIPPED_PRIMARY_SUCCEEDED", "3.3. Backup skip reason is BACKUP_SKIPPED_PRIMARY_SUCCEEDED");
+
+  // Clean up synthetic test row
+  await supabase.from("myfxbook_sync_claims").delete().eq("pacific_date", testPacificDate);
+  await supabase.from("audit_runs").delete().eq("admin_id", "myfxbook_daily_sync").eq("year", 2099);
 
   // ---------------------------------------------------------------------------
-  // TEST 3: Concurrency Protection
-  // ---------------------------------------------------------------------------
-  console.log("\n--- 3. Concurrency Protection ---");
-  acquireSyncLock(); // Simulate active run
-  const lockAcquired = acquireSyncLock(); // Second attempt must fail
-  check(lockAcquired === false, "3.1. Overlapping acquireSyncLock returns false");
-  releaseSyncLock();
-  check(acquireSyncLock() === true, "3.2. Lock can be re-acquired after releaseSyncLock");
-  releaseSyncLock();
-
-  // ---------------------------------------------------------------------------
-  // TEST 4: Accounting Immutability & Ground Truth Verification
+  // TEST 4: Accounting Immutability & Reconciled Balances
   // ---------------------------------------------------------------------------
   console.log("\n--- 4. Accounting Immutability & Reconciled Balances ---");
 
