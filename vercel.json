@@ -22,7 +22,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-myfxbook",
-      "schedule": "0 * * * *"
+      "schedule": "30 7,8,9 * * *"
     },
     {
       "path": "/api/cron/daily-reconciliation",
