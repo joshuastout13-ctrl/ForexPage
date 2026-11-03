@@ -9,8 +9,8 @@ async function runP0RegressionSuite() {
   console.log("P0 PERFORMANCE & COMMISSION PERIOD-ISOLATION & FAIL-CLOSED REGRESSION SUITE");
   console.log("================================================================================\n");
 
-  // 1. Myfxbook HTML Scraper Row-Isolation Regression Test
-  console.log("1. Testing Myfxbook HTML Scraper Row-Isolation (Nov 1 Rollover Dash Bug)");
+  // 1. Myfxbook HTML Scraper Row-Isolation Regression Test (Source Semantics for Dash)
+  console.log("1. Testing Myfxbook HTML Scraper Row-Isolation & Dash Source Semantics");
   const rolloverHtml = `
     <table>
       <tr><td>Today</td><td>-</td></tr>
@@ -19,11 +19,14 @@ async function runP0RegressionSuite() {
       <tr><td>This Year</td><td><span class="green">+33.25%</span></td></tr>
     </table>
   `;
-  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "Today"), "+0.00%");
-  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "This Week"), "+0.00%");
-  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "This Month"), "+0.00%");
+  // Documented Myfxbook source semantics: a dash indicates missing / no data for that period.
+  // The parser must return null (missing data) and never treat missing data as zero without evidence,
+  // nor tunnel across <tr> rows into This Year.
+  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "Today"), null);
+  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "This Week"), null);
+  assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "This Month"), null);
   assert.strictEqual(extractMyfxbookPeriodMetric(rolloverHtml, "This Year"), "+33.25%");
-  console.log("   ✓ Scraper strictly isolates each <tr><td> row and never tunnels across '-' cells into This Year\n");
+  console.log("   ✓ Scraper strictly isolates each <tr><td> row and preserves null for missing dash data\n");
 
   // 2. Period Isolation: This Month must NEVER copy This Week when month is 0% and week > 0%
   console.log("2. Testing Period Isolation: Daily, Weekly, Monthly, YTD, Net Return & Commissions");
