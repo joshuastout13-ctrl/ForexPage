@@ -998,10 +998,14 @@
 
     function renderSummary(data) {
       window.currentCommissionBreakdown = data.commissionBreakdown || [];
+      window.currentDashboardSummary = data.summary || {};
 
       const summary = data.summary || {};
       const investor = data.investor || {};
       const isComplete = summary.provenanceCompletenessStatus === 'COMPLETE';
+      const FAIL_CLOSED_TEXT = "Temporarily unavailable while being verified";
+      const renderUnavailableBadge = (text) =>
+        `<span class="safeguard-unavailable" style="font-size:12px; line-height:1.3; display:block; color:var(--muted); font-weight:600;">${text || FAIL_CLOSED_TEXT}</span>`;
 
       const totalDepositsVal = money(summary.totalExternalCashSent ?? summary.totalCashIn);
       const totalDepositsSubvalue = null;
@@ -1020,9 +1024,14 @@
         perfClass = "";
       }
 
+      const isTotalGainUnavailable = Boolean(summary.totalGainUnavailable);
+      const totalGainDisplay = isTotalGainUnavailable
+        ? renderUnavailableBadge(summary.totalGainStatusText)
+        : money(summary.totalGain ?? summary.total_gain);
+
       const metrics = [
         { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
-        { label: "Total Gain YTD", value: money(summary.totalGain ?? summary.total_gain), icon: ICONS.gain, class: 'success' },
+        { label: "Total Gain YTD", value: totalGainDisplay, icon: ICONS.gain, class: isTotalGainUnavailable ? 'warning' : 'success' },
         { label: "Total Deposits", value: totalDepositsVal, subvalue: totalDepositsSubvalue, icon: ICONS.cashin },
         { 
           label: "Total Performance", 
@@ -1035,9 +1044,31 @@
         { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
       ];
 
-      if (investor.hasCommissionAccount || (summary.commissionsEarnedYear || 0) > 0 || (summary.commissionsEarnedMonth || 0) > 0) {
-        metrics.push({ label: `Comm. ${summary.commMonthName || 'This Month'}`, value: money(summary.commissionsEarnedMonth), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
-        metrics.push({ label: "Comm. This Year", value: money(summary.commissionsEarnedYear), icon: ICONS.commission, class: 'success cursor-pointer', action: 'showCommissionModal' });
+      const isCommRecipient = Boolean(
+        investor.hasCommissionAccount ||
+        summary.commissionsUnavailable ||
+        (summary.commissionsEarnedYear || 0) > 0 ||
+        (summary.commissionsEarnedMonth || 0) > 0 ||
+        (summary.commissionsEarnedYearVerifiedLocked || 0) > 0
+      );
+
+      if (isCommRecipient) {
+        const commMonthUnavailable = Boolean(summary.commissionsUnavailable || summary.commissionsEarnedMonthUnavailable);
+        const commYearUnavailable = Boolean(summary.commissionsUnavailable || summary.commissionsEarnedYearUnavailable);
+        metrics.push({
+          label: `Comm. ${summary.commMonthName || 'This Month'}`,
+          value: commMonthUnavailable ? renderUnavailableBadge(summary.commissionsStatusText) : money(summary.commissionsEarnedMonth),
+          icon: ICONS.commission,
+          class: `${commMonthUnavailable ? 'warning' : 'success'} cursor-pointer`,
+          action: 'showCommissionModal'
+        });
+        metrics.push({
+          label: "Comm. This Year",
+          value: commYearUnavailable ? renderUnavailableBadge(summary.commissionsStatusText) : money(summary.commissionsEarnedYear),
+          icon: ICONS.commission,
+          class: `${commYearUnavailable ? 'warning' : 'success'} cursor-pointer`,
+          action: 'showCommissionModal'
+        });
       }
 
       document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
@@ -1054,6 +1085,8 @@
 
     function showCommissionModal() {
       const breakdown = window.currentCommissionBreakdown || [];
+      const summary = window.currentDashboardSummary || {};
+      const commMonthLabel = summary.commMonthName ? `${summary.commMonthName} 2026` : "Latest Completed Month";
       const table = document.getElementById("commissionTable");
       
       const head = `
@@ -1062,7 +1095,7 @@
             <th>Source Account Holder</th>
             <th style="text-align:right;">
               <span style="color:var(--text); font-weight:700;">
-                July 2026 Commission Basis
+                ${commMonthLabel} Commission Basis
               </span>
               <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital)</div>
             </th>
@@ -1071,13 +1104,16 @@
                 Commission %
               </span>
             </th>
-            <th style="text-align:right;">July 2026</th>
+            <th style="text-align:right;">${commMonthLabel}</th>
             <th style="text-align:right;">2026 YTD</th>
           </tr>
         </thead>
       `;
 
-      if (breakdown.length === 0) {
+      if (summary.commissionsUnavailable) {
+        const msg = summary.commissionsStatusText || "Temporarily unavailable while being verified";
+        table.innerHTML = head + `<tbody><tr><td colspan="5" style="text-align:center; padding:18px; font-weight:600;" class="muted">${msg}</td></tr></tbody>`;
+      } else if (breakdown.length === 0) {
         table.innerHTML = head + `<tbody><tr><td colspan="5" style="text-align:center;" class="muted">No commissions generated yet.</td></tr></tbody>`;
       } else {
         const body = breakdown.map(r => `
@@ -1112,6 +1148,7 @@
       const acctPerf = data.accountPerformance || {};
       const fundPerf = data.fundPerformance || {};
       const liveDollarGains = data.liveDollarGains || {};
+      const FAIL_CLOSED_TEXT = "Temporarily unavailable while being verified";
 
       // Set Split Badge
       const splitBadge = document.getElementById("accountSplitBadge");
@@ -1130,33 +1167,47 @@
         }
       }
 
+      const buildAcctItem = (label, perfObj, fallbackDollar, fallbackLiveStr) => {
+        const isUnavailable = Boolean(perfObj && perfObj.unavailable);
+        if (isUnavailable) {
+          return {
+            label,
+            unavailable: true,
+            statusText: (perfObj && perfObj.statusText) || FAIL_CLOSED_TEXT
+          };
+        }
+        const dollar = (perfObj && perfObj.netDollar !== undefined && perfObj.netDollar !== null)
+          ? perfObj.netDollar
+          : (fallbackDollar || 0);
+        const pctNum = (perfObj && perfObj.netReturnPct !== undefined && perfObj.netReturnPct !== null)
+          ? Number(perfObj.netReturnPct)
+          : ((parseFloat(fallbackLiveStr) || 0) * splitPct / 100);
+        return {
+          label,
+          unavailable: false,
+          dollar,
+          pct: `${pctNum >= 0 ? '+' : ''}${pctNum.toFixed(2)}%`
+        };
+      };
+
       // Account Performance Items (Net Investor Share: Today, This Week, This Month, This Year)
       const acctItems = [
-        {
-          label: "Today",
-          dollar: (acctPerf.today && acctPerf.today.netDollar !== undefined) ? acctPerf.today.netDollar : (liveDollarGains.today || 0),
-          pct: (acctPerf.today && acctPerf.today.netReturnPct !== undefined) ? `${acctPerf.today.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.today.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.today) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.today) || 0) * splitPct / 100).toFixed(2)}%`
-        },
-        {
-          label: "This Week",
-          dollar: (acctPerf.week && acctPerf.week.netDollar !== undefined) ? acctPerf.week.netDollar : (liveDollarGains.week || 0),
-          pct: (acctPerf.week && acctPerf.week.netReturnPct !== undefined) ? `${acctPerf.week.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.week.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.week) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.week) || 0) * splitPct / 100).toFixed(2)}%`
-        },
-        {
-          label: "This Month",
-          dollar: (acctPerf.month && acctPerf.month.netDollar !== undefined) ? acctPerf.month.netDollar : (liveDollarGains.month || 0),
-          pct: (acctPerf.month && acctPerf.month.netReturnPct !== undefined) ? `${acctPerf.month.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.month.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.month) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.month) || 0) * splitPct / 100).toFixed(2)}%`
-        },
-        {
-          label: "This Year (YTD)",
-          dollar: (acctPerf.year && acctPerf.year.netDollar !== undefined) ? acctPerf.year.netDollar : (liveDollarGains.year || 0),
-          pct: (acctPerf.year && acctPerf.year.netReturnPct !== undefined) ? `${acctPerf.year.netReturnPct >= 0 ? '+' : ''}${Number(acctPerf.year.netReturnPct).toFixed(2)}%` : `${((parseFloat(live.year) || 0) * splitPct / 100) >= 0 ? '+' : ''}${((parseFloat(live.year) || 0) * splitPct / 100).toFixed(2)}%`
-        }
+        buildAcctItem("Today", acctPerf.today, liveDollarGains.today, live.today),
+        buildAcctItem("This Week", acctPerf.week, liveDollarGains.week, live.week),
+        buildAcctItem("This Month", acctPerf.month, liveDollarGains.month, live.month),
+        buildAcctItem("This Year (YTD)", acctPerf.year, liveDollarGains.year, live.year)
       ];
 
       const acctGrid = document.getElementById("accountPerfGrid");
       if (acctGrid) {
-        acctGrid.innerHTML = acctItems.map(item => `
+        acctGrid.innerHTML = acctItems.map(item => item.unavailable ? `
+          <div class="perf-item">
+            <div class="info" style="flex:1;">
+              <span class="label">${item.label}</span>
+              <div class="val safeguard-unavailable" style="color:var(--muted); margin-top:2px; font-size:11px; line-height:1.3; font-weight:600;">${item.statusText}</div>
+            </div>
+          </div>
+        ` : `
           <div class="perf-item">
             <div class="info">
               <span class="label">${item.label}</span>
@@ -1174,11 +1225,11 @@
 
       // Fund Performance Items (Gross Fund %)
       const fundItems = [
-        { label: "Today", pct: (fundPerf.today && fundPerf.today.label) ? fundPerf.today.label : (live.today || "0.00%") },
-        { label: "This Week", pct: (fundPerf.week && fundPerf.week.label) ? fundPerf.week.label : (live.week || "0.00%") },
-        { label: "This Month", pct: (fundPerf.month && fundPerf.month.label) ? fundPerf.month.label : (live.month || "0.00%") },
-        { label: "Last Month", pct: (fundPerf.lastMonth && fundPerf.lastMonth.label) ? fundPerf.lastMonth.label : (live.lastMonth || "0.00%") },
-        { label: "This Year", pct: (fundPerf.year && fundPerf.year.label) ? fundPerf.year.label : (live.year || "0.00%") }
+        { label: "Today", unavailable: !!(fundPerf.today && fundPerf.today.unavailable), pct: (fundPerf.today && fundPerf.today.label) ? fundPerf.today.label : (live.today || "0.00%") },
+        { label: "This Week", unavailable: !!(fundPerf.week && fundPerf.week.unavailable), pct: (fundPerf.week && fundPerf.week.label) ? fundPerf.week.label : (live.week || "0.00%") },
+        { label: "This Month", unavailable: !!(fundPerf.month && fundPerf.month.unavailable), pct: (fundPerf.month && fundPerf.month.label) ? fundPerf.month.label : (live.month || "0.00%") },
+        { label: "Last Month", unavailable: !!(fundPerf.lastMonth && fundPerf.lastMonth.unavailable), pct: (fundPerf.lastMonth && fundPerf.lastMonth.label) ? fundPerf.lastMonth.label : (live.lastMonth || "0.00%") },
+        { label: "This Year", unavailable: !!(fundPerf.year && fundPerf.year.unavailable), pct: (fundPerf.year && fundPerf.year.label) ? fundPerf.year.label : (live.year || "0.00%") }
       ];
 
       const fundGrid = document.getElementById("fundPerfGrid");
@@ -1189,7 +1240,10 @@
               <div class="label">${item.label}</div>
             </div>
             <div class="change">
-              <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>
+              ${item.unavailable
+                ? `<div class="pct safeguard-unavailable" style="font-size:11px; color:var(--muted); font-weight:600;">${FAIL_CLOSED_TEXT}</div>`
+                : `<div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>`
+              }
             </div>
           </div>
         `).join("");
