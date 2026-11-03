@@ -13,6 +13,24 @@ export default async function handler(req, res) {
 
     const results = [];
     for (const row of rows) {
+      // Fail-closed guard: Cannot overwrite locked historical records
+      const { data: existingRecord } = await supabase
+        .from("investor_monthly_history")
+        .select("locked")
+        .eq("investor_id", row.investor_id)
+        .eq("year", row.year)
+        .eq("month_number", row.month_number)
+        .maybeSingle();
+
+      if (existingRecord && (existingRecord.locked === true || String(existingRecord.locked).toLowerCase() === 'true')) {
+        results.push({ 
+          success: false, 
+          error: "LOCKED_RECORD: Cannot modify locked historical history record.", 
+          row 
+        });
+        continue;
+      }
+
       const { data, error } = await supabase
         .from("investor_monthly_history")
         .upsert({

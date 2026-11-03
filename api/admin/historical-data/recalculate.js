@@ -154,8 +154,11 @@ export default async function handler(req, res) {
       }
     });
 
-    const fundRetByM = {}; allReturns?.forEach(r => {
+    const fundRetByM = {}; 
+    const fundRetLockedByM = {};
+    allReturns?.forEach(r => {
       fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
+      fundRetLockedByM[r.month_number] = (r.locked === true || String(r.locked).toLowerCase() === 'true');
     });
     const commEarningsByM = {}; 
     (commEarnings || []).filter(e => !e.status || String(e.status).trim().toUpperCase() !== 'SUPERSEDED').forEach(e => {
@@ -177,9 +180,18 @@ export default async function handler(req, res) {
                         (targetYear === startDate.getUTCFullYear() && m >= (startDate.getUTCMonth() + 1));
 
       const existing = (history || []).find(h => h.month_number === m);
-      const earnedPrevMonth = (m > 1)
-        ? new Decimal(commEarningsByM[`${targetYear}_${m - 1}`] || 0)
-        : new Decimal(commEarningsByM[`${targetYear - 1}_12`] || 0);
+      const prevM = m > 1 ? m - 1 : 12;
+      const isPrevMonthFinalizedAndLocked = m > 1 
+        ? (fundRetLockedByM[prevM] === true)
+        : true; // Prior year settled ledger
+
+      // Fail-closed guard: Unfinalized/unlocked prior month commissions CANNOT capitalize into later history!
+      // A calendar rollover alone is NOT authorization to capitalize commissions.
+      const earnedPrevMonth = isPrevMonthFinalizedAndLocked
+        ? ((m > 1)
+            ? new Decimal(commEarningsByM[`${targetYear}_${m - 1}`] || 0)
+            : new Decimal(commEarningsByM[`${targetYear - 1}_12`] || 0))
+        : new Decimal(0);
       
       const commAcc = accounts.find(a => a.is_commission) || accounts[0];
       if (commAcc && earnedPrevMonth.gt(0)) {
@@ -193,9 +205,16 @@ export default async function handler(req, res) {
 
       // Authoritative Month State (America/Los_Angeles)
       const monthState = evaluateMonthState(targetYear, m, effectiveAsOfDate);
-      const isHistoricalCompleted = (monthState === MonthState.HISTORICAL_SETTLED);
+      const isCalendarPast = (monthState === MonthState.HISTORICAL_SETTLED);
       const isOpenMonth = (monthState === MonthState.CURRENT_OPEN);
       const isFutureMonth = (monthState === MonthState.FUTURE);
+
+      const retObj = allReturns?.find(r => r.month_number === m);
+      const isMonthFinalizedAndLocked = (fundRetLockedByM[m] === true) || 
+        (existing && (existing.locked === true || String(existing.locked).toLowerCase() === 'true')) ||
+        (retObj && (retObj.locked === true || String(retObj.locked).toLowerCase() === 'true'));
+      const isHistoricalCompleted = isCalendarPast && isMonthFinalizedAndLocked;
+      const isUnfinalizedPastMonth = isCalendarPast && !isMonthFinalizedAndLocked;
 
       for (const acc of accounts) {
         // Cutover adjustment check: If an authorized cutover exists for this account & period, override opening operating basis
@@ -230,8 +249,8 @@ export default async function handler(req, res) {
             gain = totalProfit.mul(split);
           }
           accountBalances[acc.id] = adjStart.add(gain);
-        } else if (isOpenMonth) {
-          // CURRENT_OPEN Month:
+        } else if (isOpenMonth || isUnfinalizedPastMonth) {
+          // CURRENT_OPEN Month or UNFINALIZED PAST Month:
           // Unclosed trading gains contribute $0 to settled balances and MUST NOT roll into future months.
           if (existing && existing.is_manual) {
             if (existing.manual_gain_amount !== null && existing.manual_gain_amount !== undefined) {
@@ -251,7 +270,9 @@ export default async function handler(req, res) {
         }
 
         // Commission processing strictly restricted to explicit audited correction
-        if (isExplicitAuditedCorrection && isHistoricalCompleted && totalProfit.gt(0)) {
+        // AND requires the source month to be explicitly finalized and locked!
+        // A calendar rollover alone is NOT authorization to generate commissions.
+        if (isExplicitAuditedCorrection && isHistoricalCompleted && isMonthFinalizedAndLocked && totalProfit.gt(0)) {
           const activeShares = getApplicableCommissionShares({
             shares: unifiedCommRules,
             year: targetYear,
@@ -362,6 +383,14 @@ export default async function handler(req, res) {
     
     // Bulk insert commissions only if explicit audited correction
     if (isExplicitAuditedCorrection && commissionsToInsert.length > 0) {
+      // Strict Fail-Closed Guard: Verify every commission row belongs to an explicitly locked month
+      const unauthorizedComms = commissionsToInsert.filter(c => fundRetLockedByM[c.month_number] !== true);
+      if (unauthorizedComms.length > 0) {
+        throw new Error(
+          `UNAUTHORIZED_COMMISSION_GENERATION: Cannot generate commissions for unfinalized/unlocked month(s): ` +
+          `${[...new Set(unauthorizedComms.map(c => c.month_number))].join(', ')}. A calendar rollover alone is not authorization.`
+        );
+      }
       const { error: commErr } = await supabase.from("commission_earnings").insert(commissionsToInsert);
       if (commErr) {
         console.error("[Recalc ERROR] Failed to insert commissions:", commErr.message);
