@@ -148,12 +148,88 @@ async function runP0RegressionSuite() {
   assert.strictEqual(typeof jstoutLive.accountPerformance.month.netReturnPct, "number");
   assert.strictEqual(jstoutLive.accountPerformance.year.unavailable, true, "Unfinalized October rollover must fail closed on This Year (YTD)");
   assert.strictEqual(jstoutLive.accountPerformance.year.statusText, FAIL_CLOSED_TEXT);
-  assert.strictEqual(jstoutLive.summary.commissionsUnavailable, true, "Premature Oct 1 commission rows must fail closed on Commission cards");
+  assert.strictEqual(jstoutLive.summary.commissionsUnavailable, true, "Uncertified commission ledger must fail closed on Commission cards");
   assert.strictEqual(jstoutLive.summary.commissionsStatusText, FAIL_CLOSED_TEXT);
-  assert.strictEqual(jstoutLive.summary.commissionsEarnedMonth, null);
-  assert.strictEqual(jstoutLive.summary.commissionsEarnedYear, null);
+  assert.strictEqual(jstoutLive.summary.commissionsEarnedMonth, null, "Month commission must be null when unverified, never 0.00");
+  assert.strictEqual(jstoutLive.summary.commissionsEarnedYear, null, "Year commission must be null when unverified, never 0.00");
   assert.strictEqual(jstoutLive.summary.commissionsEarnedYearVerifiedLocked, 42047.37);
   console.log("   ✓ Live Joshua Stout dashboard preserves settled balance ($3,333,453.52) and fails closed on unverified metrics\n");
+
+  // 6. Hermetic Fixture Tests for Fail-Closed Display Gate & Ledger Completeness
+  console.log("6. Testing Hermetic Fixture Fail-Closed Commission Display Gate & Ledger Completeness");
+
+  // Base hermetic fixture data with Jan-Sep locked commissions and October superseded commissions
+  const hermeticBaseFixture = {
+    rawInvestors: [{
+      id: "inv_hermetic_recip",
+      investorid: "inv_hermetic_recip",
+      portalusername: "hermetic_recip",
+      first_name: "Hermetic",
+      last_name: "Recipient",
+      split_pct: 50,
+      start_date: "2026-01-01"
+    }],
+    accounts: [{
+      id: "acct_hermetic_recip",
+      investor_id: "inv_hermetic_recip",
+      startingcapital: 500000,
+      split_pct: 50,
+      status: "active",
+      is_commission: true
+    }],
+    returnsSheet: baseReturns.map(r => (r.month_number === 10 ? { ...r, gross_return_pct: 3.05, locked: false } : r)),
+    depositsSheet: [],
+    withdrawalsSheet: [],
+    historyTable: [],
+    commissionEarningsTable: [
+      // Completed month verified commissions (e.g. Jan-Sep)
+      { id: "comm_jan", recipient_id: "inv_hermetic_recip", year: 2026, month_number: 1, amount: 1000.00, status: "ACTIVE" },
+      { id: "comm_sep", recipient_id: "inv_hermetic_recip", year: 2026, month_number: 9, amount: 2000.00, status: "ACTIVE" },
+      // October commission row marked SUPERSEDED by remediation
+      { id: "comm_oct_superseded", recipient_id: "inv_hermetic_recip", year: 2026, month_number: 10, amount: 1500.00, status: "SUPERSEDED" }
+    ],
+    commissionSharesTable: [],
+    commissionRulesTable: [],
+    cutoverAdjustments: [],
+    live: { today: "+0.00%", week: "+0.00%", month: "+0.00%", year: "+33.25%" },
+    asOfDate: "2026-11-04T12:00:00Z"
+  };
+
+  // Case A: Unresolved prior-month commissions remain unavailable after October rows are SUPERSEDED
+  const uncertifiedDash = await buildInvestorDashboard("hermetic_recip", hermeticBaseFixture);
+  assert.strictEqual(uncertifiedDash.summary.commissionsUnavailable, true,
+    "SUPERSEDED October rows must NOT clear the uncertified ledger safeguard");
+  assert.strictEqual(uncertifiedDash.summary.commissionsEarnedMonth, null,
+    "Uncertified commissionsEarnedMonth must be null");
+  assert.strictEqual(uncertifiedDash.summary.commissionsEarnedYear, null,
+    "Uncertified commissionsEarnedYear must be null");
+  assert.strictEqual(uncertifiedDash.summary.commissionsStatusText, FAIL_CLOSED_TEXT,
+    "Status text must be fail-closed message");
+  console.log("   ✓ Case A: SUPERSEDED October rows do not clear safeguard; amounts remain null with unverified message");
+
+  // Case B: Verified completed-month commissions display when ledger is explicitly certified complete
+  const certifiedDash = await buildInvestorDashboard("hermetic_recip", {
+    ...hermeticBaseFixture,
+    isCommissionLedgerCertified: true
+  });
+  assert.strictEqual(certifiedDash.summary.commissionsUnavailable, false,
+    "Certified ledger must display completed-month commissions");
+  assert.strictEqual(certifiedDash.summary.commissionsEarnedYear, 3000.00,
+    "Certified YTD commissions must reflect verified Jan + Sep ($3,000.00)");
+  assert.strictEqual(certifiedDash.summary.commissionsEarnedMonth, 0,
+    "Certified open October month commission must be 0 (superseded row excluded)");
+  assert.strictEqual(certifiedDash.summary.commissionsStatusText, null,
+    "Certified ledger has no fail-closed status text");
+  console.log("   ✓ Case B: Explicitly certified ledger displays verified completed-month commissions ($3,000.00)");
+
+  // Case C: UI contract verification — unavailable never produces $0.00 or numeric total
+  assert.strictEqual(uncertifiedDash.summary.commissionsEarnedMonth, null,
+    "UI contract: month commission must be null, never 0 or 0.00");
+  assert.strictEqual(uncertifiedDash.summary.commissionsEarnedYear, null,
+    "UI contract: year commission must be null, never 0 or 0.00");
+  assert.notStrictEqual(uncertifiedDash.summary.commissionsEarnedYear, 0);
+  assert.notStrictEqual(uncertifiedDash.summary.commissionsEarnedMonth, 0);
+  console.log("   ✓ Case C: UI receives null and unavailable flag, preventing $0.00 rendering\n");
 
   console.log("================================================================================");
   console.log("ALL P0 PERFORMANCE & COMMISSION SAFEGUARD TESTS PASSED (100%)");
