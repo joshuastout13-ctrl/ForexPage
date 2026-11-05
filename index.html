@@ -1279,14 +1279,26 @@
         let activityHtml = '';
         if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
         
-        // Show commissions earned in the previous month as "Commission Added" in this month
+        // Prior month commission capitalization logic:
+        // Verification-pending status takes strict precedence: an unverified row must NEVER render a confirmed green numeric amount.
         const prevRow = idx > 0 ? rows[idx - 1] : null;
-        const commAdded = prevRow ? (parseFloat(prevRow.commissionsEarned) || 0) : 0;
-        if (commAdded > 0) {
-          const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
-          activityHtml += `<div class="green">+${money(commAdded)} Commission Added${earnedTag}${r.isProjection ? ' (Projected)' : ''}</div>`;
-        } else if (prevRow && (prevRow.commissionsUnavailable || prevRow.verificationStatus === 'UNVERIFIED')) {
-          activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
+        if (prevRow) {
+          const isPrevCommUnverified = Boolean(
+            prevRow.commissionsUnavailable ||
+            prevRow.isCommissionUnverified ||
+            prevRow.hasSupersededCommissions ||
+            (prevRow.verificationStatus === 'UNVERIFIED' && (prevRow.commissionsUnavailable || (parseFloat(prevRow.commissionsEarned) || 0) > 0))
+          );
+
+          if (isPrevCommUnverified) {
+            activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
+          } else {
+            const commAdded = parseFloat(prevRow.commissionsEarned) || 0;
+            if (commAdded > 0) {
+              const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
+              activityHtml += `<div class="green">+${money(commAdded)} Commission Added${earnedTag}${r.isProjection ? ' (Projected)' : ''}</div>`;
+            }
+          }
         }
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
