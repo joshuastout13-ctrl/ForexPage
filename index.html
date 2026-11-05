@@ -1283,7 +1283,10 @@
         const prevRow = idx > 0 ? rows[idx - 1] : null;
         const commAdded = prevRow ? (parseFloat(prevRow.commissionsEarned) || 0) : 0;
         if (commAdded > 0) {
-          activityHtml += `<div class="green">+${money(commAdded)} Commission Added${r.isProjection ? ' (Projected)' : ''}</div>`;
+          const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
+          activityHtml += `<div class="green">+${money(commAdded)} Commission Added${earnedTag}${r.isProjection ? ' (Projected)' : ''}</div>`;
+        } else if (prevRow && (prevRow.commissionsUnavailable || prevRow.verificationStatus === 'UNVERIFIED')) {
+          activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
         }
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
         if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
