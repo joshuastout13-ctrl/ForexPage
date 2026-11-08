@@ -1295,8 +1295,11 @@
           } else {
             const commAdded = parseFloat(prevRow.commissionsEarned) || 0;
             if (commAdded > 0) {
-              const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
-              activityHtml += `<div class="green">+${money(commAdded)} Commission Added${earnedTag}${r.isProjection ? ' (Projected)' : ''}</div>`;
+              const commYear = prevRow.year || r.year || 2026;
+              const commLabel = (prevRow.month && r.month)
+                ? `${prevRow.month} ${commYear} commission — capitalized in ${r.month}`
+                : 'Commission Added';
+              activityHtml += `<div class="green">+${money(commAdded)} ${commLabel}${r.isProjection ? ' (Projected)' : ''}</div>`;
             }
           }
         }
