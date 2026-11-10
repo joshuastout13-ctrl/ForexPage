@@ -1122,7 +1122,6 @@
       const activityMonthLabel = capMonthName ? `${capMonthName} 2026` : earnedMonthLabel;
       const attributionLabel = summary.bookedCommissionsAttributionLabel ||
         ((earnedMonthName && capMonthName) ? `${earnedMonthName} 2026 commission — capitalized in ${capMonthName}` : earnedMonthLabel);
-      const basisLabel = summary.bookedCommissionsBasisLabel || "Booked ledger activity (not independently reconciled or certified)";
       const table = document.getElementById("commissionTable");
       
       const head = `
