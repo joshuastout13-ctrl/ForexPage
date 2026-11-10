@@ -1062,7 +1062,6 @@
         const bookedYearVal = summary.bookedCommissionsEarnedYear ?? summary.commissionsEarnedYear;
         const hasBookedMonth = bookedMonthVal !== null && bookedMonthVal !== undefined;
         const hasBookedYear = bookedYearVal !== null && bookedYearVal !== undefined;
-        const basisLabel = summary.bookedCommissionsBasisLabel || "Booked ledger activity (not independently reconciled or certified)";
         const activityMonthName = (summary.commissionsActivityMonthName && summary.commissionsActivityMonthName !== 'N/A')
           ? summary.commissionsActivityMonthName
           : ((summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
@@ -1072,19 +1071,15 @@
         const capMonthName = (summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
           ? summary.commissionsCapitalizedMonthName
           : null;
-        const attributionLabel = summary.bookedCommissionsAttributionLabel ||
-          ((earnedMonthName && capMonthName && earnedMonthName !== capMonthName)
-            ? `${earnedMonthName} 2026 commission — capitalized in ${capMonthName}`
-            : null);
-        const monthCommSubvalue = attributionLabel
-          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${attributionLabel}</span><span style="font-size:10px; color:var(--muted); display:block; margin-top:2px;">${basisLabel}</span>`
-          : `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>`;
+
+        // October display: remove capitalization explanation, do not add replacement explanatory text, warnings, disclaimers, or labels
+        const monthCommSubvalue = null;
         const ytdCommScope = (earnedMonthName && capMonthName)
-          ? `Jan–${earnedMonthName} 2026 earned (capitalized through ${capMonthName})`
-          : null;
+          ? `Jan–${earnedMonthName} 2026 earned`
+          : (earnedMonthName ? `Jan–${earnedMonthName} 2026 earned` : null);
         const ytdCommSubvalue = ytdCommScope
-          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${ytdCommScope}</span><span style="font-size:10px; color:var(--muted); display:block; margin-top:2px;">${basisLabel}</span>`
-          : `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>`;
+          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${ytdCommScope}</span>`
+          : null;
 
         metrics.push({
           label: `Booked Comm. (${activityMonthName})`,
@@ -1134,7 +1129,7 @@
         <thead>
           <tr>
             <th colspan="5" style="text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding-bottom:10px; text-transform:none;">
-              ${activityMonthLabel} View (${attributionLabel}) · ${basisLabel} · Independent Verified YTD: Unavailable
+              ${activityMonthLabel} View · Independent Verified YTD: Unavailable
             </th>
           </tr>
           <tr>
@@ -1143,14 +1138,14 @@
               <span style="color:var(--text); font-weight:700;">
                 ${earnedMonthLabel} Commission Basis
               </span>
-              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital${capMonthName ? ` — Capitalized in ${capMonthName}` : ''})</div>
+              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital)</div>
             </th>
             <th style="text-align:right;">
               <span style="color:var(--text); font-weight:700;">
                 Commission %
               </span>
             </th>
-            <th style="text-align:right;">${activityMonthLabel}${earnedMonthName && capMonthName && earnedMonthName !== capMonthName ? ` (${earnedMonthName} Earned — Booked)` : ' (Booked)'}</th>
+            <th style="text-align:right;">${activityMonthLabel} (Booked)</th>
             <th style="text-align:right;">2026 Booked YTD</th>
           </tr>
         </thead>
