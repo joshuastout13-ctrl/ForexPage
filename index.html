@@ -1028,10 +1028,13 @@
       const totalGainDisplay = isTotalGainUnavailable
         ? renderUnavailableBadge(summary.totalGainStatusText)
         : money(summary.totalGain ?? summary.total_gain);
+      const totalGainSubvalue = (!isTotalGainUnavailable && summary.totalGainScopeLabel)
+        ? `<span style="font-size:11px; color:var(--muted);">${summary.totalGainScopeLabel}</span>`
+        : null;
 
       const metrics = [
         { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
-        { label: "Total Gain YTD", value: totalGainDisplay, icon: ICONS.gain, class: isTotalGainUnavailable ? 'warning' : 'success' },
+        { label: "Total Gain YTD", value: totalGainDisplay, subvalue: totalGainSubvalue, icon: ICONS.gain, class: isTotalGainUnavailable ? 'warning' : 'success' },
         { label: "Total Deposits", value: totalDepositsVal, subvalue: totalDepositsSubvalue, icon: ICONS.cashin },
         { 
           label: "Total Performance", 
@@ -1060,11 +1063,33 @@
         const hasBookedMonth = bookedMonthVal !== null && bookedMonthVal !== undefined;
         const hasBookedYear = bookedYearVal !== null && bookedYearVal !== undefined;
         const basisLabel = summary.bookedCommissionsBasisLabel || "Booked ledger activity (not independently reconciled or certified)";
+        const activityMonthName = (summary.commissionsActivityMonthName && summary.commissionsActivityMonthName !== 'N/A')
+          ? summary.commissionsActivityMonthName
+          : ((summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+              ? summary.commissionsCapitalizedMonthName
+              : (summary.commMonthName || 'Last Month'));
+        const earnedMonthName = summary.commissionsEarnedMonthName || summary.commMonthName || null;
+        const capMonthName = (summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+          ? summary.commissionsCapitalizedMonthName
+          : null;
+        const attributionLabel = summary.bookedCommissionsAttributionLabel ||
+          ((earnedMonthName && capMonthName && earnedMonthName !== capMonthName)
+            ? `${earnedMonthName} 2026 commission — capitalized in ${capMonthName}`
+            : null);
+        const monthCommSubvalue = attributionLabel
+          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${attributionLabel}</span><span style="font-size:10px; color:var(--muted); display:block; margin-top:2px;">${basisLabel}</span>`
+          : `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>`;
+        const ytdCommScope = (earnedMonthName && capMonthName)
+          ? `Jan–${earnedMonthName} 2026 earned (capitalized through ${capMonthName})`
+          : null;
+        const ytdCommSubvalue = ytdCommScope
+          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${ytdCommScope}</span><span style="font-size:10px; color:var(--muted); display:block; margin-top:2px;">${basisLabel}</span>`
+          : `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>`;
 
         metrics.push({
-          label: `Booked Comm. (${summary.commMonthName || 'Last Month'})`,
+          label: `Booked Comm. (${activityMonthName})`,
           value: hasBookedMonth ? money(bookedMonthVal) : renderUnavailableBadge(summary.commissionsStatusText),
-          subvalue: hasBookedMonth ? `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>` : null,
+          subvalue: hasBookedMonth ? monthCommSubvalue : null,
           icon: ICONS.commission,
           class: `${hasBookedMonth ? 'success' : 'warning'} cursor-pointer`,
           action: 'showCommissionModal'
@@ -1072,7 +1097,7 @@
         metrics.push({
           label: "Booked YTD Comm.",
           value: hasBookedYear ? money(bookedYearVal) : renderUnavailableBadge(summary.commissionsStatusText),
-          subvalue: hasBookedYear ? `<span style="font-size:11px; color:var(--muted);">${basisLabel}</span>` : null,
+          subvalue: hasBookedYear ? ytdCommSubvalue : null,
           icon: ICONS.commission,
           class: `${hasBookedYear ? 'success' : 'warning'} cursor-pointer`,
           action: 'showCommissionModal'
@@ -1094,7 +1119,14 @@
     function showCommissionModal() {
       const breakdown = window.currentCommissionBreakdown || [];
       const summary = window.currentDashboardSummary || {};
-      const commMonthLabel = summary.commMonthName ? `${summary.commMonthName} 2026` : "Latest Completed Month";
+      const earnedMonthName = summary.commissionsEarnedMonthName || summary.commMonthName || null;
+      const capMonthName = (summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+        ? summary.commissionsCapitalizedMonthName
+        : null;
+      const earnedMonthLabel = earnedMonthName ? `${earnedMonthName} 2026` : "Latest Completed Month";
+      const activityMonthLabel = capMonthName ? `${capMonthName} 2026` : earnedMonthLabel;
+      const attributionLabel = summary.bookedCommissionsAttributionLabel ||
+        ((earnedMonthName && capMonthName) ? `${earnedMonthName} 2026 commission — capitalized in ${capMonthName}` : earnedMonthLabel);
       const basisLabel = summary.bookedCommissionsBasisLabel || "Booked ledger activity (not independently reconciled or certified)";
       const table = document.getElementById("commissionTable");
       
@@ -1102,23 +1134,23 @@
         <thead>
           <tr>
             <th colspan="5" style="text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding-bottom:10px; text-transform:none;">
-              ${basisLabel} · Independent Verified YTD: Unavailable
+              ${activityMonthLabel} View (${attributionLabel}) · ${basisLabel} · Independent Verified YTD: Unavailable
             </th>
           </tr>
           <tr>
             <th>Source Account Holder</th>
             <th style="text-align:right;">
               <span style="color:var(--text); font-weight:700;">
-                ${commMonthLabel} Commission Basis
+                ${earnedMonthLabel} Commission Basis
               </span>
-              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital)</div>
+              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital${capMonthName ? ` — Capitalized in ${capMonthName}` : ''})</div>
             </th>
             <th style="text-align:right;">
               <span style="color:var(--text); font-weight:700;">
                 Commission %
               </span>
             </th>
-            <th style="text-align:right;">${commMonthLabel} (Booked)</th>
+            <th style="text-align:right;">${activityMonthLabel}${earnedMonthName && capMonthName && earnedMonthName !== capMonthName ? ` (${earnedMonthName} Earned — Booked)` : ' (Booked)'}</th>
             <th style="text-align:right;">2026 Booked YTD</th>
           </tr>
         </thead>
@@ -1204,7 +1236,8 @@
           label,
           unavailable: false,
           dollar,
-          pct: `${pctNum >= 0 ? '+' : ''}${pctNum.toFixed(2)}%`
+          pct: `${pctNum >= 0 ? '+' : ''}${pctNum.toFixed(2)}%`,
+          scopeLabel: (perfObj && perfObj.scopeLabel) || null
         };
       };
 
@@ -1230,6 +1263,7 @@
             <div class="info">
               <span class="label">${item.label}</span>
               <div class="val" style="color:var(--text); margin-top:2px;">${money(item.dollar)}</div>
+              ${item.scopeLabel ? `<div style="font-size:10px; color:var(--muted); margin-top:2px; line-height:1.2;">${item.scopeLabel}</div>` : ''}
             </div>
             <div class="change">
               <div class="label" style="font-size:10px; text-transform:uppercase; color:var(--muted);">Net Return</div>
