@@ -1342,17 +1342,15 @@
             (prevRow.verificationStatus === 'UNVERIFIED' && (prevRow.commissionsUnavailable || (parseFloat(prevRow.commissionsEarned) || 0) > 0))
           );
 
-          if (isPrevCommUnverified) {
+          const commAdded = parseFloat(prevRow.activeCommissionsEarned ?? prevRow.commissionsEarned) || 0;
+          if (commAdded > 0) {
+            const commYear = prevRow.year || r.year || 2026;
+            const commLabel = (prevRow.month && r.month)
+              ? `${prevRow.month} ${commYear} commission — capitalized in ${r.month}`
+              : 'Commission Added';
+            activityHtml += `<div class="green">+${money(commAdded)} ${commLabel}${r.isProjection ? ' (Projected)' : ''}</div>`;
+          } else if (isPrevCommUnverified) {
             activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
-          } else {
-            const commAdded = parseFloat(prevRow.commissionsEarned) || 0;
-            if (commAdded > 0) {
-              const commYear = prevRow.year || r.year || 2026;
-              const commLabel = (prevRow.month && r.month)
-                ? `${prevRow.month} ${commYear} commission — capitalized in ${r.month}`
-                : 'Commission Added';
-              activityHtml += `<div class="green">+${money(commAdded)} ${commLabel}${r.isProjection ? ' (Projected)' : ''}</div>`;
-            }
           }
         }
         if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;

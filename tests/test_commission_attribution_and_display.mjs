@@ -7,7 +7,7 @@ Decimal.set({ precision: 28, rounding: Decimal.ROUND_HALF_UP });
 /**
  * Exact replica of the index.html monthly breakdown activity rendering logic
  */
-function renderMonthlyActivity(prevRow, isProjection = false) {
+function renderMonthlyActivity(prevRow, targetMonthName = '', isProjection = false) {
   let activityHtml = '';
   if (prevRow) {
     const isPrevCommUnverified = Boolean(
@@ -17,16 +17,14 @@ function renderMonthlyActivity(prevRow, isProjection = false) {
       (prevRow.verificationStatus === 'UNVERIFIED' && (prevRow.commissionsUnavailable || (parseFloat(prevRow.commissionsEarned) || 0) > 0))
     );
 
-    if (isPrevCommUnverified) {
-      // Unverified row: verification-pending status takes strict precedence.
-      // NEVER render a confirmed green numeric "Commission Added" amount.
+    const commAdded = parseFloat(prevRow.activeCommissionsEarned ?? prevRow.commissionsEarned) || 0;
+    if (commAdded > 0) {
+      const commLabel = (prevRow.month && targetMonthName)
+        ? `${prevRow.month} 2026 commission — capitalized in ${targetMonthName}`
+        : (prevRow.month ? `Commission Added (${prevRow.month} Earned)` : 'Commission Added');
+      activityHtml += `<div class="green">+$${commAdded.toFixed(2)} ${commLabel}${isProjection ? ' (Projected)' : ''}</div>`;
+    } else if (isPrevCommUnverified) {
       activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
-    } else {
-      const commAdded = parseFloat(prevRow.commissionsEarned) || 0;
-      if (commAdded > 0) {
-        const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
-        activityHtml += `<div class="green">+$${commAdded.toFixed(2)} Commission Added${earnedTag}${isProjection ? ' (Projected)' : ''}</div>`;
-      }
     }
   }
   return activityHtml;
@@ -60,28 +58,29 @@ async function runTests() {
   // --- TEST GROUP 1: RENDERING PRECEDENCE UNIT TESTS ---
   console.log("Test 1: Verification-Pending Strict Precedence over Positive Amounts");
   {
-    // Case 1A: Positive amount + UNVERIFIED => Pending message, NO numeric amount rendered
-    const unverifiedPositiveRow = {
-      month: "July",
-      commissionsEarned: 500.00,
+    // Case 1A: Active amount with superseded warning => Renders active amount with attribution label
+    const activeWithSupersededRow = {
+      month: "August",
+      commissionsEarned: 11153.73,
       commissionsUnavailable: true,
+      hasSupersededCommissions: true,
       verificationStatus: "UNVERIFIED"
     };
-    const html1A = renderMonthlyActivity(unverifiedPositiveRow);
-    assert(html1A.includes("July Commission: Pending Verification"), "Must show pending verification message");
-    assert(!html1A.includes("500"), "Must NOT display numeric amount $500.00 when unverified");
-    assert(!html1A.includes("Commission Added"), "Must NOT display confirmed 'Commission Added' label when unverified");
-    console.log("   ✓ Positive amount ($500.00) + UNVERIFIED strictly renders pending message with zero numeric leakage");
+    const html1A = renderMonthlyActivity(activeWithSupersededRow, "September");
+    assert(html1A.includes("+$11153.73 August 2026 commission — capitalized in September"), "Must display active amount labeled capitalized in September");
+    assert(!html1A.includes("Pending Verification"), "Must NOT display pending verification when active amount exists");
+    console.log("   ✓ Active amount ($11,153.73) with superseded rows correctly renders active amount without suppressing");
 
-    // Case 1B: Zero amount + UNVERIFIED => Pending message
+    // Case 1B: Zero amount + UNVERIFIED (e.g. October with 0 active rows) => Pending message
     const unverifiedZeroRow = {
-      month: "August",
+      month: "October",
       commissionsEarned: 0.00,
       commissionsUnavailable: true,
+      hasSupersededCommissions: true,
       verificationStatus: "UNVERIFIED"
     };
-    const html1B = renderMonthlyActivity(unverifiedZeroRow);
-    assert(html1B.includes("August Commission: Pending Verification"), "Must show pending verification message for zero amount");
+    const html1B = renderMonthlyActivity(unverifiedZeroRow, "November");
+    assert(html1B.includes("October Commission: Pending Verification"), "Must show pending verification message for zero amount");
     assert(!html1B.includes("Commission Added"), "Must NOT display 'Commission Added' when zero and unverified");
     console.log("   ✓ Zero amount ($0.00) + UNVERIFIED strictly renders pending verification message");
 
@@ -186,15 +185,15 @@ async function runTests() {
     assert("hasSupersededCommissions" in m8Row, "Row must contain hasSupersededCommissions");
 
     // Test rendering of September activity (prevRow is August)
-    const sepActivity = renderMonthlyActivity(m8Row);
-    assert(sepActivity.includes("August Commission: Pending Verification"), "September activity must render 'August Commission: Pending Verification'");
-    assert(!sepActivity.includes("Commission Added"), "September activity must NOT render 'Commission Added'");
-    console.log("   ✓ Actual August monthly row data correctly drives 'August Commission: Pending Verification' in September activity");
+    const sepActivity = renderMonthlyActivity(m8Row, "September");
+    assert(sepActivity.includes("+$11153.73 August 2026 commission — capitalized in September"), "September activity must render active August commission");
+    assert(!sepActivity.includes("Pending Verification"), "September activity must NOT say Pending Verification when active amount exists");
+    console.log("   ✓ Actual August monthly row data correctly drives '+$11,153.73 August 2026 commission — capitalized in September'");
 
     // Test rendering of October activity (prevRow is September)
-    const octActivity = renderMonthlyActivity(m9Row);
-    assert(octActivity.includes("+$11487.85 Commission Added (September Earned)"), "October activity must render confirmed addition labeled September Earned");
-    console.log("   ✓ Actual September monthly row data correctly drives '+$11,487.85 Commission Added (September Earned)' in October activity");
+    const octActivity = renderMonthlyActivity(m9Row, "October");
+    assert(octActivity.includes("+$11487.85 September 2026 commission — capitalized in October"), "October activity must render September commission");
+    console.log("   ✓ Actual September monthly row data correctly drives '+$11,487.85 September 2026 commission — capitalized in October'");
 
     // Test rendering of November activity (prevRow is October)
     // October is open/unfinalized with superseded commission rows
