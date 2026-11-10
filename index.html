@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <title>ForEx Investment Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1379,21 +1382,11 @@
               <div class="breakdown-perf-group">
                 <div class="breakdown-perf-item">
                   <span class="muted breakdown-perf-label">Net Return:</span>
-                  ${hasPendingCalculatedPerf
-                    ? `<span class="breakdown-perf-val ${pendingReturnVal >= 0 ? 'green' : 'red'}">${pct(pendingReturnVal)}</span>`
-                    : (isPendingCloseDisplay
-                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
-                        : `<span class="breakdown-perf-val ${netReturnPct >= 0 ? 'green' : 'red'}">${pct(netReturnPct)}</span>`)
-                  }
+                  <span class="breakdown-perf-val ${(hasPendingCalculatedPerf ? pendingReturnVal : netReturnPct) >= 0 ? 'green' : 'red'}">${pct(hasPendingCalculatedPerf ? pendingReturnVal : netReturnPct)}</span>
                 </div>
                 <div class="breakdown-perf-item">
                   <span class="muted breakdown-perf-label">Net Gain:</span>
-                  ${hasPendingCalculatedPerf
-                    ? `<span class="breakdown-perf-val">${money(pendingGainVal)}</span>`
-                    : (isPendingCloseDisplay
-                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
-                        : `<span class="breakdown-perf-val">${money(netGain)}</span>`)
-                  }
+                  <span class="breakdown-perf-val">${money(hasPendingCalculatedPerf ? pendingGainVal : netGain)}</span>
                 </div>
               </div>
               ${activityHtml ? `<div class="breakdown-activity-wrap">${activityHtml}</div>` : ''}
