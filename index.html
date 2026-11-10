@@ -1363,7 +1363,16 @@
         const netReturnPct = parseFloat(r.effectiveReturnPct) || 0;
         const netGain = parseFloat(r.gain) || 0;
         const isPendingCloseDisplay = Boolean(r.performancePendingClose);
-        const pendingCloseText = r.pendingCloseLabel || (r.month ? `${r.month} close pending` : "Pending");
+        const pendingCloseText = r.pendingCloseLabel || (r.month ? `Pending ${r.month} close` : "Pending close");
+        const hasPendingCalculatedPerf = Boolean(
+          isPendingCloseDisplay &&
+          r.pendingGain !== null &&
+          r.pendingGain !== undefined &&
+          r.pendingEffectiveReturnPct !== null &&
+          r.pendingEffectiveReturnPct !== undefined
+        );
+        const pendingReturnVal = hasPendingCalculatedPerf ? parseFloat(r.pendingEffectiveReturnPct) : 0;
+        const pendingGainVal = hasPendingCalculatedPerf ? parseFloat(r.pendingGain) : 0;
 
         return `
           <tr class="breakdown-row ${r.isProjection ? "is-projection" : ""}">
@@ -1378,16 +1387,20 @@
               <div class="breakdown-perf-group">
                 <div class="breakdown-perf-item">
                   <span class="muted breakdown-perf-label">Net Return:</span>
-                  ${isPendingCloseDisplay
-                    ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
-                    : `<span class="breakdown-perf-val ${netReturnPct >= 0 ? 'green' : 'red'}">${pct(netReturnPct)}</span>`
+                  ${hasPendingCalculatedPerf
+                    ? `<span class="breakdown-perf-val ${pendingReturnVal >= 0 ? 'green' : 'red'}">${pct(pendingReturnVal)} <span style="font-size:11px; color:var(--muted); font-weight:500;">(${pendingCloseText})</span></span>`
+                    : (isPendingCloseDisplay
+                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
+                        : `<span class="breakdown-perf-val ${netReturnPct >= 0 ? 'green' : 'red'}">${pct(netReturnPct)}</span>`)
                   }
                 </div>
                 <div class="breakdown-perf-item">
                   <span class="muted breakdown-perf-label">Net Gain:</span>
-                  ${isPendingCloseDisplay
-                    ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
-                    : `<span class="breakdown-perf-val">${money(netGain)}</span>`
+                  ${hasPendingCalculatedPerf
+                    ? `<span class="breakdown-perf-val">${money(pendingGainVal)} <span style="font-size:11px; color:var(--muted); font-weight:500;">(${pendingCloseText})</span></span>`
+                    : (isPendingCloseDisplay
+                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
+                        : `<span class="breakdown-perf-val">${money(netGain)}</span>`)
                   }
                 </div>
               </div>
