@@ -2,6 +2,7 @@ import { parseCookies, verifySession } from "../lib/auth.js";
 import { buildInvestorDashboard } from "../lib/dashboard.js";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   try {
     const cookies = parseCookies(req);
     const session = verifySession(cookies.scff_session);
