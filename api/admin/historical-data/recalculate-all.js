@@ -11,8 +11,7 @@ function precise(val) {
 }
 
 export default async function handler(req, res) {
-  const bypassAuth = req.headers && req.headers['x-bypass-auth'] === 'temp-bypass';
-  const session = bypassAuth ? { user: { role: 'admin' } } : verifyAdminSession(req);
+  const session = verifyAdminSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -289,9 +288,12 @@ export default async function handler(req, res) {
           totalWds = totalWds.add(wds);
         }
 
+        // Handle monthly draw (Single-Counting Invariant: Avoid duplicate deduction if withdrawal already recorded)
         const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? new Decimal(existing.recurring_draw) : draw;
-        if (currentDraw.gt(0) && accounts.length > 0) {
-          accountBalances[accounts[0].id] = accountBalances[accounts[0].id].sub(currentDraw);
+        const fulfilledDraw = drawWdsByM[m] || new Decimal(0);
+        const effectiveDrawToDeduct = Decimal.max(0, currentDraw.sub(fulfilledDraw));
+        if (effectiveDrawToDeduct.gt(0) && accounts.length > 0) {
+          accountBalances[accounts[0].id] = accountBalances[accounts[0].id].sub(effectiveDrawToDeduct);
         }
 
         const ending = accounts.length > 0 ? Object.values(accountBalances).reduce((a, b) => a.add(b), new Decimal(0)) : new Decimal(0);

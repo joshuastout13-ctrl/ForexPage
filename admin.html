@@ -1518,7 +1518,11 @@ let state = {
           (item.effective_accounting_date ? parseInt(item.effective_accounting_date.slice(0, 4), 10) : new Date().getFullYear())
         ) : new Date().getFullYear();
         const monthOptions = MONTHS.map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`).join('');
+        const mutationToken = (item && item.idempotency_key)
+          ? item.idempotency_key
+          : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('mut_wd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10)));
         html = `
+          <input type="hidden" id="field_mutation_id" value="${mutationToken}" />
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
           <div class="form-group"><label>Withdrawal Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month" required>${monthOptions}</select></div>
@@ -1776,7 +1780,8 @@ let state = {
             year: selYear,
             effective_accounting_date: canonicalEffDate,
             effectiveDate: canonicalEffDate,
-            status: document.getElementById('field_status')?.value || 'Pending'
+            status: document.getElementById('field_status')?.value || 'Pending',
+            idempotency_key: document.getElementById('field_mutation_id')?.value || undefined
           };
         } else if (tab === 'returns') {
           endpoint = '/api/admin/monthly-returns';

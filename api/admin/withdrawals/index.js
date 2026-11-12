@@ -56,18 +56,15 @@ export default async function handler(req, res) {
       }
 
       const numAmount = parseFloat(body.amount);
+      // ── Idempotency Key (Strict Fail-Closed Contract) ────────────────────
       let idempotencyKey = body.idempotency_key || body.idempotencyKey || null;
-
-      // Construct canonical deterministic key if correction purpose is provided and no explicit key supplied
-      if (!idempotencyKey && (body.purpose || body.is_correction)) {
-        idempotencyKey = buildDeterministicIdempotencyKey({
-          type: "withdrawal",
-          investorId: investorId || "unknown",
-          effectiveDate: effDate,
-          amountCents: Math.round(numAmount * 100),
-          purpose: body.purpose || "authorized_correction"
+      if (!idempotencyKey || typeof idempotencyKey !== "string" || !idempotencyKey.trim()) {
+        return res.status(400).json({
+          error: "MISSING_IDEMPOTENCY_KEY: A durable idempotency_key is strictly required for financial withdrawal mutations to guarantee exactly-once processing. Supply a persistent operation ID.",
+          code: "MISSING_IDEMPOTENCY_KEY"
         });
       }
+      idempotencyKey = String(idempotencyKey).trim().slice(0, 255);
 
       const payload = {
         id: body.id || `wd_${crypto.randomBytes(4).toString("hex")}`,
