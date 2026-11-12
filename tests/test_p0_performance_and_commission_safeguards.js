@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { buildInvestorDashboard } from "../lib/dashboard.js";
 import { extractMyfxbookPeriodMetric } from "../lib/myfxbook.js";
+import { isAuthoritativeProductionDbConfigured } from "../lib/supabase.js";
 
 const FAIL_CLOSED_TEXT = "Temporarily unavailable while being verified";
 
@@ -141,19 +142,48 @@ async function runP0RegressionSuite() {
 
   // 5. Live Production Supabase Verification for Joshua Stout (jstout)
   console.log("5. Verifying Live Authoritative Dashboard Build for Joshua Stout (jstout)");
-  const jstoutLive = await buildInvestorDashboard("jstout");
-  assert.strictEqual(Number(jstoutLive.summary.currentBalance.toFixed(2)), 3333453.52, "Joshua Stout settled Current Balance must be preserved at $3,333,453.52");
-  assert.strictEqual(typeof jstoutLive.accountPerformance.today.netReturnPct, "number");
-  assert.strictEqual(typeof jstoutLive.accountPerformance.week.netReturnPct, "number");
-  assert.strictEqual(typeof jstoutLive.accountPerformance.month.netReturnPct, "number");
-  assert.strictEqual(jstoutLive.accountPerformance.year.unavailable, true, "Unfinalized October rollover must fail closed on This Year (YTD)");
-  assert.strictEqual(jstoutLive.accountPerformance.year.statusText, FAIL_CLOSED_TEXT);
-  assert.strictEqual(jstoutLive.summary.commissionsUnavailable, true, "Uncertified commission ledger must fail closed on Commission cards");
-  assert.strictEqual(jstoutLive.summary.commissionsStatusText, FAIL_CLOSED_TEXT);
-  assert.strictEqual(jstoutLive.summary.commissionsEarnedMonth, null, "Month commission must be null when unverified, never 0.00");
-  assert.strictEqual(jstoutLive.summary.commissionsEarnedYear, null, "Year commission must be null when unverified, never 0.00");
-  assert.strictEqual(jstoutLive.summary.commissionsEarnedYearVerifiedLocked, 42047.37);
-  console.log("   ✓ Live Joshua Stout dashboard preserves settled balance ($3,333,453.52) and fails closed on unverified metrics\n");
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DATA_SOURCE !== "supabase") {
+    console.log("   [SKIPPED] Live production check skipped in offline mode (authoritative credentials not configured)\n");
+  } else {
+    const jstoutLive = await buildInvestorDashboard("jstout");
+    assert.strictEqual(Number(jstoutLive.summary.currentBalance.toFixed(2)), 3333453.52, "Joshua Stout settled Current Balance must be preserved at $3,333,453.52");
+    assert.strictEqual(typeof jstoutLive.accountPerformance.today.netReturnPct, "number");
+    assert.strictEqual(typeof jstoutLive.accountPerformance.week.netReturnPct, "number");
+    assert.strictEqual(typeof jstoutLive.accountPerformance.month.netReturnPct, "number");
+    assert.strictEqual(jstoutLive.accountPerformance.year.unavailable, true, "Unfinalized October rollover must fail closed on This Year (YTD)");
+    assert.strictEqual(jstoutLive.accountPerformance.year.statusText, FAIL_CLOSED_TEXT);
+    assert.strictEqual(jstoutLive.summary.commissionsUnavailable, true, "Uncertified commission ledger must fail closed on Commission cards");
+    assert.strictEqual(jstoutLive.summary.commissionsStatusText, FAIL_CLOSED_TEXT);
+    assert.strictEqual(jstoutLive.summary.commissionsEarnedMonth, null, "Month commission must be null when unverified, never 0.00");
+    assert.strictEqual(jstoutLive.summary.commissionsEarnedYear, null, "Year commission must be null when unverified, never 0.00");
+    assert.strictEqual(jstoutLive.summary.commissionsEarnedYearVerifiedLocked, 42047.37);
+    console.log("   ✓ Live Joshua Stout dashboard preserves settled balance ($3,333,453.52) and fails closed on unverified metrics\n");
+  }
+
+  // 5b. Hermetic Offline Dashboard Verification for Joshua Stout
+  console.log("5b. Testing Hermetic Offline Dashboard Verification for Joshua Stout (jstout)");
+  const jstoutHermeticFixture = {
+    rawInvestors: [{ id: "stout001", portal_username: "jstout", first_name: "Joshua", last_name: "Stout", split_pct: 100, start_date: "2026-01-01" }],
+    accounts: [{ id: "stout001", investor_id: "stout001", startingcapital: 2500000.00, split_pct: 100, status: "active", is_commission: true }],
+    historyTable: [
+      { id: "h_10", investor_id: "stout001", year: 2026, month_number: 10, opening_balance: 3400953.52, deposits: 0, withdrawals: 67500.00, gross_return_pct: 3.05, ending_balance: 3333453.52, locked: false }
+    ],
+    commissionEarningsTable: [
+      { id: "c_sep", recipient_id: "stout001", year: 2026, month_number: 9, amount: 42852.41, status: "ACTIVE" },
+      { id: "c_oct_sup", recipient_id: "stout001", year: 2026, month_number: 10, amount: 2450.00, status: "SUPERSEDED" }
+    ],
+    returnsSheet: baseReturns.map(r => (r.month_number === 10 ? { ...r, gross_return_pct: 3.05, locked: false } : r)),
+    depositsSheet: [],
+    withdrawalsSheet: [{ investorid: "stout001", year: 2026, month_number: 10, amount: 67500.00, status: "completed" }],
+    cutoverAdjustments: [],
+    live: { today: "+0.00%", week: "+0.00%", month: "+0.00%", year: "+33.25%" },
+    asOfDate: "2026-11-04T12:00:00Z"
+  };
+  const jstoutHermetic = await buildInvestorDashboard("jstout", jstoutHermeticFixture);
+  assert.strictEqual(Number(jstoutHermetic.summary.currentBalance.toFixed(2)), 3333453.52, "Joshua Stout settled Current Balance must be preserved at $3,333,453.52");
+  assert.strictEqual(jstoutHermetic.summary.bookedCommissionsEarnedMonth, 0, "Booked October commission must be 0 for superseded rows");
+  assert.strictEqual(jstoutHermetic.summary.bookedCommissionsEarnedYear, 42852.41, "Booked YTD must equal Jan-Sep ledger ($42,852.41)");
+  console.log("   ✓ Hermetic Joshua Stout dashboard preserves settled balance ($3,333,453.52) and strictly isolates booked ledger\n");
 
   // 6. Hermetic Fixture Tests for Fail-Closed Display Gate & Ledger Completeness
   console.log("6. Testing Hermetic Fixture Fail-Closed Commission Display Gate & Ledger Completeness");
@@ -207,20 +237,25 @@ async function runP0RegressionSuite() {
     "Status text must be fail-closed message");
   console.log("   ✓ Case A: SUPERSEDED October rows do not clear safeguard; amounts remain null with unverified message");
 
-  // Case B: Verified completed-month commissions display when ledger is explicitly certified complete
-  const certifiedDash = await buildInvestorDashboard("hermetic_recip", {
+  // Case B: In-memory/caller flags (isCommissionLedgerCertified / commissionLedgerCertified) CANNOT bypass the fail-closed safeguard
+  const attemptBypassDash = await buildInvestorDashboard("hermetic_recip", {
     ...hermeticBaseFixture,
-    isCommissionLedgerCertified: true
+    isCommissionLedgerCertified: true,
+    commissionLedgerCertified: true
   });
-  assert.strictEqual(certifiedDash.summary.commissionsUnavailable, false,
-    "Certified ledger must display completed-month commissions");
-  assert.strictEqual(certifiedDash.summary.commissionsEarnedYear, 3000.00,
-    "Certified YTD commissions must reflect verified Jan + Sep ($3,000.00)");
-  assert.strictEqual(certifiedDash.summary.commissionsEarnedMonth, 0,
-    "Certified open October month commission must be 0 (superseded row excluded)");
-  assert.strictEqual(certifiedDash.summary.commissionsStatusText, null,
-    "Certified ledger has no fail-closed status text");
-  console.log("   ✓ Case B: Explicitly certified ledger displays verified completed-month commissions ($3,000.00)");
+  assert.strictEqual(attemptBypassDash.summary.commissionsUnavailable, true,
+    "Caller-provided certification flags must NOT bypass the uncertified ledger safeguard");
+  assert.strictEqual(attemptBypassDash.summary.commissionsEarnedMonth, null,
+    "Month commission must remain null despite caller-provided certification flag");
+  assert.strictEqual(attemptBypassDash.summary.commissionsEarnedYear, null,
+    "Year commission must remain null despite caller-provided certification flag");
+  assert.strictEqual(attemptBypassDash.summary.commissionsStatusText, FAIL_CLOSED_TEXT,
+    "Status text must remain fail-closed message");
+  assert.strictEqual(attemptBypassDash.summary.bookedCommissionsEarnedYear, 3000.00,
+    "Booked YTD commissions strictly reflect active Jan + Sep ledger rows ($3,000.00)");
+  assert.strictEqual(attemptBypassDash.summary.bookedCommissionsEarnedMonth, 0,
+    "Booked open October month commission strictly reflects active ledger rows (0 for superseded rows)");
+  console.log("   ✓ Case B: Caller certification flags cannot bypass safeguard; verified fields remain null while booked ledger is preserved");
 
   // Case C: UI contract verification — unavailable never produces $0.00 or numeric total
   assert.strictEqual(uncertifiedDash.summary.commissionsEarnedMonth, null,
@@ -229,7 +264,10 @@ async function runP0RegressionSuite() {
     "UI contract: year commission must be null, never 0 or 0.00");
   assert.notStrictEqual(uncertifiedDash.summary.commissionsEarnedYear, 0);
   assert.notStrictEqual(uncertifiedDash.summary.commissionsEarnedMonth, 0);
-  console.log("   ✓ Case C: UI receives null and unavailable flag, preventing $0.00 rendering\n");
+  // Verify investor response contains NO candidate fields
+  assert.strictEqual(uncertifiedDash.summary._internalCandidateCommissionsEarnedMonth, undefined);
+  assert.strictEqual(JSON.stringify(uncertifiedDash).includes("candidate"), false);
+  console.log("   ✓ Case C: UI receives null and unavailable flag, preventing $0.00 rendering; zero candidate fields in serialized payload\n");
 
   console.log("================================================================================");
   console.log("ALL P0 PERFORMANCE & COMMISSION SAFEGUARD TESTS PASSED (100%)");
