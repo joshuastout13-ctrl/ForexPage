@@ -695,12 +695,22 @@
         overflow: hidden;
       }
     }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <!-- Initial Loading Screen (shown during auth/session check) -->
+    <div id="loadingCard" class="card" style="max-width: 440px; margin: 100px auto; text-align: center; padding: 60px 24px;">
+      <div style="width: 36px; height: 36px; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;"></div>
+      <div class="muted" style="font-size: 14px; font-weight: 500;">Loading dashboard...</div>
+    </div>
+
     <!-- Login Screen -->
-    <div id="loginCard" class="card">
+    <div id="loginCard" class="card hidden">
       <div class="login-header">
         <div class="kicker">Investor Portal</div>
         <h1>ForEx Tracker</h1>
@@ -1405,6 +1415,7 @@
     // Guarantees exactly one application state is visible at all times.
     // Valid views: "login", "changePassword", "dashboard", "error"
     const VIEW_IDS = {
+      loading: "loadingCard",
       login: "loginCard",
       changePassword: "changePasswordCard",
       dashboard: "dashboard",
@@ -1603,12 +1614,12 @@
     });
     
     // ── Safe startup ─────────────────────────────────────────
-    // Always show login first, then attempt session restoration.
-    // Login is only hidden AFTER dashboard data loads successfully.
+    // Start with clean loading state during session restoration.
+    // If session is valid, transitions directly to dashboard with zero login flash.
+    // If unauthorized (401/404), loadDashboard cleanly shows the login card.
     (async function initializeApp() {
       try {
-        // Start with login visible — safe default
-        showView("login");
+        showView("loading");
         await loadDashboard();
       } catch (err) {
         console.error("[App Init Error]", err);
