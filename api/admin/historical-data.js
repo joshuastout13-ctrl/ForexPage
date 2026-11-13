@@ -47,7 +47,14 @@ export default async function handler(req, res) {
         gain = adjStart * (pct / 100);
       }
 
-      const endingBalance = adjStart + gain - (recurringDraw || 0);
+            // Deduplicate recurring draw only if withdrawal is linked to draw obligation
+      const fulfilled = (drawFulfillmentWithdrawals !== undefined && drawFulfillmentWithdrawals !== null)
+        ? Number(drawFulfillmentWithdrawals)
+        : ((isDrawLinked || (notes && String(notes).toLowerCase().includes('draw')))
+            ? (withdrawals || 0)
+            : 0);
+      const effectiveDraw = Math.max(0, (recurringDraw || 0) - fulfilled);
+      const endingBalance = adjStart + gain - effectiveDraw;
 
       // Fail-closed guard: Cannot overwrite locked historical history records
       const { data: existingRecord } = await supabase

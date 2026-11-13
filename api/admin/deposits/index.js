@@ -200,47 +200,19 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── Idempotency key ───────────────────────────────────────────────────
-      // Every deposit (including NEW_CASH) MUST receive a non-null idempotency_key
-      // so the database unique index idx_deposits_idempotency_key atomically
-      // prevents duplicate economic inserts on concurrent/retried submissions.
+      // ── Idempotency Key (Strict Fail-Closed Contract) ────────────────────
+      // A durable operation ID (idempotency_key) generated once per intended transaction
+      // and reused across retries is STRICTLY REQUIRED.
+      // Do NOT derive a missing key from investor/account/date/amount — that can collapse
+      // two legitimate same-amount transactions. Fail closed instead of guessing.
       let idempotencyKey = body.idempotency_key || body.idempotencyKey || null;
-      if (idempotencyKey) {
-        // Normalize caller-provided key (e.g. client mutation UUID preserved across retries)
-        idempotencyKey = String(idempotencyKey).trim().slice(0, 255);
-      } else if (rawTreatment === "HISTORICAL_PROVENANCE") {
-        // Historical provenance records MUST be idempotent — build deterministic key
-        try {
-          idempotencyKey = buildDeterministicIdempotencyKey({
-            type: "deposit",
-            investorId,
-            effectiveDate: effDate,
-            amountCents,
-            purpose: `historical_provenance_${rawTreatment.toLowerCase()}`
-          });
-        } catch (keyErr) {
-          return res.status(400).json({ error: `IDEMPOTENCY_KEY_ERROR: ${keyErr.message}` });
-        }
-      } else {
-        // Deterministic economic key for NEW_CASH to prevent accidental double-posting
-        const purposeSuffix = body.confirm_duplicate_economic_deposit
-          ? `confirmed_addition_${crypto.randomBytes(4).toString("hex")}`
-          : (body.transaction_reference
-              ? `ref_${String(body.transaction_reference).toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`
-              : `new_cash_${String(accountId).toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`);
-
-        try {
-          idempotencyKey = buildDeterministicIdempotencyKey({
-            type: "deposit",
-            investorId,
-            effectiveDate: effDate,
-            amountCents,
-            purpose: purposeSuffix
-          });
-        } catch (keyErr) {
-          idempotencyKey = `dep_mut_${investorId}_${effDate}_${amountCents}_${purposeSuffix}`;
-        }
+      if (!idempotencyKey || typeof idempotencyKey !== "string" || !idempotencyKey.trim()) {
+        return res.status(400).json({
+          error: "MISSING_IDEMPOTENCY_KEY: A durable idempotency_key is strictly required for financial deposit mutations to guarantee exactly-once processing. Supply a persistent operation ID.",
+          code: "MISSING_IDEMPOTENCY_KEY"
+        });
       }
+      idempotencyKey = String(idempotencyKey).trim().slice(0, 255);
 
       // ── Build payload ─────────────────────────────────────────────────────
       const payload = {
@@ -259,30 +231,81 @@ export default async function handler(req, res) {
         idempotency_key: idempotencyKey
       };
 
-      // ── Insert with idempotency duplicate detection ───────────────────────
-      const { data: inserted, error: insertErr } = await supabase
-        .from("deposits")
-        .insert([payload])
-        .select();
+      // ── Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock) ──
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc("create_deposit_atomic", {
+        p_investor_id: investorId,
+        p_account_id: accountId,
+        p_amount: amount,
+        p_date: entryDate,
+        p_effective_date: effDate,
+        p_accounting_treatment: rawTreatment,
+        p_status: rawStatus,
+        p_type: body.type || "Wire",
+        p_notes: body.notes || "",
+        p_idempotency_key: idempotencyKey,
+        p_created_by: auditActor
+      });
 
-      if (insertErr) {
-        // Detect unique constraint violation on idempotency_key
-        const msg = String(insertErr.message || "");
-        if (
-          msg.includes("idx_deposits_idempotency_key") ||
-          msg.includes("unique") ||
-          insertErr.code === "23505"
-        ) {
+      if (rpcErr) {
+        const msg = String(rpcErr.message || "");
+        if (msg.includes("IDEMPOTENCY_KEY_PAYLOAD_MISMATCH")) {
           return res.status(409).json({
-            error: "DUPLICATE_DEPOSIT: A deposit with this idempotency key already exists. " +
-              "This submission is a duplicate and has been blocked to prevent double-counting.",
+            error: msg,
+            code: "IDEMPOTENCY_KEY_PAYLOAD_MISMATCH",
             idempotency_key: idempotencyKey
           });
         }
-        throw insertErr;
+        if (msg.includes("INVALID_AMOUNT") || msg.includes("INVALID_ACCOUNTING_TREATMENT") || msg.includes("INVALID_DEPOSIT_STATUS")) {
+          return res.status(400).json({ error: msg });
+        }
+        // Unique index violation backstop
+        if (msg.includes("idx_deposits_idempotency_key") || rpcErr.code === "23505") {
+          const { data: existingDep } = await supabase
+            .from("deposits")
+            .select("*")
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+
+          if (existingDep) {
+            // Compare the COMPLETE canonical payload of all relevant transaction fields:
+            const isMatch = 
+              String(existingDep.investor_id || '').toLowerCase() === String(investorId).toLowerCase() &&
+              String(existingDep.account_id || '').toLowerCase() === String(accountId).toLowerCase() &&
+              Math.abs(Number(existingDep.amount) - amount) < 0.001 &&
+              String(existingDep.date || '').slice(0, 10) === String(entryDate).slice(0, 10) &&
+              String(existingDep.effective_accounting_date || '').slice(0, 10) === String(effDate).slice(0, 10) &&
+              String(existingDep.accounting_treatment || 'NEW_CASH').toUpperCase() === String(rawTreatment).toUpperCase() &&
+              String(existingDep.status || 'confirmed').toLowerCase() === String(rawStatus).toLowerCase() &&
+              String(existingDep.type || 'Wire').toLowerCase() === String(body.type || 'Wire').toLowerCase();
+
+            if (isMatch) {
+              return res.status(200).json({
+                success: true,
+                deposit: existingDep,
+                idempotency_replay: true,
+                status: "IDEMPOTENT_REPLAY"
+              });
+            } else {
+              return res.status(409).json({
+                error: `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH: Key ${idempotencyKey} was already used with a different deposit payload.`,
+                code: "IDEMPOTENCY_KEY_PAYLOAD_MISMATCH",
+                existing_deposit_id: existingDep.id
+              });
+            }
+          }
+        }
+        throw rpcErr;
       }
 
-      return res.status(200).json({ success: true, deposit: inserted[0] });
+      if (rpcRes) {
+        const isReplay = rpcRes.status === "IDEMPOTENT_REPLAY" || rpcRes.idempotency_replay === true;
+        return res.status(200).json({
+          success: true,
+          deposit: rpcRes.deposit,
+          idempotency_replay: isReplay,
+          status: rpcRes.status || (isReplay ? "IDEMPOTENT_REPLAY" : "SUCCESS")
+        });
+      }
     } catch (err) {
       const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });

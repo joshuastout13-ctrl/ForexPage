@@ -10,8 +10,7 @@ function precise(val) {
 }
 
 export default async function handler(req, res) {
-  const bypassAuth = req.headers && req.headers['x-bypass-auth'] === 'temp-bypass';
-  const session = bypassAuth ? { user: { role: 'admin' } } : verifyAdminSession(req);
+  const session = verifyAdminSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -141,6 +140,7 @@ export default async function handler(req, res) {
 
     const wdsByM = {}; 
     const wdsByMAcc = {};
+    const drawWdsByM = {};
     allWds?.forEach(w => {
       if(w.effective_year === targetYear || (!w.effective_year && targetYear === new Date().getFullYear())) {
         const m = w.month_number;
@@ -150,6 +150,17 @@ export default async function handler(req, res) {
         if (accId) {
           if (!wdsByMAcc[m]) wdsByMAcc[m] = {};
           wdsByMAcc[m][accId] = (wdsByMAcc[m][accId] || 0) + amt;
+        }
+        const isDrawLinked = Boolean(
+          w.is_draw === true || String(w.is_draw).toLowerCase() === 'true' ||
+          w.draw_fulfillment === true || String(w.draw_fulfillment).toLowerCase() === 'true' ||
+          (w.purpose && String(w.purpose).trim().toLowerCase() === 'monthly_draw') ||
+          (w.type && String(w.type).trim().toLowerCase() === 'monthly_draw') ||
+          (w.source_event_type && String(w.source_event_type).trim().toUpperCase() === 'CONTRACTUAL_MONTHLY_DRAW') ||
+          w.linked_draw_id || w.draw_fulfillment_id
+        );
+        if (isDrawLinked) {
+          drawWdsByM[m] = (drawWdsByM[m] || new Decimal(0)).add(amt);
         }
       }
     });
@@ -306,10 +317,12 @@ export default async function handler(req, res) {
         totalWds = totalWds.add(wds);
       }
 
-      // Handle monthly draw
+      // Handle monthly draw (Single-Counting Invariant: Avoid duplicate deduction if withdrawal already recorded)
       const currentDraw = (existing && existing.recurring_draw !== null && existing.recurring_draw !== undefined) ? new Decimal(existing.recurring_draw) : draw;
-      if (currentDraw.gt(0) && accounts.length > 0) {
-        accountBalances[accounts[0].id] = accountBalances[accounts[0].id].sub(currentDraw);
+      const fulfilledDraw = drawWdsByM[m] || new Decimal(0);
+      const effectiveDrawToDeduct = Decimal.max(0, currentDraw.sub(fulfilledDraw));
+      if (effectiveDrawToDeduct.gt(0) && accounts.length > 0) {
+        accountBalances[accounts[0].id] = accountBalances[accounts[0].id].sub(effectiveDrawToDeduct);
       }
 
       if (m < startMonth) continue;
