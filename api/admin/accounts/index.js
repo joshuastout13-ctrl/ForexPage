@@ -1,5 +1,5 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { supabase, paginatedRead } from "../../../lib/supabase.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -8,11 +8,13 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
-      const { data: accounts, error } = await supabase.from("investor_accounts").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
+      const accounts = await paginatedRead("investor_accounts");
+      accounts.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
       
-      const { data: rules, error: rulesError } = await supabase.from("commission_rules").select("*").not("account_id", "is", null);
-      if (!rulesError && rules) {
+      const rules = await paginatedRead("commission_rules", {
+        queryModifier: q => q.not("account_id", "is", null)
+      }).catch(() => []);
+      if (rules) {
         accounts.forEach(acc => {
           acc.commissionRules = rules.filter(r => r.account_id === acc.id);
         });
@@ -22,24 +24,30 @@ export default async function handler(req, res) {
         const { buildInvestorDashboard } = await import("../../../lib/dashboard.js");
         const { getMyfxbookLive } = await import("../../../lib/myfxbook.js");
         
-        const [rawInvestors, returnsSheet, depositsSheet, withdrawalsSheet, historyTable, commissionEarningsTable, live] = await Promise.all([
-          supabase.from("investors").select("*"),
-          supabase.from("monthly_returns").select("*"),
-          supabase.from("deposits").select("*"),
-          supabase.from("withdrawals").select("*"),
-          supabase.from("investor_monthly_history").select("*"),
-          supabase.from("commission_earnings").select("*"),
+        const [rawInvestors, returnsSheet, depositsSheet, withdrawalsSheet, historyTable, commissionEarningsTable, commissionSharesTable, commissionRulesTable, cutovers, live] = await Promise.all([
+          paginatedRead("investors"),
+          paginatedRead("monthly_returns"),
+          paginatedRead("deposits"),
+          paginatedRead("withdrawals"),
+          paginatedRead("investor_monthly_history"),
+          paginatedRead("commission_earnings"),
+          paginatedRead("commission_shares"),
+          paginatedRead("commission_rules").catch(() => []),
+          paginatedRead("account_cutover_adjustments").catch(() => []),
           getMyfxbookLive({ skipScraper: true })
         ]);
         
         const preloadedData = {
-          rawInvestors: rawInvestors.data || [],
+          rawInvestors: rawInvestors || [],
           accounts: accounts, // already fetched
-          returnsSheet: returnsSheet.data || [],
-          depositsSheet: depositsSheet.data || [],
-          withdrawalsSheet: withdrawalsSheet.data || [],
-          historyTable: historyTable.data || [],
-          commissionEarningsTable: commissionEarningsTable.data || [],
+          returnsSheet: returnsSheet || [],
+          depositsSheet: depositsSheet || [],
+          withdrawalsSheet: withdrawalsSheet || [],
+          historyTable: historyTable || [],
+          commissionEarningsTable: commissionEarningsTable || [],
+          commissionSharesTable: commissionSharesTable || [],
+          commissionRulesTable: commissionRulesTable || [],
+          cutovers: cutovers || [],
           live
         };
 

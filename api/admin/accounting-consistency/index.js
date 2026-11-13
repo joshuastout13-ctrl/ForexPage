@@ -1,5 +1,5 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { paginatedRead } from "../../../lib/supabase.js";
 import Decimal from "decimal.js";
 import ExcelJS from "exceljs";
 
@@ -34,17 +34,18 @@ export default async function handler(req, res) {
     const filterStatus = query.status || null;
     const format = (query.format || "json").toLowerCase();
 
-    // Fetch all reference data
-    const [{ data: investors }, { data: accounts }, { data: returns }, { data: history }, { data: earningsTargetYear }, { data: earningsPrevYearDec }, { data: deposits }, { data: withdrawals }] = await Promise.all([
-      supabase.from("investors").select("*"),
-      supabase.from("investor_accounts").select("*"),
-      supabase.from("monthly_returns").select("*").eq("year", year),
-      supabase.from("investor_monthly_history").select("*").eq("year", year).order("month_number"),
-      supabase.from("commission_earnings").select("*").eq("year", year),
-      supabase.from("commission_earnings").select("*").eq("year", year - 1).eq("month_number", 12),
-      supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"])
+    // Fetch all reference data with deterministic id pagination (>1,000 rows in investor_monthly_history & commission_earnings)
+    const [investors, accounts, returns, history, earningsTargetYear, earningsPrevYearDec, deposits, withdrawals] = await Promise.all([
+      paginatedRead("investors"),
+      paginatedRead("investor_accounts"),
+      paginatedRead("monthly_returns", { queryModifier: q => q.eq("year", year) }),
+      paginatedRead("investor_monthly_history", { queryModifier: q => q.eq("year", year) }),
+      paginatedRead("commission_earnings", { queryModifier: q => q.eq("year", year) }),
+      paginatedRead("commission_earnings", { queryModifier: q => q.eq("year", year - 1).eq("month_number", 12) }),
+      paginatedRead("deposits", { queryModifier: q => q.not("type", "ilike", "VOID") }),
+      paginatedRead("withdrawals", { queryModifier: q => q.in("status", ["Approved", "Completed"]) })
     ]);
+    history.sort((a, b) => Number(a.month_number) - Number(b.month_number));
 
     const returnMap = {};
     (returns || []).forEach(r => { returnMap[r.month_number] = new Decimal(r.gross_return_pct || 0); });
