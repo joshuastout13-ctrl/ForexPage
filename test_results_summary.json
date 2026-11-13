@@ -1,0 +1,247 @@
+[
+  {
+    "file": "test_audit_hardening_and_rollover_regression.js",
+    "cmd": "node tests/test_audit_hardening_and_rollover_regression.js",
+    "code": 1,
+    "duration": "0.20",
+    "summary": "at ModuleJob.link (node:internal/modules/esm/module_job:253:17) | Node.js v24.19.0"
+  },
+  {
+    "file": "test_authorized_batch_regression.js",
+    "cmd": "node tests/test_authorized_batch_regression.js",
+    "code": 1,
+    "duration": "11.46",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_commission_attribution_and_display.mjs",
+    "cmd": "node tests/test_commission_attribution_and_display.mjs",
+    "code": 0,
+    "duration": "0.36",
+    "summary": "ALL COMMISSION ATTRIBUTION & DISPLAY LOGIC TESTS PASSED (100%) | ================================================================================"
+  },
+  {
+    "file": "test_commission_single_source_of_truth.js",
+    "cmd": "node tests/test_commission_single_source_of_truth.js",
+    "code": 1,
+    "duration": "0.37",
+    "summary": "TEST SUITE FAILED: TypeError: Cannot read properties of null (reading 'toFixed') | at runCommissionSingleSourceOfTruthTests (file:///C:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage/tests/test_commission_single_source_of_truth.js:132:77)"
+  },
+  {
+    "file": "test_daily_reconciliation_and_ground_truth.js",
+    "cmd": "node tests/test_daily_reconciliation_and_ground_truth.js",
+    "code": 1,
+    "duration": "17.17",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_daily_reconciliation_endpoint.js",
+    "cmd": "node tests/test_daily_reconciliation_endpoint.js",
+    "code": 1,
+    "duration": "13.83",
+    "summary": "❌ FAIL: 12. Verified audit_runs report_json carries status: PASS | ❌ FAIL: 14. Verified admin_email_logs record is tagged is_test = true"
+  },
+  {
+    "file": "test_database_duplicate_protection.js",
+    "cmd": "node tests/test_database_duplicate_protection.js",
+    "code": 0,
+    "duration": "8.92",
+    "summary": "DATABASE DUPLICATE PROTECTION RESULTS: 5 PASSED / 0 FAILED | ================================================================================"
+  },
+  {
+    "file": "test_deposit_provenance_and_performance.js",
+    "cmd": "node tests/test_deposit_provenance_and_performance.js",
+    "code": 0,
+    "duration": "0.44",
+    "summary": "RESULTS: 16 PASSED / 0 FAILED | ================================================================================"
+  },
+  {
+    "file": "test_financial_mutation_safety.js",
+    "cmd": "node tests/test_financial_mutation_safety.js",
+    "code": 0,
+    "duration": "0.52",
+    "summary": "TEST SUMMARY: 16 PASSED / 0 FAILED | ==============================================================================="
+  },
+  {
+    "file": "test_first_class_internal_transfer.js",
+    "cmd": "node tests/test_first_class_internal_transfer.js",
+    "code": 0,
+    "duration": "0.32",
+    "summary": "Total Performance %: 50 | ✓ ALL INTERNAL TRANSFER ACCOUNTING ENGINE INVARIANTS PASSED!"
+  },
+  {
+    "file": "test_investor_portal_clean_presentation.js",
+    "cmd": "node tests/test_investor_portal_clean_presentation.js",
+    "code": 0,
+    "duration": "0.35",
+    "summary": "ALL 6 CLEAN PRESENTATION TESTS PASSED (100%) | ================================================================================"
+  },
+  {
+    "file": "test_jstout_screenshot_reconciliation.js",
+    "cmd": "node tests/test_jstout_screenshot_reconciliation.js",
+    "code": 0,
+    "duration": "0.37",
+    "summary": "Live 'This Month' Net Dollar: $ 6,257.823 | Commission Card Label:     Comm. August"
+  },
+  {
+    "file": "test_legacy_adoption_transactional.mjs",
+    "cmd": "node tests/test_legacy_adoption_transactional.mjs",
+    "code": 0,
+    "duration": "2.18",
+    "summary": "✅ ALL 12 ADOPTION INVARIANTS 100% CERTIFIED IN POSTGRESQL ENGINE! | ✅ CLEANUP VERIFIED: Complete transaction rolled back cleanly with ZERO persistent rows."
+  },
+  {
+    "file": "test_lifetime_withdrawals_canonical.js",
+    "cmd": "node tests/test_lifetime_withdrawals_canonical.js",
+    "code": 1,
+    "duration": "0.51",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_locked_history_immutability.js",
+    "cmd": "node tests/test_locked_history_immutability.js",
+    "code": 0,
+    "duration": "0.20",
+    "summary": "PASS: 4. Ted Trajectory: Under $0 cutover reset, October opening is $1,702.78 (positive commissions) | ALL 4 REGRESSION TESTS PASSED CLEANLY."
+  },
+  {
+    "file": "test_mobile_responsive.js",
+    "cmd": "node tests/test_mobile_responsive.js",
+    "code": 0,
+    "duration": "0.21",
+    "summary": "ALL MOBILE RESPONSIVE TESTS PASSED SUCCESSFULLY (100% PASS) | ================================================================================"
+  },
+  {
+    "file": "test_month_state.js",
+    "cmd": "node tests/test_month_state.js",
+    "code": 0,
+    "duration": "0.55",
+    "summary": "RESULTS: 39 PASS / 0 FAIL | ✅ ALL 39 TESTS PASS"
+  },
+  {
+    "file": "test_myfxbook_daily_pacific_sync.js",
+    "cmd": "node tests/test_myfxbook_daily_pacific_sync.js",
+    "code": 1,
+    "duration": "13.03",
+    "summary": "❌ FAIL: 4.7. All 108 accounts reconciled with zero balance variances | ❌ FAIL: 4.8. Zero P0 or P1 accounting anomalies"
+  },
+  {
+    "file": "test_myfxbook_sync_and_alerting.js",
+    "cmd": "node tests/test_myfxbook_sync_and_alerting.js",
+    "code": 1,
+    "duration": "1.59",
+    "summary": "[Cron] Unauthorized access attempt blocked. Header missing or secret mismatch. | ❌ FAIL: 4b. October 2026 return reflects current Myfxbook 1.71%"
+  },
+  {
+    "file": "test_october_rollover_certification.js",
+    "cmd": "node tests/test_october_rollover_certification.js",
+    "code": 1,
+    "duration": "0.81",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_october_transfer_correction_regression.js",
+    "cmd": "node tests/test_october_transfer_correction_regression.js",
+    "code": 1,
+    "duration": "10.02",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_open_month_settled_rules.js",
+    "cmd": "node tests/test_open_month_settled_rules.js",
+    "code": 1,
+    "duration": "0.35",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_p0_commission_writer_containment.mjs",
+    "cmd": "node tests/test_p0_commission_writer_containment.mjs",
+    "code": 0,
+    "duration": "0.16",
+    "summary": "ALL COMMISSION WRITER CONTAINMENT TESTS PASSED (5 / 5) ✓ | ================================================================================"
+  },
+  {
+    "file": "test_p0_performance_and_commission_safeguards.js",
+    "cmd": "node tests/test_p0_performance_and_commission_safeguards.js",
+    "code": 0,
+    "duration": "2.10",
+    "summary": "ALL P0 PERFORMANCE & COMMISSION SAFEGUARD TESTS PASSED (100%) | ================================================================================"
+  },
+  {
+    "file": "test_postgrest_internal_transfer_guards.js",
+    "cmd": "node tests/test_postgrest_internal_transfer_guards.js",
+    "code": 0,
+    "duration": "4.77",
+    "summary": "✓ CONFIRMED: ZERO rows created in production database across all tables during guard tests. | ✅ ALL DIRECT POSTGREST GUARD INVOCATION TESTS PASSED!"
+  },
+  {
+    "file": "test_production_internal_transfer_transactional.mjs",
+    "cmd": "node tests/test_production_internal_transfer_transactional.mjs",
+    "code": 0,
+    "duration": "5.59",
+    "summary": "] | ✓ Zero QA test residue confirmed in production database."
+  },
+  {
+    "file": "test_provenance_certification_lifecycle.js",
+    "cmd": "node tests/test_provenance_certification_lifecycle.js",
+    "code": 1,
+    "duration": "0.35",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_rollover_regression.js",
+    "cmd": "node tests/test_rollover_regression.js",
+    "code": 0,
+    "duration": "0.79",
+    "summary": "ALL REGRESSION & CHART SELECTION TESTS PASSED (100%) | ================================================================================"
+  },
+  {
+    "file": "test_schema_update_v5_postgres.js",
+    "cmd": "node tests/test_schema_update_v5_postgres.js",
+    "code": 0,
+    "duration": "14.40",
+    "summary": "NATIVE POSTGRESQL 18.4 MIGRATION CERTIFICATION: 19 PASSED / 0 FAILED | ==============================================================================="
+  },
+  {
+    "file": "test_scott_and_ted_accounting_remediation.js",
+    "cmd": "node tests/test_scott_and_ted_accounting_remediation.js",
+    "code": 1,
+    "duration": "35.01",
+    "summary": "TEST SUMMARY: 14 PASSED / 0 FAILED | ==============================================================================="
+  },
+  {
+    "file": "test_summary_card_reconciliation_and_withdrawals.js",
+    "cmd": "node tests/test_summary_card_reconciliation_and_withdrawals.js",
+    "code": 0,
+    "duration": "0.53",
+    "summary": "ALL TESTS COMPLETED | ================================================================================"
+  },
+  {
+    "file": "test_theresa_kruger_and_duplicate_prevention_regression.js",
+    "cmd": "node tests/test_theresa_kruger_and_duplicate_prevention_regression.js",
+    "code": 1,
+    "duration": "11.68",
+    "summary": "diff: 'simple' | }"
+  },
+  {
+    "file": "test_transaction_lifecycle_integrity.js",
+    "cmd": "node tests/test_transaction_lifecycle_integrity.js",
+    "code": 0,
+    "duration": "0.36",
+    "summary": "TRANSACTION LIFECYCLE TEST RESULTS: 8 PASSED / 0 FAILED | ==============================================================================="
+  },
+  {
+    "file": "test_withdrawal_edit_canonical_date.js",
+    "cmd": "node tests/test_withdrawal_edit_canonical_date.js",
+    "code": 1,
+    "duration": "35.02",
+    "summary": "ALL REGRESSION TESTS PASSED (16 / 16) | ==============================================================================="
+  },
+  {
+    "file": "test_withdrawal_start_date_validation.js",
+    "cmd": "node tests/test_withdrawal_start_date_validation.js",
+    "code": 1,
+    "duration": "2.25",
+    "summary": "[WithdrawalValidation] METADATA_START_DATE_DISCREPANCY: Account open period (2026-1) differs from investor start period (2026-8) for investor inv_6ba53bbe. | [WithdrawalValidation] METADATA_START_DATE_DISCREPANCY: Account open period (2026-1) differs from investor start period (2026-8) for investor inv_6ba53bbe."
+  }
+]

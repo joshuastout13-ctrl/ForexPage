@@ -1284,10 +1284,10 @@
         const prevRow = idx > 0 ? rows[idx - 1] : null;
         if (prevRow) {
           const isPrevCommUnverified = Boolean(
+            prevRow.verificationStatus === 'UNVERIFIED' ||
             prevRow.commissionsUnavailable ||
             prevRow.isCommissionUnverified ||
-            prevRow.hasSupersededCommissions ||
-            (prevRow.verificationStatus === 'UNVERIFIED' && (prevRow.commissionsUnavailable || (parseFloat(prevRow.commissionsEarned) || 0) > 0))
+            prevRow.hasSupersededCommissions
           );
 
           if (isPrevCommUnverified) {
@@ -1295,8 +1295,10 @@
           } else {
             const commAdded = parseFloat(prevRow.commissionsEarned) || 0;
             if (commAdded > 0) {
-              const earnedTag = prevRow.month ? ` (${prevRow.month} Earned)` : '';
-              activityHtml += `<div class="green">+${money(commAdded)} Commission Added${earnedTag}${r.isProjection ? ' (Projected)' : ''}</div>`;
+              const commLabel = (prevRow.month && r.month)
+                ? `${prevRow.month} 2026 commission — capitalized in ${r.month}`
+                : 'Commission Added';
+              activityHtml += `<div class="green">+${money(commAdded)} ${commLabel}${r.isProjection ? ' (Projected)' : ''}</div>`;
             }
           }
         }

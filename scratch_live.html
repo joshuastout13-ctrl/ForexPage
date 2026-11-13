@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ForEx Investment Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <style>
+    :root {
+      --bg: #030712;
+      --bg-surface: #0f172a;
+      --panel: rgba(30, 41, 59, 0.7);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.5);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.3);
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --glass: rgba(15, 23, 42, 0.6);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+      background-attachment: fixed;
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      font-weight: 700;
+    }
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      margin-bottom: 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* Layout Grids */
+    .hero-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    /* Metric Cards */
+    .metric {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: visible;
+    }
+
+    .metric::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.5;
+      border-top-left-radius: var(--radius-md);
+      border-bottom-left-radius: var(--radius-md);
+    }
+
+    .metric.success::before { background: var(--success); }
+    .metric.warning::before { background: var(--warning); }
+
+    .metric .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .metric .icon {
+      width: 24px;
+      height: 24px;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    .metric .value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+    }
+
+    .metric .subvalue {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Sidebar Styles */
+    .performance-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .perf-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
+    }
+
+    .perf-item .info .label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .perf-item .info .val {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .perf-item .change {
+      text-align: right;
+    }
+
+    .perf-item .pct {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 8px;
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    td:first-child {
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px 0 0 12px;
+    }
+
+    td:last-child {
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0 12px 12px 0;
+    }
+
+    /* Breakdown Table Classes (Desktop & Base) */
+    .breakdown-mobile-label {
+      display: none;
+    }
+    .breakdown-month-title {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .breakdown-balance-val {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+    }
+    .breakdown-perf-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-end;
+    }
+    .breakdown-perf-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .breakdown-perf-label {
+      font-size: 12px;
+    }
+    .breakdown-perf-val {
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+    }
+    .breakdown-activity-wrap {
+      margin-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 8px;
+      width: 100%;
+      text-align: right;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .breakdown-projection-tag {
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+      display: inline-block;
+      font-style: normal;
+    }
+    .is-projection {
+      opacity: 0.6;
+      font-style: italic;
+    }
+
+    /* Inputs & Buttons */
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      background: rgba(15, 23, 42, 0.5);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    button {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      box-shadow: none;
+    }
+
+    button.secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: none;
+    }
+
+    /* Login Screen */
+    #loginCard {
+      max-width: 440px;
+      margin: 100px auto;
+      text-align: center;
+    }
+
+    .login-header {
+      margin-bottom: 32px;
+    }
+
+    .login-header h1 {
+      font-size: 32px;
+      margin-top: 12px;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      text-align: left;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(3, 7, 18, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+    
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      transform: translateY(20px);
+      transition: transform 0.2s ease;
+    }
+    
+    .modal-overlay.active .modal-content {
+      transform: translateY(0);
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px;
+      margin: -8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+    
+    .cursor-pointer { cursor: pointer; }
+
+    /* Utilities */
+    .hidden { display: none !important; }
+    .green { color: var(--success); }
+    .red { color: var(--danger); }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    /* Month grid */
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .month-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .month-box .month {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .month-box .pct {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 4px;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-layout, .main-grid {
+        grid-template-columns: 1fr;
+      }
+      .sidebar-col {
+        order: -1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 16px 12px; }
+      .card {
+        padding: 16px 12px;
+        margin-bottom: 16px;
+        border-radius: 18px;
+      }
+      .summary-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .table-container {
+        overflow-x: visible;
+      }
+
+      /* Mobile Breakdown Table -> Restored Josh's Compact Multi-Column Format */
+      #breakdownTable {
+        display: table;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 4px;
+        table-layout: fixed;
+      }
+      #breakdownTable thead {
+        display: table-header-group;
+      }
+      #breakdownTable tbody {
+        display: table-row-group;
+      }
+      #breakdownTable th {
+        padding: 6px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      #breakdownTable th.breakdown-th-month {
+        width: 25%;
+        text-align: left;
+      }
+      #breakdownTable th.breakdown-th-balance {
+        width: 37%;
+        text-align: left;
+      }
+      #breakdownTable th.breakdown-th-perf {
+        width: 38%;
+        text-align: right;
+      }
+      #breakdownTable tr.breakdown-row {
+        display: table-row;
+        box-sizing: border-box;
+      }
+      #breakdownTable tr.breakdown-row:hover td {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      #breakdownTable td {
+        display: table-cell;
+        vertical-align: top;
+        padding: 8px 4px;
+        background: rgba(255, 255, 255, 0.02);
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        box-sizing: border-box;
+      }
+      #breakdownTable td:first-child {
+        border-left: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 10px 0 0 10px;
+        padding-left: 6px;
+      }
+      #breakdownTable td:last-child {
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0 10px 10px 0;
+        padding-right: 6px;
+      }
+
+      /* 1. Month Cell */
+      .breakdown-cell-month {
+        width: 25%;
+        text-align: left;
+      }
+      .breakdown-cell-month .breakdown-month-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1.2;
+      }
+      .breakdown-cell-month .breakdown-projection-tag {
+        font-size: 9px;
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-top: 3px;
+        display: inline-block;
+      }
+
+      /* 2. Starting Balance Cell */
+      .breakdown-cell-balance {
+        width: 37%;
+        text-align: left;
+      }
+      .breakdown-mobile-label {
+        display: none !important;
+      }
+      .breakdown-balance-val {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text);
+        font-family: 'Outfit', sans-serif;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      /* 3. Performance Cell */
+      .breakdown-cell-perf {
+        width: 38%;
+        text-align: right;
+      }
+      .breakdown-perf-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        align-items: flex-end;
+        background: none;
+        border: none;
+        padding: 0;
+        border-radius: 0;
+      }
+      .breakdown-perf-item {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .breakdown-perf-item:last-child {
+        align-items: center;
+      }
+      .breakdown-perf-label {
+        font-size: 10.5px;
+        color: var(--muted);
+        text-transform: none;
+        letter-spacing: normal;
+      }
+      .breakdown-perf-val {
+        font-size: 11px;
+        font-weight: 700;
+        font-family: 'Outfit', sans-serif;
+      }
+
+      /* 4. Activity Section */
+      .breakdown-activity-wrap {
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding-top: 4px;
+        margin-top: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        text-align: right;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      /* Chart Responsiveness */
+      .chart-container {
+        height: 280px !important;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Login Screen -->
+    <div id="loginCard" class="card">
+      <div class="login-header">
+        <div class="kicker">Investor Portal</div>
+        <h1>ForEx Tracker</h1>
+        <p class="muted">Access your investment dashboard and performance metrics.</p>
+      </div>
+      <div class="login-form">
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Username</label>
+          <input id="username" placeholder="Enter your username" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Password</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+        <button id="loginBtn" style="width:100%; margin-top:12px;">Sign In</button>
+        <div id="loginError" style="color:var(--danger); font-size:14px; text-align:center; min-height:20px;"></div>
+      </div>
+    </div>
+
+    <!-- First-Login Password Setup -->
+    <div id="changePasswordCard" class="card hidden">
+      <div class="login-header">
+        <div class="kicker" style="background:rgba(245,158,11,0.15); color:var(--warning); border-color:rgba(245,158,11,0.3);">Security Update</div>
+        <h1>Set New Password</h1>
+        <p class="muted">You are logging in with a temporary password. Please set a new secure password to access your dashboard.</p>
+      </div>
+      <div class="login-form">
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Current (Temporary) Password</label>
+          <input id="currentPassword" type="password" placeholder="••••••••" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">New Password</label>
+          <input id="newPassword" type="password" placeholder="Minimum 4 characters" />
+        </div>
+        <div>
+          <label class="muted" style="display:block; margin-bottom:8px; font-weight:600;">Confirm New Password</label>
+          <input id="confirmPassword" type="password" placeholder="Re-enter new password" />
+        </div>
+        <button id="changePassBtn" style="width:100%; margin-top:12px; background:linear-gradient(135deg,var(--accent),#2563eb);">Save & Continue to Dashboard</button>
+        <div id="changePassError" style="color:var(--danger); font-size:14px; text-align:center; min-height:20px;"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+
+    <div id="dashboard" class="hidden">
+      <!-- Header -->
+      <div class="hero-layout">
+        <div class="card flex-between" style="padding: 32px;">
+          <div>
+            <div class="kicker">Active Portfolio</div>
+            <h1 style="font-size:36px;">ForEx Investment Tracker</h1>
+            <p class="muted" style="margin-top:8px;">Real-time performance monitoring and historical analysis.</p>
+          </div>
+          <div style="text-align:right;">
+             <button id="logoutBtn" class="secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Logout
+             </button>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="muted" style="margin-bottom:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">System Status</div>
+          <div class="status-badge">
+            <div class="status-dot"></div>
+            <span id="status" style="font-weight:700; font-family:'Outfit'; font-size:18px;">Ready</span>
+          </div>
+          <div id="statusText" class="muted" style="margin-top:16px; font-weight:500;">Welcome back</div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main-grid">
+        <!-- Left Column -->
+        <div class="content-col">
+          <div class="card">
+            <div class="flex-between" style="margin-bottom:24px;">
+              <h2>Investor Account</h2>
+              <div id="investorName" class="kicker" style="margin-bottom:0;"></div>
+            </div>
+            <div class="summary-grid" id="summaryGrid">
+              <!-- Summary Metrics injected here -->
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 style="margin-bottom:20px;">Historical Monthly Returns</h2>
+            <div class="month-grid" id="monthGrid"></div>
+          </div>
+
+          <div class="card">
+            <h2 style="margin-bottom:24px;">Monthly Performance Growth</h2>
+            <div class="chart-container" style="height:350px; position:relative; width:100%; max-width:100%;">
+              <canvas id="performanceChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 style="margin-bottom:24px;">Monthly Balance Breakdown</h2>
+            <div class="table-container">
+              <table id="breakdownTable"></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column (Sidebar) -->
+        <div class="sidebar-col">
+          <!-- Account Performance (Investor Share / Net) -->
+          <div class="card">
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h2 style="font-size:20px;">Account Performance</h2>
+              <div id="accountSplitBadge" class="kicker" style="margin-bottom:0; font-size:11px; padding:4px 8px;"></div>
+            </div>
+            <p class="muted" style="font-size:12px; margin-top:-8px; margin-bottom:16px;">Investor net earnings and return rates</p>
+            <div class="performance-list" id="accountPerfGrid">
+              <!-- Account net metrics injected here -->
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-top:14px; line-height:1.4; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
+              Performance begins when this account became active in 4xtrack and does not include historical performance not tracked in this tool.
+            </div>
+          </div>
+
+          <!-- Fund Performance (Gross Fund Returns) -->
+          <div class="card" id="fundPerfCard" style="margin-top:20px;">
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h2 style="font-size:20px;">Fund Performance</h2>
+              <span class="muted" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Gross Return %</span>
+            </div>
+            <p class="muted" style="font-size:12px; margin-top:-8px; margin-bottom:16px;">Total trading system benchmark returns</p>
+            <div class="performance-list" id="fundPerfGrid">
+              <!-- Gross metrics injected here -->
+            </div>
+            <div id="liveMeta" class="muted" style="margin-top:20px; font-size:12px; text-align:center;"></div>
+            <div class="muted" style="margin-top:6px; font-size:11px; opacity:0.6; text-align:center;">
+              Data refreshes daily at 4:00 PM PST
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User-Friendly Error State Container (Task 8) -->
+    <div id="errorCard" class="card login-card hidden" style="text-align:center; padding:36px 24px; max-width:480px; margin:40px auto;">
+      <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+      <h2 style="font-size:22px; margin-bottom:12px;">Unable to Load Dashboard</h2>
+      <p id="errorMessage" class="muted" style="margin-bottom:24px; line-height:1.5;">We couldn't load your dashboard. Please sign in again or contact support if the issue persists.</p>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <button id="retryBtn" style="padding:10px 20px; background:linear-gradient(135deg,var(--accent),#2563eb);">Try Again</button>
+        <button id="errorLogoutBtn" class="secondary" style="padding:10px 20px;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commission Breakdown Modal -->
+  <div id="commissionModal" class="modal-overlay" onclick="if(event.target === this) this.classList.remove('active')">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0; font-size: 24px;">Commission Breakdown</h2>
+        <button class="modal-close" onclick="document.getElementById('commissionModal').classList.remove('active')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="table-container">
+        <table id="commissionTable">
+          <!-- Populated via JS -->
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ICONS = {
+      capital: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
+      balance: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`,
+      gain: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+      cashin: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M5 15l7 7 7-7"/></svg>`,
+      performance: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+      withdrawal: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V2M5 9l7-7 7 7"/></svg>`,
+      split: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>`,
+      commission: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
+    };
+
+    function money(n) {
+      if (n === null || n === undefined || isNaN(Number(n))) return "—";
+      return Number(n || 0).toLocaleString(undefined, {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function pct(n) {
+      if (n === null || n === undefined || isNaN(Number(n))) return "—";
+      const v = Number(n || 0);
+      return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+    }
+
+    async function login() {
+      const btn = document.getElementById("loginBtn");
+      const originalText = btn.textContent;
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorEl = document.getElementById("loginError");
+      
+      errorEl.textContent = "";
+      btn.textContent = "Authenticating...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || "Login failed. Please check credentials.";
+          btn.textContent = originalText;
+          btn.disabled = false;
+          return;
+        }
+
+        if (data.forcePasswordChange) {
+          showView("changePassword");
+          document.getElementById("currentPassword").value = password;
+          return;
+        }
+
+        btn.textContent = "Loading Dashboard...";
+        await loadDashboard();
+      } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    async function changePassword() {
+      const btn = document.getElementById("changePassBtn");
+      const currentPassword = document.getElementById("currentPassword").value.trim();
+      const newPassword = document.getElementById("newPassword").value.trim();
+      const confirmPassword = document.getElementById("confirmPassword").value.trim();
+      const errorEl = document.getElementById("changePassError");
+
+      errorEl.textContent = "";
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        errorEl.textContent = "Please fill out all password fields.";
+        return;
+      }
+
+      if (newPassword.length < 4) {
+        errorEl.textContent = "New password must be at least 4 characters.";
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        errorEl.textContent = "New passwords do not match.";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Updating Password...";
+
+      try {
+        const res = await fetch("/api/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          errorEl.textContent = data.error || "Failed to update password.";
+          return;
+        }
+
+        await loadDashboard();
+      } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save & Continue to Dashboard";
+      }
+    }
+
+    async function logout() {
+      await fetch("/api/logout", { method: "POST" });
+      cachedDashboardData = null;
+      showView("login");
+      document.getElementById("statusText").textContent = "Signed out";
+    }
+
+    function renderSummary(data) {
+      window.currentCommissionBreakdown = data.commissionBreakdown || [];
+      window.currentDashboardSummary = data.summary || {};
+
+      const summary = data.summary || {};
+      const investor = data.investor || {};
+      const isComplete = summary.provenanceCompletenessStatus === 'COMPLETE';
+      const FAIL_CLOSED_TEXT = "Temporarily unavailable while being verified";
+      const renderUnavailableBadge = (text) =>
+        `<span class="safeguard-unavailable" style="font-size:12px; line-height:1.3; display:block; color:var(--muted); font-weight:600;">${text || FAIL_CLOSED_TEXT}</span>`;
+
+      const totalDepositsVal = money(summary.totalExternalCashSent ?? summary.totalCashIn);
+      const totalDepositsSubvalue = null;
+
+      let perfValue = "—";
+      let perfSubvalue = null;
+      let perfClass = "";
+
+      if (isComplete && summary.totalPerformancePct !== null && summary.totalPerformancePct !== undefined) {
+        perfValue = pct(summary.totalPerformancePct);
+        perfSubvalue = money(summary.totalPerformanceDollar);
+        perfClass = summary.totalPerformancePct >= 0 ? 'success' : 'warning';
+      } else {
+        perfValue = "—";
+        perfSubvalue = null;
+        perfClass = "";
+      }
+
+      const isTotalGainUnavailable = Boolean(summary.totalGainUnavailable);
+      const totalGainDisplay = isTotalGainUnavailable
+        ? renderUnavailableBadge(summary.totalGainStatusText)
+        : money(summary.totalGain ?? summary.total_gain);
+      const totalGainSubvalue = (!isTotalGainUnavailable && summary.totalGainScopeLabel)
+        ? `<span style="font-size:11px; color:var(--muted);">${summary.totalGainScopeLabel}</span>`
+        : null;
+
+      const metrics = [
+        { label: "Current Balance", value: money(summary.currentBalance ?? summary.current_balance), icon: ICONS.balance, class: 'success' },
+        { label: "Total Gain YTD", value: totalGainDisplay, subvalue: totalGainSubvalue, icon: ICONS.gain, class: isTotalGainUnavailable ? 'warning' : 'success' },
+        { label: "Total Deposits", value: totalDepositsVal, subvalue: totalDepositsSubvalue, icon: ICONS.cashin },
+        { 
+          label: "Total Performance", 
+          value: perfValue, 
+          subvalue: perfSubvalue,
+          icon: ICONS.performance,
+          class: perfClass
+        },
+        { label: "Total Withdrawals", value: money(summary.totalWithdrawals ?? summary.total_withdrawals), icon: ICONS.withdrawal, class: 'warning' },
+        { label: "Investor Split", value: (investor.splitPct || investor.split_pct || 0) + "%", icon: ICONS.split }
+      ];
+
+      const isCommRecipient = Boolean(
+        investor.hasCommissionAccount ||
+        summary.commissionsUnavailable ||
+        (summary.bookedCommissionsEarnedYear || 0) > 0 ||
+        (summary.bookedCommissionsEarnedMonth || 0) > 0 ||
+        (summary.commissionsEarnedYear || 0) > 0 ||
+        (summary.commissionsEarnedMonth || 0) > 0 ||
+        (summary.commissionsEarnedYearVerifiedLocked || 0) > 0
+      );
+
+      if (isCommRecipient) {
+        const bookedMonthVal = summary.bookedCommissionsEarnedMonth ?? summary.commissionsEarnedMonth;
+        const bookedYearVal = summary.bookedCommissionsEarnedYear ?? summary.commissionsEarnedYear;
+        const hasBookedMonth = bookedMonthVal !== null && bookedMonthVal !== undefined;
+        const hasBookedYear = bookedYearVal !== null && bookedYearVal !== undefined;
+        const activityMonthName = (summary.commissionsActivityMonthName && summary.commissionsActivityMonthName !== 'N/A')
+          ? summary.commissionsActivityMonthName
+          : ((summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+              ? summary.commissionsCapitalizedMonthName
+              : (summary.commMonthName || 'Last Month'));
+        const earnedMonthName = summary.commissionsEarnedMonthName || summary.commMonthName || null;
+        const capMonthName = (summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+          ? summary.commissionsCapitalizedMonthName
+          : null;
+
+        // October display: remove capitalization explanation, do not add replacement explanatory text, warnings, disclaimers, or labels
+        const monthCommSubvalue = null;
+        const ytdCommScope = (earnedMonthName && capMonthName)
+          ? `Jan–${earnedMonthName} 2026 earned`
+          : (earnedMonthName ? `Jan–${earnedMonthName} 2026 earned` : null);
+        const ytdCommSubvalue = ytdCommScope
+          ? `<span style="font-size:11px; color:var(--muted); display:block; font-weight:600;">${ytdCommScope}</span>`
+          : null;
+
+        metrics.push({
+          label: `Booked Comm. (${activityMonthName})`,
+          value: hasBookedMonth ? money(bookedMonthVal) : renderUnavailableBadge(summary.commissionsStatusText),
+          subvalue: hasBookedMonth ? monthCommSubvalue : null,
+          icon: ICONS.commission,
+          class: `${hasBookedMonth ? 'success' : 'warning'} cursor-pointer`,
+          action: 'showCommissionModal'
+        });
+        metrics.push({
+          label: "Booked YTD Comm.",
+          value: hasBookedYear ? money(bookedYearVal) : renderUnavailableBadge(summary.commissionsStatusText),
+          subvalue: hasBookedYear ? ytdCommSubvalue : null,
+          icon: ICONS.commission,
+          class: `${hasBookedYear ? 'success' : 'warning'} cursor-pointer`,
+          action: 'showCommissionModal'
+        });
+      }
+
+      document.getElementById("summaryGrid").innerHTML = metrics.map(m => `
+        <div class="metric ${m.class || ''}" ${m.action ? `data-action="${m.action}"` : ''}>
+          <div class="label-row">
+            <div class="label">${m.label}</div>
+            ${m.icon}
+          </div>
+          <div class="value">${m.value}</div>
+          ${m.subvalue ? `<div class="subvalue">${m.subvalue}</div>` : ''}
+        </div>
+      `).join("");
+    }
+
+    function showCommissionModal() {
+      const breakdown = window.currentCommissionBreakdown || [];
+      const summary = window.currentDashboardSummary || {};
+      const earnedMonthName = summary.commissionsEarnedMonthName || summary.commMonthName || null;
+      const capMonthName = (summary.commissionsCapitalizedMonthName && summary.commissionsCapitalizedMonthName !== 'N/A')
+        ? summary.commissionsCapitalizedMonthName
+        : null;
+      const earnedMonthLabel = earnedMonthName ? `${earnedMonthName} 2026` : "Latest Completed Month";
+      const activityMonthLabel = capMonthName ? `${capMonthName} 2026` : earnedMonthLabel;
+      const attributionLabel = summary.bookedCommissionsAttributionLabel ||
+        ((earnedMonthName && capMonthName) ? `${earnedMonthName} 2026 commission — capitalized in ${capMonthName}` : earnedMonthLabel);
+      const table = document.getElementById("commissionTable");
+      
+      const head = `
+        <thead>
+          <tr>
+            <th colspan="5" style="text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding-bottom:10px; text-transform:none;">
+              ${activityMonthLabel} View · Independent Verified YTD: Unavailable
+            </th>
+          </tr>
+          <tr>
+            <th>Source Account Holder</th>
+            <th style="text-align:right;">
+              <span style="color:var(--text); font-weight:700;">
+                ${earnedMonthLabel} Commission Basis
+              </span>
+              <div style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none;">(Eligible Capital)</div>
+            </th>
+            <th style="text-align:right;">
+              <span style="color:var(--text); font-weight:700;">
+                Commission %
+              </span>
+            </th>
+            <th style="text-align:right;">${activityMonthLabel} (Booked)</th>
+            <th style="text-align:right;">2026 Booked YTD</th>
+          </tr>
+        </thead>
+      `;
+
+      if (breakdown.length === 0) {
+        table.innerHTML = head + `<tbody><tr><td colspan="5" style="text-align:center;" class="muted">No booked commissions recorded.</td></tr></tbody>`;
+      } else {
+        const body = breakdown.map(r => `
+          <tr>
+            <td>
+              <div style="font-weight:700; color:var(--text);">${r.sourceName}</div>
+            </td>
+            <td style="text-align:right; font-family:'Outfit'; font-weight:600;" class="green">
+              <div>${(r.sourceBalance !== undefined || r.eligibleCapital !== undefined) ? money(r.eligibleCapital !== undefined ? r.eligibleCapital : r.sourceBalance) : '-'}</div>
+              <div style="font-size:10px; color:var(--muted); font-weight:400;">Eligible Capital Basis</div>
+            </td>
+            <td style="text-align:right; font-family:'Outfit'; font-weight:600;" class="green">
+              ${typeof r.percent === 'number' ? r.percent.toFixed(1) + '%' : (r.percent || '-')}
+            </td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">
+              ${money(r.monthAmount)}
+            </td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">
+              ${money(r.yearAmount)}
+            </td>
+          </tr>
+        `).join("");
+        const totalRow = `
+          <tr style="border-top:2px solid rgba(255,255,255,0.12);">
+            <td colspan="3" style="font-weight:700; color:var(--text);">Booked Total (${basisLabel})</td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(summary.bookedCommissionsEarnedMonth)}</td>
+            <td style="text-align:right; font-weight:700; font-family:'Outfit';" class="green">${money(summary.bookedCommissionsEarnedYear)}</td>
+          </tr>
+        `;
+        table.innerHTML = head + `<tbody>${body}${totalRow}</tbody>`;
+      }
+      
+      document.getElementById("commissionModal").classList.add("active");
+    }
+
+    function renderLive(data) {
+      const live = data.live || {};
+      const splitPct = (data.investor && data.investor.splitPct !== undefined) ? data.investor.splitPct : 100;
+      const acctPerf = data.accountPerformance || {};
+      const fundPerf = data.fundPerformance || {};
+      const liveDollarGains = data.liveDollarGains || {};
+      const FAIL_CLOSED_TEXT = "Temporarily unavailable while being verified";
+
+      // Set Split Badge
+      const splitBadge = document.getElementById("accountSplitBadge");
+      if (splitBadge) {
+        splitBadge.textContent = `${splitPct}% Investor Split`;
+      }
+
+      // Conditional Fund Performance Display
+      const fundCard = document.getElementById("fundPerfCard");
+      const showFundPerf = !!(data.investor && (data.investor.showFundPerformance || data.investor.show_fund_performance));
+      if (fundCard) {
+        if (showFundPerf) {
+          fundCard.classList.remove("hidden");
+        } else {
+          fundCard.classList.add("hidden");
+        }
+      }
+
+      const buildAcctItem = (label, perfObj, fallbackDollar, fallbackLiveStr) => {
+        const isUnavailable = Boolean(perfObj && perfObj.unavailable);
+        if (isUnavailable) {
+          return {
+            label,
+            unavailable: true,
+            statusText: (perfObj && perfObj.statusText) || FAIL_CLOSED_TEXT
+          };
+        }
+        const dollar = (perfObj && perfObj.netDollar !== undefined && perfObj.netDollar !== null)
+          ? perfObj.netDollar
+          : (fallbackDollar || 0);
+        const pctNum = (perfObj && perfObj.netReturnPct !== undefined && perfObj.netReturnPct !== null)
+          ? Number(perfObj.netReturnPct)
+          : ((parseFloat(fallbackLiveStr) || 0) * splitPct / 100);
+        return {
+          label,
+          unavailable: false,
+          dollar,
+          pct: `${pctNum >= 0 ? '+' : ''}${pctNum.toFixed(2)}%`,
+          scopeLabel: (perfObj && perfObj.scopeLabel) || null
+        };
+      };
+
+      // Account Performance Items (Net Investor Share: Today, This Week, This Month, This Year)
+      const acctItems = [
+        buildAcctItem("Today", acctPerf.today, liveDollarGains.today, live.today),
+        buildAcctItem("This Week", acctPerf.week, liveDollarGains.week, live.week),
+        buildAcctItem("This Month", acctPerf.month, liveDollarGains.month, live.month),
+        buildAcctItem("This Year (YTD)", acctPerf.year, liveDollarGains.year, live.year)
+      ];
+
+      const acctGrid = document.getElementById("accountPerfGrid");
+      if (acctGrid) {
+        acctGrid.innerHTML = acctItems.map(item => item.unavailable ? `
+          <div class="perf-item">
+            <div class="info" style="flex:1;">
+              <span class="label">${item.label}</span>
+              <div class="val safeguard-unavailable" style="color:var(--muted); margin-top:2px; font-size:11px; line-height:1.3; font-weight:600;">${item.statusText}</div>
+            </div>
+          </div>
+        ` : `
+          <div class="perf-item">
+            <div class="info">
+              <span class="label">${item.label}</span>
+              <div class="val" style="color:var(--text); margin-top:2px;">${money(item.dollar)}</div>
+              ${item.scopeLabel ? `<div style="font-size:10px; color:var(--muted); margin-top:2px; line-height:1.2;">${item.scopeLabel}</div>` : ''}
+            </div>
+            <div class="change">
+              <div class="label" style="font-size:10px; text-transform:uppercase; color:var(--muted);">Net Return</div>
+              <div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}" style="margin-top:2px;">
+                ${item.pct}
+              </div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      // Fund Performance Items (Gross Fund %)
+      const fundItems = [
+        { label: "Today", unavailable: !!(fundPerf.today && fundPerf.today.unavailable), pct: (fundPerf.today && fundPerf.today.label) ? fundPerf.today.label : (live.today || "0.00%") },
+        { label: "This Week", unavailable: !!(fundPerf.week && fundPerf.week.unavailable), pct: (fundPerf.week && fundPerf.week.label) ? fundPerf.week.label : (live.week || "0.00%") },
+        { label: "This Month", unavailable: !!(fundPerf.month && fundPerf.month.unavailable), pct: (fundPerf.month && fundPerf.month.label) ? fundPerf.month.label : (live.month || "0.00%") },
+        { label: "Last Month", unavailable: !!(fundPerf.lastMonth && fundPerf.lastMonth.unavailable), pct: (fundPerf.lastMonth && fundPerf.lastMonth.label) ? fundPerf.lastMonth.label : (live.lastMonth || "0.00%") },
+        { label: "This Year", unavailable: !!(fundPerf.year && fundPerf.year.unavailable), pct: (fundPerf.year && fundPerf.year.label) ? fundPerf.year.label : (live.year || "0.00%") }
+      ];
+
+      const fundGrid = document.getElementById("fundPerfGrid");
+      if (fundGrid) {
+        fundGrid.innerHTML = fundItems.map(item => `
+          <div class="perf-item" style="padding:12px 16px;">
+            <div class="info">
+              <div class="label">${item.label}</div>
+            </div>
+            <div class="change">
+              ${item.unavailable
+                ? `<div class="pct safeguard-unavailable" style="font-size:11px; color:var(--muted); font-weight:600;">${FAIL_CLOSED_TEXT}</div>`
+                : `<div class="pct ${parseFloat(item.pct) >= 0 ? 'green' : 'red'}">${item.pct}</div>`
+              }
+            </div>
+          </div>
+        `).join("");
+      }
+
+      const liveMeta = document.getElementById("liveMeta");
+      if (liveMeta) {
+        liveMeta.textContent = `Last sync: ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })} PST`;
+      }
+    }
+
+    function renderMonths(monthlyHistory) {
+      document.getElementById("monthGrid").innerHTML = monthlyHistory.map((m) => `
+        <div class="month-box">
+          <div class="month">${m.month}</div>
+          <div class="pct ${parseFloat(m.grossReturnPct) >= 0 ? 'green' : 'red'}">${pct(m.grossReturnPct)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderBreakdown(rows, splitPct = 100) {
+      const head = `
+        <thead>
+          <tr>
+            <th class="breakdown-th-month">Month</th>
+            <th class="breakdown-th-balance">Starting Balance</th>
+            <th class="breakdown-th-perf" style="text-align:right;">Performance & Activity</th>
+          </tr>
+        </thead>
+      `;
+
+      const body = rows.map((r, idx) => {
+        let activityHtml = '';
+        if (r.deposits > 0) activityHtml += `<div class="green">+${money(r.deposits)} Deposit</div>`;
+        
+        // Prior month commission capitalization logic:
+        // Verification-pending status takes strict precedence: an unverified row must NEVER render a confirmed green numeric amount.
+        const prevRow = idx > 0 ? rows[idx - 1] : null;
+        if (prevRow) {
+          const isPrevCommUnverified = Boolean(
+            prevRow.commissionsUnavailable ||
+            prevRow.isCommissionUnverified ||
+            prevRow.hasSupersededCommissions ||
+            (prevRow.verificationStatus === 'UNVERIFIED' && (prevRow.commissionsUnavailable || (parseFloat(prevRow.commissionsEarned) || 0) > 0))
+          );
+
+          const commAdded = parseFloat(prevRow.activeCommissionsEarned ?? prevRow.commissionsEarned) || 0;
+          if (commAdded > 0) {
+            const commYear = prevRow.year || r.year || 2026;
+            const commLabel = (prevRow.month && r.month)
+              ? `${prevRow.month} ${commYear} commission — capitalized in ${r.month}`
+              : 'Commission Added';
+            activityHtml += `<div class="green">+${money(commAdded)} ${commLabel}${r.isProjection ? ' (Projected)' : ''}</div>`;
+          } else if (isPrevCommUnverified) {
+            activityHtml += `<div class="safeguard-unavailable" style="font-size:11px; color:var(--muted);">${prevRow.month} Commission: Pending Verification</div>`;
+          }
+        }
+        if (r.recurringDraw > 0) activityHtml += `<div class="red">-${money(r.recurringDraw)} Draw</div>`;
+        if (r.pendingWithdrawal > 0) activityHtml += `<div style="color:var(--warning)">-${money(r.pendingWithdrawal)} Withdrawal Pending</div>`;
+        if (r.oneTimeWithdrawal > 0) activityHtml += `<div class="red">-${money(r.oneTimeWithdrawal)} Withdrawal Completed</div>`;
+
+        // gain and effectiveReturnPct are already calculated with investor split in the backend
+        const netReturnPct = parseFloat(r.effectiveReturnPct) || 0;
+        const netGain = parseFloat(r.gain) || 0;
+        const isPendingCloseDisplay = Boolean(r.performancePendingClose);
+        const pendingCloseText = r.pendingCloseLabel || (r.month ? `Pending ${r.month} close` : "Pending close");
+        const hasPendingCalculatedPerf = Boolean(
+          isPendingCloseDisplay &&
+          r.pendingGain !== null &&
+          r.pendingGain !== undefined &&
+          r.pendingEffectiveReturnPct !== null &&
+          r.pendingEffectiveReturnPct !== undefined
+        );
+        const pendingReturnVal = hasPendingCalculatedPerf ? parseFloat(r.pendingEffectiveReturnPct) : 0;
+        const pendingGainVal = hasPendingCalculatedPerf ? parseFloat(r.pendingGain) : 0;
+
+        return `
+          <tr class="breakdown-row ${r.isProjection ? "is-projection" : ""}">
+            <td class="breakdown-cell-month">
+              <div class="breakdown-month-title">${r.month}</div>
+              ${r.isProjection ? '<span class="breakdown-projection-tag">Projection</span>' : ""}
+            </td>
+            <td class="breakdown-cell-balance">
+              <div class="breakdown-balance-val">${money(r.adjustedStartingBalance)}</div>
+            </td>
+            <td class="breakdown-cell-perf">
+              <div class="breakdown-perf-group">
+                <div class="breakdown-perf-item">
+                  <span class="muted breakdown-perf-label">Net Return:</span>
+                  ${hasPendingCalculatedPerf
+                    ? `<span class="breakdown-perf-val ${pendingReturnVal >= 0 ? 'green' : 'red'}">${pct(pendingReturnVal)}</span>`
+                    : (isPendingCloseDisplay
+                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
+                        : `<span class="breakdown-perf-val ${netReturnPct >= 0 ? 'green' : 'red'}">${pct(netReturnPct)}</span>`)
+                  }
+                </div>
+                <div class="breakdown-perf-item">
+                  <span class="muted breakdown-perf-label">Net Gain:</span>
+                  ${hasPendingCalculatedPerf
+                    ? `<span class="breakdown-perf-val">${money(pendingGainVal)}</span>`
+                    : (isPendingCloseDisplay
+                        ? `<span class="breakdown-perf-val safeguard-unavailable" style="color:var(--muted); font-size:12px;">${pendingCloseText}</span>`
+                        : `<span class="breakdown-perf-val">${money(netGain)}</span>`)
+                  }
+                </div>
+              </div>
+              ${activityHtml ? `<div class="breakdown-activity-wrap">${activityHtml}</div>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("breakdownTable").innerHTML = head + `<tbody>${body}</tbody>`;
+    }
+
+    let cachedDashboardData = null;
+    let cachedAt = 0;
+
+    // ── Centralized view visibility ──────────────────────────
+    // Guarantees exactly one application state is visible at all times.
+    // Valid views: "login", "changePassword", "dashboard", "error"
+    const VIEW_IDS = {
+      login: "loginCard",
+      changePassword: "changePasswordCard",
+      dashboard: "dashboard",
+      error: "errorCard"
+    };
+
+    function showView(view) {
+      for (const [key, id] of Object.entries(VIEW_IDS)) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (key === view) {
+          el.classList.remove("hidden");
+        } else {
+          el.classList.add("hidden");
+        }
+      }
+    }
+
+    function showErrorState(message) {
+      cachedDashboardData = null;
+      showView("error");
+      const msgEl = document.getElementById("errorMessage");
+      if (msgEl) {
+        msgEl.textContent = message || "We couldn't load your dashboard. Please sign in again or contact support if the issue persists.";
+      }
+      const statusEl = document.getElementById("statusText");
+      if (statusEl) statusEl.textContent = message || "Dashboard error";
+    }
+
+    // ── Global error handlers ────────────────────────────────
+    window.addEventListener("error", function(event) {
+      console.error("[GLOBAL ERROR]", event.error || event.message);
+    });
+    window.addEventListener("unhandledrejection", function(event) {
+      console.error("[UNHANDLED PROMISE]", event.reason);
+    });
+
+    // ── Dashboard loader with safe state transitions ─────────
+    async function loadDashboard(forceRefresh = false) {
+      const now = Date.now();
+      let data = null;
+
+      try {
+        if (!forceRefresh && cachedDashboardData && (now - cachedAt < 60000)) {
+          data = cachedDashboardData;
+        } else {
+          const res = await fetch("/api/me", { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+
+          if (res.status === 401 || res.status === 404) {
+            cachedDashboardData = null;
+            showView("login");
+            return;
+          }
+
+          // Try to parse JSON — if it fails, show error
+          try {
+            data = await res.json();
+          } catch (parseErr) {
+            console.error("[Dashboard] Failed to parse /api/me response:", parseErr);
+            showErrorState("We couldn't load your dashboard. Please sign in again.");
+            return;
+          }
+
+          if (!res.ok) {
+            showErrorState(data?.error || "We couldn't load your dashboard. Please sign in again.");
+            return;
+          }
+
+          if (data.forcePasswordChange) {
+            cachedDashboardData = null;
+            showView("changePassword");
+            return;
+          }
+
+          cachedDashboardData = data;
+          cachedAt = now;
+        }
+
+        // Validate payload keys defensively
+        if (!data || !data.investor) {
+          showErrorState("Invalid dashboard payload received.");
+          return;
+        }
+
+        // Ensure array/object defaults
+        data.monthlyHistory = data.monthlyHistory || [];
+        data.breakdown = data.breakdown || [];
+        data.live = data.live || {};
+        data.liveDollarGains = data.liveDollarGains || {};
+        data.summary = data.summary || {};
+
+        // Show dashboard BEFORE rendering content
+        showView("dashboard");
+
+        const firstName = (data.investor.name || "").split(' ')[0] || "Investor";
+        const statusTextEl = document.getElementById("statusText");
+        if (statusTextEl) statusTextEl.textContent = `Welcome back, ${firstName}`;
+        const investorNameEl = document.getElementById("investorName");
+        if (investorNameEl) investorNameEl.textContent = `Active since ${data.investor.startDate || "N/A"}`;
+
+        renderSummary(data);
+        renderLive(data);
+        renderMonths(data.monthlyHistory);
+        renderChart(data);
+
+        const splitPct = data.investor.splitPct || data.investor.split_pct || 100;
+        renderBreakdown(data.breakdown, splitPct);
+      } catch (err) {
+        console.error("[Dashboard Load Error]", err);
+        showErrorState("An unexpected error occurred while loading the dashboard.");
+      }
+    }
+    
+    let perfChart = null;
+    function renderChart(data) {
+      const ctx = document.getElementById('performanceChart').getContext('2d');
+      if (perfChart) perfChart.destroy();
+
+      const fullBreakdown = data.breakdown || [];
+      // Chart renders settled (historical) months only.
+      // isHistoricalCompleted is computed authorita­tively by the backend
+      // (lib/month-state.js, America/Los_Angeles) and passed through every
+      // breakdown row — never recomputed client-side to avoid timezone drift.
+      const labels = fullBreakdown.map(r => r.month);
+      const pctData = fullBreakdown.map(r => r.isHistoricalCompleted ? r.effectiveReturnPct : null);
+      const dollarGains = fullBreakdown.map(r => r.gain);
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+      perfChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Monthly Return %',
+            data: pctData,
+            backgroundColor: gradient,
+            borderColor: '#3b82f6',
+            borderWidth: 2,
+            borderRadius: 8,
+            hoverBackgroundColor: '#60a5fa',
+            barPercentage: 0.6,
+            categoryPercentage: 0.8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              titleFont: { family: 'Outfit', size: 14, weight: 'bold' },
+              bodyFont: { family: 'Inter', size: 13 },
+              padding: 16,
+              displayColors: false,
+              callbacks: {
+                label: function(context) {
+                  const val = context.parsed.y;
+                  const gain = dollarGains[context.dataIndex];
+                  return [
+                    `Return: ${typeof val === 'number' && !isNaN(val) ? val.toFixed(2) : '0.00'}%`,
+                    `Gain: ${money(gain)}`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+              ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, callback: v => v + '%' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 }, maxRotation: 45, minRotation: 0, autoSkip: false }
+            }
+          }
+        }
+      });
+    }
+
+    document.getElementById("loginBtn")?.addEventListener("click", login);
+    document.getElementById("changePassBtn")?.addEventListener("click", changePassword);
+    document.getElementById("logoutBtn")?.addEventListener("click", logout);
+    document.getElementById("retryBtn")?.addEventListener("click", () => loadDashboard(true));
+    document.getElementById("errorLogoutBtn")?.addEventListener("click", logout);
+    
+    document.getElementById("summaryGrid")?.addEventListener("click", (e) => {
+      const metricBox = e.target.closest('.metric');
+      if (metricBox && metricBox.dataset.action === 'showCommissionModal') {
+        showCommissionModal();
+      }
+    });
+    
+    // ── Safe startup ─────────────────────────────────────────
+    // Always show login first, then attempt session restoration.
+    // Login is only hidden AFTER dashboard data loads successfully.
+    (async function initializeApp() {
+      try {
+        // Start with login visible — safe default
+        showView("login");
+        await loadDashboard();
+      } catch (err) {
+        console.error("[App Init Error]", err);
+        showErrorState("We couldn't start the application. Please try again.");
+      }
+    })();
+  </script>
+</body>
+</html>
+
