@@ -28,6 +28,7 @@
     table{width:100%;min-width:1000px;border-collapse:collapse;}
     th,td{padding:14px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;}
     th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+    .date-nowrap{white-space:nowrap !important;}
     tr:last-child td{border-bottom:none}
     .hidden{display:none !important}
     .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -1000,7 +1001,7 @@ let state = {
         const stClass = log.status === 'success' ? 'active' : (log.status === 'partial' ? 'partial' : 'inactive');
 
         return `<tr>
-          <td>${dateStr}</td>
+          <td class="date-nowrap">${dateStr}</td>
           <td style="font-weight:600; color:#fff;">${escapeHtml(log.subject)}</td>
           <td>${log.recipient_count || 0}</td>
           <td><span class="badge ${stClass}">${log.status || 'Sent'}</span></td>
@@ -1224,7 +1225,8 @@ let state = {
           ) || {};
           const rawStart = i.starting_capital !== undefined ? i.starting_capital : (primaryAcc.starting_capital !== undefined ? primaryAcc.starting_capital : 0);
           const startCap = money(rawStart);
-          const asOfDate = i.start_date || primaryAcc.open_date || '—';
+          const rawAsOfDate = i.start_date || primaryAcc.open_date || '';
+          const asOfDate = rawAsOfDate ? String(rawAsOfDate).slice(0, 10) : '—';
           const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (rawStart !== undefined ? money(rawStart) : 'N/A');
           const split = primaryAcc.split_pct !== undefined ? `${primaryAcc.split_pct}%` : `${i.split_pct !== undefined ? i.split_pct : 100}%`;
           const pass = i.temp_password || i.password || i.temppasswordprototypeonly || '••••••••';
@@ -1234,7 +1236,7 @@ let state = {
             <td>${i.id}</td><td>${i.portal_username}</td>
             <td><code style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-family:monospace;">${escapeHtml(pass)}</code></td>
             <td>${startCap}</td>
-            <td><span class="muted" style="font-size:12px">${asOfDate}</span></td>
+            <td class="date-nowrap"><span class="muted date-nowrap" style="font-size:12px">${asOfDate}</span></td>
             <td><div style="font-weight:600">${currBal}</div></td>
             <td>${split}</td><td>${money(i.monthly_draw)}</td>
             <td>
@@ -1254,6 +1256,7 @@ let state = {
           const provBadgeClass = provStatus === 'COMPLETE' ? 'active' : (provStatus === 'PARTIAL' ? 'pending' : 'inactive');
           const isComplete = provStatus === 'COMPLETE';
           const title = i.provenance_certified_at ? `Certified ${i.provenance_certified_at.slice(0, 10)} by ${i.provenance_certified_by || 'admin'}` : 'Basis Incomplete / Verification in Progress';
+          const openDate = i.open_date ? String(i.open_date).slice(0, 10) : '—';
           return `<tr>
             <td><span class="badge ${i.status==='Active'?'active':'inactive'}">${i.status}</span></td>
             <td><span class="badge ${provBadgeClass}" title="${escapeHtml(title)}">${provStatus}</span></td>
@@ -1262,7 +1265,7 @@ let state = {
               <div style="font-weight:600">${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
               <div class="muted" style="font-size:11px">Start: ${money(i.starting_capital)}</div>
             </td>
-            <td>${i.is_commission ? '✅' : ''}</td><td>${i.open_date || '—'}</td>
+            <td>${i.is_commission ? '✅' : ''}</td><td class="date-nowrap">${openDate}</td>
             <td>
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
@@ -1298,8 +1301,8 @@ let state = {
             <td style="white-space:nowrap">${i.investor_id || '—'}</td>
             <td style="font-size:12px;color:var(--muted);white-space:nowrap">${i.account_id || '—'}</td>
             <td style="font-weight:600;white-space:nowrap">${money(i.amount)}</td>
-            <td style="white-space:nowrap">${displayDate}</td>
-            <td style="white-space:nowrap">${effMonth}</td>
+            <td class="date-nowrap">${displayDate}</td>
+            <td class="date-nowrap">${effMonth}</td>
             <td style="white-space:nowrap">
               <div class="btn-group">
                 ${!isVoid ? `<button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>` : ''}
@@ -1316,10 +1319,10 @@ let state = {
           const displayMonth = i.month || (i.month_number && MONTHS[i.month_number - 1]) || (i.effective_accounting_date && MONTHS[parseInt(i.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
           const displayYear = i.year || (i.effective_accounting_date ? i.effective_accounting_date.slice(0, 4) : '');
           return `<tr>
-            <td><span class="badge ${cls}">${i.status}</span>${(i.is_draw === true || String(i.notes || '').toLowerCase().includes('[draw')) ? ' <span class="badge pending">Draw</span>' : ''}</td>
-            <td>${i.id}${i.notes ? `<div style="font-size:11px;color:var(--muted)">${escapeHtml(i.notes)}</div>` : ''}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
-            <td>${displayMonth} ${displayYear}</td>
-            <td>
+            <td class="date-nowrap"><span class="badge ${cls}">${i.status}</span>${(i.is_draw === true || String(i.notes || '').toLowerCase().includes('[draw')) ? ' <span class="badge pending">Draw</span>' : ''}</td>
+            <td>${i.id}${i.notes ? `<div style="font-size:11px;color:var(--muted)">${escapeHtml(i.notes)}</div>` : ''}</td><td class="date-nowrap">${i.investor_id}</td><td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${money(i.amount)}</td>
+            <td class="date-nowrap">${displayMonth} ${displayYear}</td>
+            <td class="date-nowrap">
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>
                 ${i.status==='Pending'? `<button class="btn-action btn-action-delete action-btn" data-action="cancel_wd" data-id="${i.id}">Cancel</button>` : ''}
@@ -1331,9 +1334,9 @@ let state = {
         hd.innerHTML = `<tr><th>Month</th><th>Year</th><th>Gross Return %</th><th>Created</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.month} ${i.year}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => `<tr>
-            <td>${i.month}</td><td>${i.year}</td><td><div style="font-weight:600">${i.gross_return_pct}%</div></td>
-            <td>${i.created_at ? i.created_at.split('T')[0] : ''}</td>
-            <td>
+            <td class="date-nowrap">${i.month}</td><td class="date-nowrap">${i.year}</td><td><div style="font-weight:600">${i.gross_return_pct}%</div></td>
+            <td class="date-nowrap">${i.created_at ? String(i.created_at).slice(0, 10) : '—'}</td>
+            <td class="date-nowrap">
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.month}_${i.year}">Edit</button>
               </div>
@@ -1343,8 +1346,8 @@ let state = {
         hd.innerHTML = `<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th><th>Actions</th></tr>`;
         bd.innerHTML = d.map(i => `<tr>
             <td>${i.metric}</td><td><div style="font-weight:600">${i.value_pct !== undefined ? i.value_pct : (i.value || '0.00')}%</div></td>
-            <td>${i.source || ''}</td><td>${i.last_updated || ''}</td>
-            <td>
+            <td>${i.source || ''}</td><td class="date-nowrap">${i.last_updated || ''}</td>
+            <td class="date-nowrap">
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.metric}">Edit</button>
               </div>
@@ -1353,15 +1356,15 @@ let state = {
       } else if (state.tab === 'snapshots') {
         hd.innerHTML = `<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>`;
         bd.innerHTML = d.map(i => `<tr>
-            <td>${i.investor_id}</td><td>${i.account_id}</td><td>${i.month}</td><td>${i.year}</td>
-            <td>${money(i.ending_balance)}</td><td>${money(i.net_draw)}</td>
+            <td class="date-nowrap">${i.investor_id}</td><td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${i.month}</td><td class="date-nowrap">${i.year}</td>
+            <td class="date-nowrap">${money(i.ending_balance)}</td><td class="date-nowrap">${money(i.net_draw)}</td>
           </tr>`).join('');
       } else if (state.tab === 'history') {
         hd.innerHTML = `<tr><th>Month</th><th>Year</th><th>Open Bal</th><th>Deposits</th><th>Withdrawals</th><th>Gross %</th><th>End Bal</th><th>Notes</th></tr>`;
         bd.innerHTML = d.map(i => `<tr>
-            <td>${i.month}</td><td>${i.year}</td><td>${money(i.opening_balance)}</td>
-            <td>${money(i.deposits)}</td><td>${money(i.withdrawals)}</td><td>${i.gross_return_pct}%</td>
-            <td><div style="font-weight:600">${money(i.ending_balance)}</div></td><td>${i.notes||''}</td>
+            <td class="date-nowrap">${i.month}</td><td class="date-nowrap">${i.year}</td><td class="date-nowrap">${money(i.opening_balance)}</td>
+            <td class="date-nowrap">${money(i.deposits)}</td><td class="date-nowrap">${money(i.withdrawals)}</td><td class="date-nowrap">${i.gross_return_pct}%</td>
+            <td class="date-nowrap"><div style="font-weight:600">${money(i.ending_balance)}</div></td><td>${i.notes||''}</td>
           </tr>`).join('');
       } else if (state.tab === 'commission_shares') {
         hd.innerHTML = `<tr><th>Investor & Account</th><th>Investor Keeps</th><th>Commission Pool</th><th>Assigned</th><th>Remaining</th><th>Actions</th></tr>`;
@@ -1418,14 +1421,16 @@ let state = {
             const isInactive = s.status === 'cancelled' || s.status === 'ended' || isPastEnd;
             const displayStatus = isPastEnd ? 'ended (historical)' : (s.status || 'active');
             const statusBadge = `<span class="badge ${isInactive ? 'inactive' : 'active'}">${displayStatus}</span>`;
+            const effStart = s.effective_start_date ? String(s.effective_start_date).slice(0, 10) : 'N/A';
+            const effEnd = s.effective_end_date ? String(s.effective_end_date).slice(0, 10) : '—';
             return `
               <tr class="sub-row row-group-${g.investor_id}-${g.account_id} hidden" style="background: rgba(255,255,255,0.02)">
                 <td style="padding-left: 32px">↳ <strong>${s.recipient_name || s.recipient_id}</strong></td>
                 <td colspan="2">${s.percent}%</td>
-                <td colspan="2">
-                  <div style="font-size:12px">
-                    Start: ${s.effective_start_date || 'N/A'}<br>
-                    End: ${s.effective_end_date || '—'}
+                <td colspan="2" class="date-nowrap">
+                  <div class="date-nowrap" style="font-size:12px">
+                    Start: ${effStart}<br>
+                    End: ${effEnd}
                   </div>
                 </td>
                 <td>
