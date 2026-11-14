@@ -8,7 +8,8 @@ import { supabase } from "../../../../../lib/supabase.js";
  * Protects freezing of completed monthly performance return behind ACCOUNTING_RETURN_FREEZE_ENABLED feature flag.
  * Performs ZERO investor history or commission ledger writes.
  */
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
+  const db = deps.supabase || supabase;
   // 1. Verify Admin Session
   const auth = verifyAdminSession(req);
   if (!auth || !auth.adminId) {
@@ -57,19 +58,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 4. Update monthly_returns table in Supabase
-    const { data, error } = await supabase
+    if (!db) {
+      throw new Error("Supabase client is not configured.");
+    }
+    const monthName = new Date(Date.UTC(yr, m - 1, 1)).toLocaleString("en-US", {
+      month: "long",
+      timeZone: "UTC"
+    });
+
+    // 4. Update monthly_returns table in Supabase (exact schema columns only)
+    const { data, error } = await db
       .from("monthly_returns")
       .upsert({
         year: yr,
         month_number: m,
-        month: new Date(Date.UTC(yr, m - 1, 1)).toLocaleString("default", { month: "long" }),
+        month: monthName,
         gross_return_pct: returnVal,
         source: "MYFXBOOK_COMPLETED_MONTH",
-        status: "FINAL_RETURN_CAPTURED",
         locked: true,
-        captured_at: capturedAt,
-        notes: `Frozen by Admin session at ${new Date().toISOString()}`
+        last_updated: capturedAt,
+        notes: `Frozen by Admin (${auth.adminId}) at ${new Date().toISOString()}`
       }, { onConflict: "year,month_number" })
       .select();
 
@@ -79,9 +87,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `August ${yr} return of ${returnVal.toFixed(2)}% frozen successfully as FINAL_RETURN_CAPTURED.`,
+      message: `${monthName} ${yr} return of ${returnVal.toFixed(2)}% frozen successfully as FINAL_RETURN_CAPTURED.`,
       actionRequired: "Generate a NEW final accounting preview and inputHash prior to finalization.",
-      frozenReturn: data[0]
+      frozenReturn: data?.[0] || null
     });
   } catch (err) {
     console.error("[Return Freeze Error]:", err.message);

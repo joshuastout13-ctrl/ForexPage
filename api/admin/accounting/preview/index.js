@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     //    (investor_monthly_history and commission_earnings exceed 1,000 rows)
     const {
       investors, accounts, deposits, withdrawals,
-      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns
+      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns, cutoverAdjustments
     } = await loadAccountingData();
 
     // 3. Perform In-Memory Accounting Period Calculation (Pure Preview - ZERO DB WRITES)
@@ -49,7 +49,8 @@ export default async function handler(req, res) {
       commissionShares: commissionShares || [],
       monthlyHistory: monthlyHistory || [],
       commissionEarnings: commissionEarnings || [],
-      monthlyReturns: monthlyReturns || []
+      monthlyReturns: monthlyReturns || [],
+      cutoverAdjustments: cutoverAdjustments || []
     });
 
     return res.status(200).json(previewResult);
