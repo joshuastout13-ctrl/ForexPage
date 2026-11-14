@@ -1279,18 +1279,30 @@ let state = {
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
+          const treatmentMeta = {
+            HISTORICAL_PROVENANCE: {
+              label: 'Hist. Provenance',
+              cls: 'pending',
+              title: 'Provenance only — does NOT affect accounting balance'
+            },
+            UNVERIFIED_LEGACY: {
+              label: 'Unverified Legacy',
+              cls: 'inactive',
+              title: 'Unverified Legacy row — preserves monthly balance continuity but excluded from Total Deposits until verified'
+            },
+            INTERNAL_TRANSFER: {
+              label: 'Internal Transfer',
+              cls: 'pending',
+              title: 'Internal account-to-account transfer — adds to receiving balance, excluded from external Total Deposits'
+            },
+            NEW_CASH: {
+              label: 'New Cash',
+              cls: 'active',
+              title: 'Balance-affecting — adds to accounting balance and external Total Deposits'
+            }
+          };
           const treatment = (i.accounting_treatment || 'NEW_CASH').toUpperCase();
-          const treatmentLabel = treatment === 'HISTORICAL_PROVENANCE' 
-            ? 'Hist. Provenance' 
-            : (treatment === 'UNVERIFIED_LEGACY' ? 'Unverified Legacy' : 'New Cash');
-          const treatmentClass = treatment === 'HISTORICAL_PROVENANCE' 
-            ? 'pending' 
-            : (treatment === 'UNVERIFIED_LEGACY' ? 'inactive' : 'active');
-          const treatmentTitle = treatment === 'HISTORICAL_PROVENANCE'
-            ? 'Provenance only — does NOT affect accounting balance'
-            : (treatment === 'UNVERIFIED_LEGACY'
-                ? 'Unverified Legacy row — preserves monthly balance continuity but excluded from Total Deposits until verified'
-                : 'Balance-affecting — adds to accounting balance');
+          const { label: treatmentLabel, cls: treatmentClass, title: treatmentTitle } = treatmentMeta[treatment] || treatmentMeta.NEW_CASH;
           const statusLabel = isVoid ? (i.status || i.type) : (i.status || 'confirmed');
           const displayDate = i.date ? String(i.date).slice(0, 10) : '—';
           const effMonth = i.effective_accounting_date ? String(i.effective_accounting_date).slice(0, 7) : (i.date ? String(i.date).slice(0, 7) : '—');
