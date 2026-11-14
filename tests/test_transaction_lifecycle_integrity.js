@@ -99,11 +99,11 @@ async function runSuite() {
         recurringmonthlydraw: 0
       }],
       returnsSheet: [
-        { month: "Apr", monthnumber: 4, year: 2026, grossreturn: 3.15 },
-        { month: "May", monthnumber: 5, year: 2026, grossreturn: 3.31 },
-        { month: "Jun", monthnumber: 6, year: 2026, grossreturn: 3.67 },
-        { month: "Jul", monthnumber: 7, year: 2026, grossreturn: 3.13 },
-        { month: "Aug", monthnumber: 8, year: 2026, grossreturn: 3.03 }
+        { month: "Apr", monthnumber: 4, year: 2026, grossreturn: 3.15, locked: true },
+        { month: "May", monthnumber: 5, year: 2026, grossreturn: 3.31, locked: true },
+        { month: "Jun", monthnumber: 6, year: 2026, grossreturn: 3.67, locked: true },
+        { month: "Jul", monthnumber: 7, year: 2026, grossreturn: 3.13, locked: true },
+        { month: "Aug", monthnumber: 8, year: 2026, grossreturn: 3.03, locked: false }
       ],
       depositsSheet: [],
       withdrawalsSheet: [
@@ -127,7 +127,8 @@ async function runSuite() {
           deposits: 0,
           withdrawals: 0,
           ending_balance: 35013.48,
-          manual_gain_amount: 702.52
+          manual_gain_amount: 702.52,
+          locked: true
         }
       ],
       live: { source: "Live_Performance", today: 0, week: 0, month: 0, year: 0 }

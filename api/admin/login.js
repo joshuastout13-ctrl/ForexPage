@@ -1,6 +1,6 @@
-import { readSupabaseTable } from "../../lib/supabase.js";
+import { readSupabaseTable, supabase } from "../../lib/supabase.js";
 import { createSession, adminSessionCookie } from "../../lib/auth.js";
-import { verifyPassword } from "../../lib/password.js";
+import { verifyPassword, hashPassword, isBcryptHash } from "../../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -61,6 +61,24 @@ export default async function handler(req, res) {
     const adminId = String(adminUser.id ?? "").trim();
     if (!adminId) {
        return res.status(500).json({ error: "Admin record is missing an id" });
+    }
+
+    const storedPass = String(
+      adminUser.temp_password ??
+      adminUser.temppassword ??
+      adminUser.password ??
+      adminUser.temppasswordprototypeonly ??
+      ""
+    ).trim();
+    if (supabase && storedPass && !isBcryptHash(storedPass)) {
+      try {
+        await supabase
+          .from("investors")
+          .update({ temp_password: hashPassword(password) })
+          .eq("id", adminId);
+      } catch (upgradeErr) {
+        console.warn("[Admin Login API] Non-fatal bcrypt upgrade warning:", upgradeErr.message);
+      }
     }
 
     const token = createSession({ adminId, role: "admin" });

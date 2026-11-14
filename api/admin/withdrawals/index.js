@@ -2,6 +2,7 @@ import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity, canonicalizeWithdrawalPeriod } from "../../../lib/withdrawal-validation.js";
 import { assertAuthoritativeProductionDb, assertAuditActor, buildDeterministicIdempotencyKey } from "../../../lib/financial-mutation-guard.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../lib/period-lock-guard.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -36,6 +37,10 @@ export default async function handler(req, res) {
       const year = period.year;
       const monthIdx = period.monthNumber;
       const monthName = period.monthName;
+
+      if (supabase) {
+        await assertPeriodUnlocked(supabase, { year, monthNumber: monthIdx, effectiveDate: effDate }, "create_withdrawal");
+      }
 
       let investorId = body.investor_id || body.investorId;
       let accountId = body.account_id || body.accountId;
@@ -99,7 +104,8 @@ export default async function handler(req, res) {
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
         const allowDuplicateAmount = Boolean(body.allow_duplicate_amount || body.allowDuplicateAmount);
-        const { data: rpcData, error: rpcError } = await supabase.rpc("create_withdrawal_atomic", {
+        const isDrawRequested = body.is_draw === true || body.is_draw === "true" || body.isDraw === true || body.isDraw === "true";
+        const baseRpcArgs = {
           p_investor_id: payload.investor_id,
           p_account_id: payload.account_id,
           p_amount: payload.amount,
@@ -109,7 +115,29 @@ export default async function handler(req, res) {
           p_idempotency_key: payload.idempotency_key,
           p_created_by: payload.created_by,
           p_allow_duplicate_amount: allowDuplicateAmount
+        };
+        let { data: rpcData, error: rpcError } = await supabase.rpc("create_withdrawal_atomic", {
+          ...baseRpcArgs,
+          p_is_draw: isDrawRequested
         });
+
+        const isParamSignatureMismatch = (err) => {
+          if (!err) return false;
+          const m = String(err.message || "");
+          const c = String(err.code || "");
+          return c === "42883" || c === "PGRST202" || m.includes("Could not find the function") || (m.includes("schema cache") && m.includes("function"));
+        };
+
+        if (rpcError && isParamSignatureMismatch(rpcError)) {
+          if (isDrawRequested) {
+            return res.status(503).json({
+              error: "MIGRATION_REQUIRED: Database create_withdrawal_atomic does not yet support p_is_draw. Apply 20261114 migration before creating draw withdrawals.",
+              code: "MIGRATION_REQUIRED"
+            });
+          }
+          // Pre-migration 9-arg RPC compatibility fallback when is_draw=false
+          ({ data: rpcData, error: rpcError } = await supabase.rpc("create_withdrawal_atomic", baseRpcArgs));
+        }
 
         if (!rpcError && rpcData) {
           if (rpcData.status === "DUPLICATE_ECONOMIC_TRANSACTION") {
@@ -137,6 +165,9 @@ export default async function handler(req, res) {
         // Map RPC error codes to safe HTTP responses
         if (rpcError) {
           const msg = rpcError.message || "";
+          if (msg.includes("PERIOD_LOCKED")) {
+            return res.status(409).json({ error: msg, code: "PERIOD_LOCKED" });
+          }
           if (msg.includes("DUPLICATE_ECONOMIC_TRANSACTION")) {
             return res.status(409).json({ error: msg, code: "DUPLICATE_ECONOMIC_TRANSACTION" });
           }
@@ -192,6 +223,9 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       console.error("Error creating withdrawal:", error);
+      if (isPeriodLockedError(error)) {
+        return res.status(409).json({ error: error.message, code: "PERIOD_LOCKED" });
+      }
       const isAuthDbUnavailable = String(error?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 400).json({ error: error.message || "Withdrawal creation failed." });
     }

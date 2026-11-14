@@ -321,7 +321,7 @@ async function runSuite() {
         status: "Active"
       }],
       returnsSheet: [
-        { month: "January", month_number: 1, year: 2026, gross_return_pct: 5.0 },
+        { month: "January", month_number: 1, year: 2026, gross_return_pct: 5.0, locked: true },
         { month: "February", month_number: 2, year: 2026, gross_return_pct: 2.0 }
       ],
       depositsSheet: [

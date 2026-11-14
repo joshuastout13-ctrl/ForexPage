@@ -30,58 +30,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      // Create a new share
-      const { recipient_username, commission_percent, effective_start_date, source_account_id } = req.body;
-      
-      if (!recipient_username || !commission_percent || !effective_start_date) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      // Find recipient
-      const { data: recipient, error: recErr } = await supabase
-        .from("investors")
-        .select("id")
-        .or(`portal_username.ilike.${recipient_username},email.ilike.${recipient_username}`)
-        .single();
-        
-      if (recErr || !recipient) {
-        return res.status(404).json({ error: "Recipient not found" });
-      }
-      
-      if (recipient.id.toLowerCase() === investorId.toLowerCase()) {
-        return res.status(400).json({ error: "Cannot share commission with yourself" });
-      }
-
-      // Validate total active percentage does not exceed 100%
-      const { data: activeShares, error: activeErr } = await supabase
-        .from("commission_shares")
-        .select("commission_percent")
-        .ilike("source_investor_id", investorId)
-        .in("status", ["active", "pending"])
-        .is("effective_end_date", null); // Or complex overlap check. Keep simple for now.
-
-      if (!activeErr && activeShares) {
-        const totalPct = activeShares.reduce((sum, s) => sum + Number(s.commission_percent), 0);
-        if (totalPct + Number(commission_percent) > 100) {
-          return res.status(400).json({ error: "Total commission sharing exceeds 100%" });
-        }
-      }
-
-      const { data, error } = await supabase
-        .from("commission_shares")
-        .insert({
-          source_investor_id: investorId,
-          source_account_id: source_account_id || null,
-          recipient_investor_id: recipient.id,
-          commission_percent,
-          effective_start_date,
-          status: "active"
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return res.status(201).json({ share: data });
+      return res.status(403).json({
+        error: "ADMIN_APPROVAL_REQUIRED: Self-service commission share creation is disabled. Contact fund administration to create or modify commission shares.",
+        code: "ADMIN_APPROVAL_REQUIRED"
+      });
     }
 
     return res.status(405).json({ error: "Method not allowed" });

@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { validateCommissionShareMutation } from "../../../lib/commission-share-validation.js";
 
 export default async function handler(req, res) {
   try {
@@ -134,43 +135,22 @@ export default async function handler(req, res) {
         sourceInv = srcByUsername;
       }
 
-      const invSplit = sourceInv ? Number(sourceInv.split_pct || 100) : 100;
-      const maxPool = 100 - invSplit;
+      const canonicalSourceId = sourceInv ? sourceInv.id : sourceInvestorId;
+      const candidateShare = {
+        source_investor_id: canonicalSourceId,
+        source_account_id: accountId || null,
+        recipient_investor_id: recipient.id,
+        commission_percent: Number(commissionPercent),
+        effective_start_date: effectiveStartDate,
+        effective_end_date: effectiveEndDate || null,
+        status: status || "active"
+      };
 
-      // Validate total active percentage does not exceed available pool
-      const { data: activeShares } = await supabase
-        .from("commission_shares")
-        .select("commission_percent, source_investor_id")
-        .in("status", ["active", "pending"])
-        .is("effective_end_date", null); 
-
-      if (activeShares && activeShares.length > 0) {
-        const matchingShares = activeShares.filter(s => {
-          const sId = String(s.source_investor_id || '').toLowerCase();
-          return sId === String(sourceInvestorId).toLowerCase() ||
-            (sourceInv && sId === String(sourceInv.id).toLowerCase()) ||
-            (sourceInv && sId === String(sourceInv.portal_username).toLowerCase());
-        });
-        const currentTotalAssigned = matchingShares.reduce((sum, s) => sum + Number(s.commission_percent || 0), 0);
-        
-        if (currentTotalAssigned + Number(commissionPercent) > maxPool + 0.01) {
-          return res.status(400).json({ 
-            error: `Total assigned commission (${(currentTotalAssigned + Number(commissionPercent)).toFixed(2)}%) exceeds available commission pool (${maxPool.toFixed(2)}%) for this investor.` 
-          });
-        }
-      }
+      await validateCommissionShareMutation(supabase, candidateShare);
 
       const { data, error } = await supabase
         .from("commission_shares")
-        .insert({
-          source_investor_id: sourceInvestorId,
-          source_account_id: accountId || null,
-          recipient_investor_id: recipient.id,
-          commission_percent: commissionPercent,
-          effective_start_date: effectiveStartDate,
-          effective_end_date: effectiveEndDate || null,
-          status: status || "active"
-        })
+        .insert(candidateShare)
         .select()
         .single();
 
@@ -181,6 +161,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     console.error("[Admin Commission Shares API]", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    const statusCode = error?.status || (String(error?.message || "").includes("PERIOD_LOCKED") ? 409 : 500);
+    res.status(statusCode).json({ error: error.message || "Internal server error", code: error?.code });
   }
 }

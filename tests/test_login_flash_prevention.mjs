@@ -5,7 +5,7 @@ console.log("===================================================================
 console.log("TEST SUITE: HYDRATION & REFRESH LOGIN FLASH PREVENTION");
 console.log("================================================================================\n");
 
-const html = fs.readFileSync("c:/Users/USER/.gemini/antigravity-ide/scratch/ForexPage-commission-display/index.html", "utf8");
+const html = fs.readFileSync("./index.html", "utf8");
 
 // Test 1: loginCard must have class="card hidden" in HTML markup
 assert.ok(

@@ -1,8 +1,8 @@
 import { readSheet, bool, filterInvestors } from "../lib/sheets.js";
-import { readSupabaseTable } from "../lib/supabase.js";
+import { readSupabaseTable, supabase } from "../lib/supabase.js";
 import { CONFIG } from "../lib/config.js";
 import { createSession, sessionCookie } from "../lib/auth.js";
-import { verifyPassword } from "../lib/password.js";
+import { verifyPassword, hashPassword, isBcryptHash } from "../lib/password.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -66,6 +66,25 @@ export default async function handler(req, res) {
       investor.portalusername ?? 
       ""
     ).trim();
+
+    // Transparently upgrade legacy plaintext password to bcrypt on verified login
+    const storedPass = String(
+      investor.temp_password ??
+      investor.temppassword ??
+      investor.password ??
+      investor.temppasswordprototypeonly ??
+      ""
+    ).trim();
+    if (useSupabase && supabase && investor.id && storedPass && !isBcryptHash(storedPass)) {
+      try {
+        await supabase
+          .from("investors")
+          .update({ temp_password: hashPassword(password) })
+          .eq("id", investor.id);
+      } catch (upgradeErr) {
+        console.warn("[Login API] Non-fatal bcrypt upgrade warning:", upgradeErr.message);
+      }
+    }
 
     const forcePasswordChange = Boolean(
       investor.force_password_change ?? 

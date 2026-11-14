@@ -51,7 +51,7 @@ async function runProvenanceLifecycleSuite() {
         is_commission: false
       }],
       returnsSheet: [
-        { month: "August", month_number: 8, monthnumber: 8, year: 2026, gross_return_pct: 0, grossreturn: 0 }
+        { month: "August", month_number: 8, monthnumber: 8, year: 2026, gross_return_pct: 0, grossreturn: 0, locked: true }
       ],
       depositsSheet: [
         {
@@ -70,7 +70,10 @@ async function runProvenanceLifecycleSuite() {
         investor_id: "stout001",
         year: 2026,
         month_number: 8,
-        ending_balance: 3304885.82
+        opening_balance: 3302385.82,
+        deposits: 2500.00,
+        ending_balance: 3304885.82,
+        locked: true
       }],
       commissionEarningsTable: [],
       commissionSharesTable: [],
@@ -79,7 +82,7 @@ async function runProvenanceLifecycleSuite() {
       live: { today: "0.00%", week: "0.00%", month: "0.00%", year: "0.00%" }
     };
 
-    const d = await buildInvestorDashboard("jstout", preloadedA);
+    const d = await buildInvestorDashboard("jstout", preloadedA, { asOfDate: "2026-09-15T12:00:00Z" });
 
     assert.strictEqual(d.summary.currentBalance, 3304885.82, "Current balance must match $3,304,885.82");
     assert.strictEqual(d.summary.totalExternalCashSent, 2500.00, "Total deposits known/partial must equal $2,500.00");
@@ -121,7 +124,7 @@ async function runProvenanceLifecycleSuite() {
         is_commission: false
       }],
       returnsSheet: [
-        { month: "August", month_number: 8, monthnumber: 8, year: 2026, gross_return_pct: 0, grossreturn: 0 }
+        { month: "August", month_number: 8, monthnumber: 8, year: 2026, gross_return_pct: 0, grossreturn: 0, locked: true }
       ],
       depositsSheet: [
         {
@@ -140,7 +143,10 @@ async function runProvenanceLifecycleSuite() {
         investor_id: "stout001",
         year: 2026,
         month_number: 8,
-        ending_balance: 3304885.82
+        opening_balance: 3302385.82,
+        deposits: 2500.00,
+        ending_balance: 3304885.82,
+        locked: true
       }],
       commissionEarningsTable: [],
       commissionSharesTable: [],
@@ -149,7 +155,7 @@ async function runProvenanceLifecycleSuite() {
       live: { today: "0.00%", week: "0.00%", month: "0.00%", year: "0.00%" }
     };
 
-    const d = await buildInvestorDashboard("jstout", preloadedB);
+    const d = await buildInvestorDashboard("jstout", preloadedB, { asOfDate: "2026-09-15T12:00:00Z" });
 
     assert.strictEqual(d.summary.currentBalance, 3304885.82);
     assert.strictEqual(d.summary.totalExternalCashSent, 2500.00);

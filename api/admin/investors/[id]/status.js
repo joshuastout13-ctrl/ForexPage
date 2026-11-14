@@ -25,7 +25,17 @@ export default async function handler(req, res) {
       const { data, error } = await supabase.from("investors").update(updates).eq("id", id).select();
       if (error) throw error;
 
-      return res.status(200).json({ success: true, investor: data[0] });
+      const updatedInv = data && data[0];
+      const targetAccountStatus = active ? "Active" : "Inactive";
+      const matchIds = [id, updatedInv?.portal_username].filter(Boolean);
+      const { error: accSyncErr } = await supabase
+        .from("investor_accounts")
+        .update({ status: targetAccountStatus })
+        .in("investor_id", matchIds);
+
+      if (accSyncErr) throw accSyncErr;
+
+      return res.status(200).json({ success: true, investor: updatedInv, accountStatusSynced: targetAccountStatus });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

@@ -31,7 +31,7 @@
     tr:last-child td{border-bottom:none}
     .hidden{display:none !important}
     .right{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:bold;text-transform:uppercase;}
+    .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:bold;text-transform:uppercase;white-space:nowrap;}
     .badge.active{background:rgba(34,197,94,0.15);color:var(--success)}
     .badge.inactive{background:rgba(239,68,68,0.15);color:var(--danger)}
     .badge.pending{background:rgba(234,179,8,0.15);color:var(--warning)}
@@ -247,11 +247,13 @@
                   <label class="muted" style="font-size:12px; display:block; margin-bottom:4px;">Year</label>
                   <input id="previewYearInput" type="number" value="2026" style="width:100px; padding:8px 12px; font-size:14px;" />
                 </div>
-                <div style="align-self:flex-end;">
-                  <button id="btnGeneratePreview" style="padding:9px 18px; font-size:14px;">⚡ Generate Preview</button>
+                <div style="align-self:flex-end; display:flex; gap:8px; flex-wrap:wrap;">
+                  <button id="btnGeneratePreview" type="button" style="padding:9px 18px; font-size:14px;">⚡ Generate Preview</button>
+                  <button id="btnFreezeReturn" type="button" class="secondary" style="padding:9px 16px; font-size:14px;">🔒 Freeze Return</button>
+                  <button id="btnFinalizeClose" type="button" style="padding:9px 16px; font-size:14px; background:var(--success); color:#020617; font-weight:700;">✅ Finalize Month-End Close</button>
                 </div>
               </div>
-              <div style="font-size:12px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); padding:8px 14px; border-radius:10px; color:#fde047;">
+              <div id="previewModeBanner" style="font-size:12px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.25); padding:8px 14px; border-radius:10px; color:#fde047;">
                 🛡️ <strong>SHADOW PREVIEW MODE</strong> — Calculations performed in memory. Zero database writes.
               </div>
             </div>
@@ -730,6 +732,13 @@ let state = {
 
       document.getElementById('cardAuditPassBadge').innerHTML = `<span class="badge active" style="font-size:12px; padding:4px 8px;">${summary.passCount || 0} PASS</span> <span class="badge ${summary.flaggedCount > 0 ? 'inactive' : 'active'}" style="font-size:12px; padding:4px 8px; margin-left:2px;">${summary.flaggedCount || 0} FLAGGED</span>`;
 
+      const banner = document.getElementById('previewModeBanner');
+      if (banner) {
+        const retStatus = String(data.returnStatus || data.periodStatus || 'OPEN').toUpperCase();
+        const shortHash = data.inputHash ? ` | Hash: <code>${escapeHtml(String(data.inputHash).slice(0, 12))}</code>` : '';
+        banner.innerHTML = `🛡️ <strong>PREVIEW</strong> — Return Status: <strong>${escapeHtml(retStatus)}</strong> (${escapeHtml(data.returnSource || 'UNKNOWN')})${shortHash}. Use Freeze Return then Finalize Close when verified.`;
+      }
+
       const tbody = document.getElementById('previewTableBody');
       if (!tbody) return;
 
@@ -793,6 +802,76 @@ let state = {
 
     document.getElementById('btnGeneratePreview')?.addEventListener('click', () => {
       generateAccountingPreview();
+    });
+
+    document.getElementById('btnFreezeReturn')?.addEventListener('click', async () => {
+      const month = Number(document.getElementById('previewMonthSelect')?.value || 0);
+      const year = Number(document.getElementById('previewYearInput')?.value || 0);
+      const data = state.previewData;
+      if (!data || Number(data.month || month) !== month || Number(data.year || year) !== year) {
+        showToast('Please click Generate Preview for this month/year first.', true);
+        return;
+      }
+      const retPct = Number(data.fundReturnPct);
+      if (!confirm(`Freeze completed return ${retPct >= 0 ? '+' : ''}${retPct.toFixed(2)}% for ${month}/${year} (source: MYFXBOOK_COMPLETED_MONTH)? This locks monthly_returns for finalization.`)) {
+        return;
+      }
+      const btn = document.getElementById('btnFreezeReturn');
+      if (btn) btn.disabled = true;
+      try {
+        await api.request('/api/admin/accounting/return/freeze', {
+          method: 'POST',
+          body: JSON.stringify({ year, month, grossReturnPct: retPct, source: 'MYFXBOOK_COMPLETED_MONTH' })
+        });
+        showToast(`Frozen ${month}/${year} return at ${retPct.toFixed(2)}%. Generating updated preview...`);
+        await generateAccountingPreview();
+      } catch (err) {
+        showToast('Freeze return failed: ' + err.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    document.getElementById('btnFinalizeClose')?.addEventListener('click', async () => {
+      const month = Number(document.getElementById('previewMonthSelect')?.value || 0);
+      const year = Number(document.getElementById('previewYearInput')?.value || 0);
+      const data = state.previewData;
+      if (!data || !data.inputHash) {
+        showToast('Please click Generate Preview first so inputHash is verified.', true);
+        return;
+      }
+      if ((data.summary?.flaggedCount || 0) > 0) {
+        showToast('Cannot finalize while investors are FLAGGED in preview.', true);
+        return;
+      }
+      const summary = data.summary || {};
+      const msg = `FINALIZE MONTH-END CLOSE for ${month}/${year}?\n\n` +
+        `Fund Return: ${Number(data.fundReturnPct || 0).toFixed(2)}%\n` +
+        `Eligible Capital: ${money(summary.grossEligibleCapital || 0)}\n` +
+        `Total Commissions: ${money(summary.totalRecipientCommissions || 0)}\n` +
+        `Input Hash: ${String(data.inputHash).slice(0, 16)}\n\n` +
+        `This posts immutable commissions, closes history, and initializes next month rollover.`;
+      if (!confirm(msg)) return;
+      const btn = document.getElementById('btnFinalizeClose');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await api.request('/api/admin/accounting/finalize', {
+          method: 'POST',
+          body: JSON.stringify({
+            year,
+            month,
+            previewRunId: data.previewRunId,
+            inputHash: data.inputHash,
+            dryRun: false
+          })
+        });
+        showToast(`Month ${month}/${year} finalized! Commissions posted: ${res.manifest?.changesApplied?.commissionEarningsRowsCreated ?? 'OK'}`);
+        await generateAccountingPreview();
+      } catch (err) {
+        showToast('Finalize failed: ' + err.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
 
     /* Email Center Functions */
@@ -1193,7 +1272,7 @@ let state = {
           </tr>`;
         }).join('');
       } else if (state.tab === 'deposits') {
-        hd.innerHTML = `<tr><th>Type</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Status</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>`;
         d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
         bd.innerHTML = d.map(i => {
           const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
@@ -1210,16 +1289,18 @@ let state = {
                 ? 'Unverified Legacy row — preserves monthly balance continuity but excluded from Total Deposits until verified'
                 : 'Balance-affecting — adds to accounting balance');
           const statusLabel = isVoid ? (i.status || i.type) : (i.status || 'confirmed');
-          const effMonth = i.effective_accounting_date ? i.effective_accounting_date.slice(0, 7) : (i.date ? i.date.slice(0, 7) : '—');
+          const displayDate = i.date ? String(i.date).slice(0, 10) : '—';
+          const effMonth = i.effective_accounting_date ? String(i.effective_accounting_date).slice(0, 7) : (i.date ? String(i.date).slice(0, 7) : '—');
           return `<tr>
             <td><span class="badge ${isVoid ? 'inactive' : 'active'}">${statusLabel}</span></td>
             <td><span class="badge ${treatmentClass}" title="${treatmentTitle}">${treatmentLabel}</span></td>
-            <td style="font-size:11px;color:var(--muted)">${i.id}</td>
-            <td>${i.investor_id}<br><span style="font-size:11px;color:var(--muted)">${i.account_id}</span></td>
-            <td style="font-weight:600">${money(i.amount)}</td>
-            <td>${i.date || '—'}</td>
-            <td>${effMonth}</td>
-            <td>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap">${i.id}</td>
+            <td style="white-space:nowrap">${i.investor_id || '—'}</td>
+            <td style="font-size:12px;color:var(--muted);white-space:nowrap">${i.account_id || '—'}</td>
+            <td style="font-weight:600;white-space:nowrap">${money(i.amount)}</td>
+            <td style="white-space:nowrap">${displayDate}</td>
+            <td style="white-space:nowrap">${effMonth}</td>
+            <td style="white-space:nowrap">
               <div class="btn-group">
                 ${!isVoid ? `<button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.id}">Edit</button>` : ''}
                 ${!isVoid ? `<button class="btn-action btn-action-delete action-btn" data-action="void" data-id="${i.id}">Void</button>` : '<span style="color:var(--muted);font-size:12px">Voided</span>'}
@@ -1235,8 +1316,8 @@ let state = {
           const displayMonth = i.month || (i.month_number && MONTHS[i.month_number - 1]) || (i.effective_accounting_date && MONTHS[parseInt(i.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
           const displayYear = i.year || (i.effective_accounting_date ? i.effective_accounting_date.slice(0, 4) : '');
           return `<tr>
-            <td><span class="badge ${cls}">${i.status}</span></td>
-            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
+            <td><span class="badge ${cls}">${i.status}</span>${(i.is_draw === true || String(i.notes || '').toLowerCase().includes('[draw')) ? ' <span class="badge pending">Draw</span>' : ''}</td>
+            <td>${i.id}${i.notes ? `<div style="font-size:11px;color:var(--muted)">${escapeHtml(i.notes)}</div>` : ''}</td><td>${i.investor_id}</td><td>${i.account_id}</td><td>${money(i.amount)}</td>
             <td>${displayMonth} ${displayYear}</td>
             <td>
               <div class="btn-group">
@@ -1480,6 +1561,7 @@ let state = {
           <div class="form-group"><label>Account</label><select id="field_account_id" required>${accOptions}</select></div>
           <div class="form-group"><label>Deposit Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Actual Funding Date <span style="color:var(--muted);font-weight:400;font-size:12px">(date the cash was received)</span></label><input id="field_date" type="date" value="${item ? item.date : new Date().toISOString().split('T')[0]}" required /></div>
+          <div class="form-group"><label>Effective Accounting Date <span style="color:var(--muted);font-weight:400;font-size:12px">(optional override; defaults to funding date)</span></label><input id="field_effective_accounting_date" type="date" value="${item && item.effective_accounting_date ? String(item.effective_accounting_date).slice(0, 10) : ''}" /></div>
           <div class="form-group"><label>Payment Method</label><select id="field_type">${typeOptions}</select></div>
           <div style="margin:16px 0; padding:14px 16px; border-radius:12px; border:2px solid var(--warning,#f59e0b); background:rgba(245,158,11,0.07);">
             <div style="font-weight:700; font-size:13px; color:var(--warning,#f59e0b); margin-bottom:10px;">⚠ ACCOUNTING TREATMENT — Required</div>
@@ -1528,6 +1610,13 @@ let state = {
           <div class="form-group"><label>Effective Month</label><select id="field_month" required>${monthOptions}</select></div>
           <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${selectedYear}" required /></div>
           <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${item && item.status==='Pending'?'selected':''}>Pending</option><option value="Approved" ${item && item.status==='Approved'?'selected':''}>Approved</option><option value="Completed" ${item && item.status==='Completed'?'selected':''}>Completed</option><option value="Cancelled" ${item && item.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
+          <div class="form-group">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input id="field_is_draw" type="checkbox" ${item && (item.is_draw === true || String(item.notes || '').toLowerCase().includes('[draw')) ? 'checked' : ''} style="width:auto;" />
+              <span>Recurring Draw Fulfillment <span style="color:var(--muted);font-weight:400;font-size:12px">(counts against monthly recurring draw without double deduction)</span></span>
+            </label>
+          </div>
+          <div class="form-group"><label>Reference / Notes <span style="color:var(--muted);font-weight:400;font-size:12px">(optional)</span></label><input id="field_notes" type="text" value="${item ? escapeHtml(item.notes || '') : ''}" placeholder="Draw / wire reference / context..." /></div>
           <div id="withdrawalEquityFeedback" style="display:none; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;"></div>
         `;
       } else if (tab === 'returns') {
@@ -1700,14 +1789,19 @@ let state = {
 
     document.getElementById('entityForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const modalEl = document.getElementById('entityModal');
+      const btn = document.getElementById('saveEntityBtn');
+      if (modalEl?.classList.contains('saving-active') || btn?.disabled) {
+        return;
+      }
       const action = document.getElementById('formAction').value;
       const id = document.getElementById('formId').value;
       const tab = state.tab;
       const errorEl = document.getElementById('modalError');
-      
-      const btn = document.getElementById('saveEntityBtn');
+      if (errorEl) errorEl.textContent = '';
+
       btn.disabled = true; btn.textContent = 'Saving...';
-      document.getElementById('entityModal').classList.add('saving-active');
+      modalEl.classList.add('saving-active');
 
       try {
         let endpoint = '', method = 'POST', body = {};
@@ -1750,11 +1844,13 @@ let state = {
           const mutationId = document.getElementById('field_mutation_id')?.value;
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PATCH' : 'POST';
+          const effAccDate = document.getElementById('field_effective_accounting_date')?.value || '';
           body = {
             investorId: invId,
             accountId: accId,
             amount: Number(document.getElementById('field_amount')?.value || 0),
             date: document.getElementById('field_date')?.value,
+            effective_accounting_date: effAccDate || undefined,
             type: document.getElementById('field_type')?.value || 'Wire',
             accounting_treatment: accountingTreatment,
             notes: document.getElementById('field_notes')?.value || '',
@@ -1781,6 +1877,8 @@ let state = {
             effective_accounting_date: canonicalEffDate,
             effectiveDate: canonicalEffDate,
             status: document.getElementById('field_status')?.value || 'Pending',
+            is_draw: !!document.getElementById('field_is_draw')?.checked,
+            notes: document.getElementById('field_notes')?.value || '',
             idempotency_key: document.getElementById('field_mutation_id')?.value || undefined
           };
         } else if (tab === 'returns') {
@@ -1837,18 +1935,9 @@ let state = {
 
         await api.request(endpoint, { method, body: JSON.stringify(body) });
 
-        if (tab === 'returns') {
-          try {
-            await api.request('/api/admin/historical-data/recalculate-all', {
-              method: 'POST',
-              body: JSON.stringify({ year: body.year })
-            });
-          } catch (recalcErr) {
-            console.error('Auto-recalculate after returns update failed:', recalcErr);
-          }
-        }
-
-        showToast('Saved successfully!');
+        showToast(tab === 'returns'
+          ? 'Return saved! Use Accounting Preview -> Freeze Return -> Finalize Close to close a month.'
+          : 'Saved successfully!');
         document.getElementById('entityModal').classList.add('hidden');
         await loadTab(tab);
       } catch (err) {

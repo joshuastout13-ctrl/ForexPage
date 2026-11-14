@@ -3,6 +3,8 @@ import { supabase } from "../../../../lib/supabase.js";
 import { calculateAccountingPeriod } from "../../../../lib/accounting-period-engine.js";
 import { loadAccountingData } from "../../../../lib/paginated-read.js";
 import { getMyfxbookLive } from "../../../../lib/myfxbook.js";
+import { getFundAccountingDate } from "../../../../lib/month-state.js";
+import { getApplicableCommissionShares } from "../../../../lib/commission-utils.js";
 
 export const ACCOUNTING_ENGINE_VERSION = "2.0.0";
 
@@ -21,12 +23,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const year = Number(req.query?.year || 2026);
-    const month = Number(req.query?.month || 8);
+    const fundDate = getFundAccountingDate();
+    const year = Number(req.query?.year || fundDate.year);
+    const month = Number(req.query?.month || fundDate.monthNumber);
 
     // Fetch live Myfxbook return estimate
     let myfxbookLive = null;
-    let fundReturnPct = 2.81;
+    let fundReturnPct = 0;
     let capturedAt = new Date().toISOString();
     let returnSource = "MYFXBOOK_LIVE";
 
@@ -102,8 +105,12 @@ export default async function handler(req, res) {
       };
     });
 
-    // Rule integrity audit for positive months
-    const activeRules = (commissionShares || []).filter(s => s.status !== "cancelled" && s.status !== "void");
+    // Rule integrity audit for target period (date-effective shares only)
+    const activeRules = getApplicableCommissionShares({
+      shares: commissionShares || [],
+      year,
+      month
+    });
     const ruleAnomalies = [];
     
     // Group rules by source
@@ -118,7 +125,7 @@ export default async function handler(req, res) {
       const srcRules = rulesBySource[src];
       const totalPct = srcRules.reduce((sum, r) => sum + Number(r.commission_percent || 0), 0);
       const srcInvestor = (investors || []).find(i => i.id === src || i.portal_username === src);
-      const srcSplit = Number(srcInvestor?.split_pct || 70);
+      const srcSplit = Number(srcInvestor?.split_pct ?? 100);
       const expectedPool = 100 - srcSplit;
 
       if (Math.abs(totalPct - expectedPool) > 0.01) {

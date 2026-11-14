@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../lib/adminAuth.js";
 import { supabase } from "../../lib/supabase.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../lib/period-lock-guard.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -31,8 +32,11 @@ export default async function handler(req, res) {
         investorId, accountId, year, monthNumber, month,
         openingBalance, deposits, withdrawals, grossReturnPct,
         manualGainAmount, manualReturnPct, recurringDraw,
+        drawFulfillmentWithdrawals, isDrawLinked,
         notes, isManual
       } = payload;
+
+      await assertPeriodUnlocked(supabase, { year: Number(year), monthNumber: Number(monthNumber) }, "edit_historical_data");
 
       // Calculation logic
       const adjStart = (openingBalance || 0) + (deposits || 0) - (withdrawals || 0);
@@ -47,7 +51,7 @@ export default async function handler(req, res) {
         gain = adjStart * (pct / 100);
       }
 
-            // Deduplicate recurring draw only if withdrawal is linked to draw obligation
+      // Deduplicate recurring draw only if withdrawal is linked to draw obligation
       const fulfilled = (drawFulfillmentWithdrawals !== undefined && drawFulfillmentWithdrawals !== null)
         ? Number(drawFulfillmentWithdrawals)
         : ((isDrawLinked || (notes && String(notes).toLowerCase().includes('draw')))
@@ -66,8 +70,8 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (existingRecord && (existingRecord.locked === true || String(existingRecord.locked).toLowerCase() === 'true')) {
-        return res.status(403).json({ 
-          error: "LOCKED_RECORD", 
+        return res.status(409).json({ 
+          error: "PERIOD_LOCKED", 
           message: "Cannot modify locked historical monthly history record." 
         });
       }
@@ -98,6 +102,9 @@ export default async function handler(req, res) {
       if (error) throw error;
       return res.status(200).json({ record: data });
     } catch (err) {
+      if (isPeriodLockedError(err) || String(err?.message || "").includes("PERIOD_LOCKED")) {
+        return res.status(409).json({ error: "PERIOD_LOCKED", message: err.message });
+      }
       console.error(err);
       return res.status(500).json({ error: err.message });
     }

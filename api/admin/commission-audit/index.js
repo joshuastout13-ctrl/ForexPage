@@ -1,6 +1,8 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { supabase, paginatedRead } from "../../../lib/supabase.js";
 import { calculateCommissionAllocation } from "../../../lib/commission-engine.js";
+import { getFundAccountingDate } from "../../../lib/month-state.js";
+import { getApplicableCommissionShares } from "../../../lib/commission-utils.js";
 import Decimal from "decimal.js";
 import ExcelJS from "exceljs";
 
@@ -39,17 +41,20 @@ export default async function handler(req, res) {
     const query = req.method === "POST" ? req.body : req.query;
     const { sourceInvestorId, year: reqYear, month: reqMonth, all } = query;
 
-    const year = Number(reqYear || new Date().getFullYear());
-    const monthNumber = Number(reqMonth || 7);
+    const fundDate = getFundAccountingDate();
+    const year = Number(reqYear || fundDate.year);
+    const monthNumber = Number(reqMonth || fundDate.monthNumber);
     const isRunAll = String(all || "").toLowerCase() === "true" || String(all || "") === "1";
 
-    // Batch Fetch Common Tables to avoid N+1 queries
-    const { data: allInvestors } = await supabase.from("investors").select("*");
-    const { data: allAccounts } = await supabase.from("investor_accounts").select("*");
-    const { data: allHistory } = await supabase.from("investor_monthly_history").select("*").eq("year", year);
-    const { data: allMonthlyReturns } = await supabase.from("monthly_returns").select("*").eq("year", year);
-    const { data: allShares } = await supabase.from("commission_shares").select("*");
-    const { data: allEarnings } = await supabase.from("commission_earnings").select("*").eq("year", year);
+    // Batch Fetch Common Tables with deterministic pagination (>1,000 rows safe)
+    const [allInvestors, allAccounts, allHistory, allMonthlyReturns, allShares, allEarnings] = await Promise.all([
+      paginatedRead("investors"),
+      paginatedRead("investor_accounts"),
+      paginatedRead("investor_monthly_history", { queryModifier: q => q.eq("year", year) }),
+      paginatedRead("monthly_returns", { queryModifier: q => q.eq("year", year) }),
+      paginatedRead("commission_shares"),
+      paginatedRead("commission_earnings", { queryModifier: q => q.eq("year", year) })
+    ]);
 
     if (isRunAll) {
       return handleRunAllAudit({
@@ -164,11 +169,11 @@ export function calculateSingleAudit({
   // 4. Source Split & Active Shares
   const sourceSplitPct = sourceInv.split_pct !== null && sourceInv.split_pct !== undefined ? num(sourceInv.split_pct) : 75;
 
-  // 5. Recipient Allocation Rows (Excluding Voided/Cancelled)
+  // 5. Recipient Allocation Rows (Strictly ACTIVE rows; exclude SUPERSEDED/void/cancelled)
   const sourceEarningsThisMonth = (allEarnings || []).filter(e =>
     sourceIdSet.has(String(e.source_investor_id || "").trim().toLowerCase()) &&
     num(e.month_number) === monthNumber &&
-    e.status !== 'void' && e.status !== 'cancelled'
+    (!e.status || String(e.status).trim().toUpperCase() === 'ACTIVE')
   );
 
   let recipientDataSource = "ledger";
@@ -188,12 +193,18 @@ export function calculateSingleAudit({
         ? [String(recInv.first_name || "").trim(), String(recInv.last_name || "").trim()].filter(Boolean).join(" ") || recInv.portal_username
         : String(e.recipient_id || "Unknown");
 
-      const share = (allShares || []).find(s =>
-        sourceIdSet.has(String(s.source_investor_id || "").toLowerCase()) &&
-        (String(s.recipient_investor_id || "").toLowerCase() === recId ||
-         (recInv && String(s.recipient_investor_id || "").toLowerCase() === String(recInv.id || "").toLowerCase()))
-      );
-      const commPct = share ? num(share.commission_percent) : (grossProfit > 0 ? (num(e.amount) / grossProfit) * 100 : 0);
+      const share = getApplicableCommissionShares({
+        shares: allShares || [],
+        year,
+        month: monthNumber,
+        sourceIdSet,
+        recipientInvestorId: recInv ? recInv.id : recId
+      })[0];
+      const commPct = share
+        ? num(share.commission_percent)
+        : (e.commission_percent_snapshot !== null && e.commission_percent_snapshot !== undefined
+            ? num(e.commission_percent_snapshot)
+            : (grossProfit > 0 ? (num(e.amount) / grossProfit) * 100 : 0));
 
       return {
         id: e.id,
@@ -325,7 +336,8 @@ export function calculateSingleAudit({
 
     const mEarnings = (allEarnings || []).filter(e =>
       sourceIdSet.has(String(e.source_investor_id || "").trim().toLowerCase()) &&
-      num(e.month_number) === m && e.status !== 'void' && e.status !== 'cancelled'
+      num(e.month_number) === m &&
+      (!e.status || String(e.status).trim().toUpperCase() === 'ACTIVE')
     );
     const mTotalCommissions = mEarnings.reduce((sum, e) => sum + num(e.amount), 0);
     const mMonthNet = new Decimal(mGrossProfit).sub(mTotalCommissions).toNumber();

@@ -687,7 +687,7 @@ async function runTestSuite() {
     const dashSt = await buildInvestorDashboard("jstout", preloaded, { asOfDate });
     assert.equal(Number(dashSt.summary.currentBalance.toFixed(2)), 3472252.1);
     assert.equal(dashSt.summary.totalGainUnavailable, false);
-    assert.equal(dashSt.summary.commissionsUnavailable, true); // M10 legacy SUPERSEDED audit trail kept fail-closed on verified card
+    assert.equal(dashSt.summary.commissionsUnavailable, false); // M10 finalized & locked with ACTIVE replacement ledger
     assert.equal(dashSt.summary.bookedCommissionsEarnedMonth, 36298.65); // Booked Comm displays ACTIVE M10 ledger
     const stOctRow = dashSt.breakdown.find(r => r.monthNumber === 10);
     assert.equal(stOctRow.hasSupersededCommissions, true);

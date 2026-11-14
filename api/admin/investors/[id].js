@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
+import { hashPassword, isBcryptHash } from "../../../lib/password.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -17,8 +18,11 @@ export default async function handler(req, res) {
       if (body.lastName !== undefined) updates.last_name = body.lastName;
       if (body.email !== undefined) updates.email = body.email;
       if (body.portalUsername !== undefined) updates.portal_username = body.portalUsername;
-      if (body.tempPassword !== undefined) updates.temp_password = body.tempPassword;
-      if (body.password !== undefined) updates.temp_password = body.password;
+      const rawPwd = body.tempPassword !== undefined ? body.tempPassword : body.password;
+      if (rawPwd !== undefined) {
+        const cleanPwd = String(rawPwd || "").trim();
+        updates.temp_password = cleanPwd ? (isBcryptHash(cleanPwd) ? cleanPwd : hashPassword(cleanPwd)) : "";
+      }
       if (body.splitPct !== undefined) updates.split_pct = Number(body.splitPct);
       if (body.monthlyDraw !== undefined) updates.monthly_draw = Number(body.monthlyDraw);
       if (body.startDate !== undefined) updates.start_date = body.startDate;
@@ -36,12 +40,11 @@ export default async function handler(req, res) {
         throw new Error("Invalid split percentage: must be between 0 and 100");
       }
 
-      if (commissionRules !== null) {
-        const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
-        const effectiveSplit = splitPct !== undefined ? splitPct : 100;
-        if (effectiveSplit + totalCommissions > 100.01) {
-          throw new Error(`Total split (${effectiveSplit}%) and commission rules (${totalCommissions}%) cannot exceed 100%`);
-        }
+      if (commissionRules !== null && commissionRules.length > 0) {
+        return res.status(400).json({
+          error: "LEGACY_COMMISSION_RULES_DEPRECATED: Use /api/admin/commission-shares (or /bulk) to manage date-effective commission shares instead of legacy commission_rules.",
+          code: "LEGACY_COMMISSION_RULES_DEPRECATED"
+        });
       }
 
       // Update investors table with schema resilience
@@ -112,27 +115,6 @@ export default async function handler(req, res) {
           notes: "Created via Admin Dashboard update"
         };
         await supabase.from("investor_accounts").insert([accPayload]);
-      }
-
-      // Update commission rules if provided
-      if (commissionRules !== null) {
-        // Delete old rules for this investor's primary account
-        if (primaryAccId) {
-          await supabase.from("commission_rules").delete().eq("account_id", primaryAccId);
-        } else {
-          await supabase.from("commission_rules").delete().eq("investor_id", id);
-        }
-        
-        if (commissionRules.length > 0) {
-          const rulesPayload = commissionRules.map(rule => ({
-            investor_id: id,
-            account_id: primaryAccId,
-            recipient_id: rule.recipientId,
-            percent: Number(rule.percent)
-          }));
-          const { error: rulesError } = await supabase.from("commission_rules").insert(rulesPayload);
-          if (rulesError) console.error("Failed to update commission rules:", rulesError.message);
-        }
       }
 
       return res.status(200).json({ success: true, investor: data[0] });

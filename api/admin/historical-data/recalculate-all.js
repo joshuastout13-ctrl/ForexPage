@@ -1,8 +1,8 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
-import { paginatedRead } from "../../../lib/paginated-read.js";
+import { supabase, paginatedRead } from "../../../lib/supabase.js";
 import { evaluateMonthState, MonthState, isHistoricalSettled, getFundAccountingDate } from "../../../lib/month-state.js";
 import { getApplicableCommissionShares } from "../../../lib/commission-utils.js";
+import { buildRecalcCashflowBuckets } from "../../../lib/recalc-helpers.js";
 import Decimal from "decimal.js";
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
@@ -25,25 +25,32 @@ export default async function handler(req, res) {
     const isExplicitAuditedCorrection = allowHistoricalCommissionCorrection === true && Boolean(auditReason);
     const isExplicitAuditedHistoryCorrection = (allowLockedHistoryOverride === true || allowHistoricalCommissionCorrection === true) && Boolean(auditReason);
 
-    // 1. Fetch all investors
+    // 1. Fetch all active non-admin investors
     const { data: investors, error: invErr } = await supabase
       .from("investors")
-      .select("id, portal_username, email, split_pct, monthly_draw, start_date");
+      .select("id, portal_username, email, split_pct, monthly_draw, start_date, active, role");
     if (invErr) throw invErr;
 
-    // 2. Fetch all required data globally
-    const [ {data: allDeps}, {data: allWds}, {data: allReturns}, {data: commShares}, {data: commRules}, commEarnings, {data: allAccounts}, allHistory, {data: cutovers} ] = await Promise.all([
-      supabase.from("deposits").select("*").not("type", "ilike", "VOID"),
-      supabase.from("withdrawals").select("*").in("status", ["Approved", "Completed"]),
+    const activeInvestors = (investors || []).filter(
+      (inv) => inv.active !== false && String(inv.role || "").trim().toLowerCase() !== "admin"
+    );
+
+    // 2. Fetch all required data globally with pagination
+    const [allDeps, allWds, { data: allReturns }, { data: commShares }, { data: commRules }, commEarnings, allAccounts, allHistory, { data: cutovers }, { data: accountingPeriods }] = await Promise.all([
+      paginatedRead("deposits"),
+      paginatedRead("withdrawals"),
       supabase.from("monthly_returns").select("*").eq("year", targetYear),
       supabase.from("commission_shares").select("*"),
       supabase.from("commission_rules").select("*"),
-      paginatedRead('commission_earnings', { queryModifier: q => q.in('year', [targetYear, targetYear - 1]) }),
-      supabase.from("investor_accounts").select("*").eq("status", "Active"),
-      paginatedRead('investor_monthly_history', { queryModifier: q => q.eq('year', targetYear) }),
-      supabase.from("account_cutover_adjustments").select("*").eq("year", targetYear)
+      paginatedRead("commission_earnings", { queryModifier: q => q.in("year", [targetYear, targetYear - 1]) }),
+      paginatedRead("investor_accounts", { queryModifier: q => q.eq("status", "Active") }),
+      paginatedRead("investor_monthly_history", { queryModifier: q => q.eq("year", targetYear) }),
+      supabase.from("account_cutover_adjustments").select("*").eq("year", targetYear),
+      supabase.from("accounting_periods").select("*").eq("year", targetYear)
     ]);
-    const commEarningsData = (commEarnings || []).filter(r => !r.status || String(r.status).trim().toUpperCase() !== 'SUPERSEDED');
+    const commEarningsData = (commEarnings || []).filter(
+      (r) => String(r.status || "ACTIVE").trim().toUpperCase() === "ACTIVE"
+    );
     const allHistoryData = allHistory || [];
 
     // Build unified commission rules/shares list
@@ -80,19 +87,26 @@ export default async function handler(req, res) {
       }
     });
 
-    // Group returns by month
+    // Group returns and accounting periods by month
     const fundRetByM = {};
     const fundRetLockedByM = {};
-    allReturns?.forEach(r => { 
-      fundRetByM[r.month_number] = Number(r.gross_return_pct || 0); 
+    allReturns?.forEach(r => {
+      fundRetByM[r.month_number] = Number(r.gross_return_pct || 0);
       fundRetLockedByM[r.month_number] = (r.locked === true || String(r.locked).toLowerCase() === 'true');
+    });
+
+    const apLockedByM = {};
+    (accountingPeriods || []).forEach(ap => {
+      if (String(ap.status || "").trim().toUpperCase() === "FINALIZED") {
+        apLockedByM[Number(ap.month_number)] = true;
+      }
     });
 
     let historyToUpsert = [];
     let commissionsToInsert = [];
 
-    // We process each investor
-    for (const inv of (investors || [])) {
+    // We process each active non-admin investor
+    for (const inv of activeInvestors) {
       const investorId = inv.id;
       const investorSplit = new Decimal(inv.split_pct || 100).div(100);
       const draw = new Decimal(inv.monthly_draw || 0);
@@ -111,41 +125,19 @@ export default async function handler(req, res) {
       ].filter(Boolean).map(s => String(s).trim().toLowerCase()));
 
       const accounts = (allAccounts || []).filter(a => sourceIdSet.has(String(a.investor_id || '').toLowerCase()));
-      
-      const invDeps = (allDeps || []).filter(d => sourceIdSet.has(String(d.investor_id || '').toLowerCase()));
-      const invWds = (allWds || []).filter(w => sourceIdSet.has(String(w.investor_id || '').toLowerCase()));
-      const invCommEarnings = (commEarningsData || []).filter(e => sourceIdSet.has(String(e.recipient_id || '').toLowerCase()));
 
-      const depsByMAcc = {};
-      invDeps.forEach(d => {
-        const dt = new Date(d.date);
-        if(dt.getUTCFullYear() === targetYear) {
-          const m = dt.getUTCMonth() + 1;
-          const accId = d.account_id || accounts[0]?.id;
-          if (accId) {
-            if (!depsByMAcc[m]) depsByMAcc[m] = {};
-            depsByMAcc[m][accId] = (depsByMAcc[m][accId] || 0) + Number(d.amount);
-          }
-        }
-      });
-
-      const wdsByMAcc = {};
-      invWds.forEach(w => {
-        if(w.effective_year === targetYear || (!w.effective_year && targetYear === new Date().getFullYear())) {
-          const m = w.month_number;
-          const accId = w.account_id || accounts[0]?.id;
-          if (accId) {
-            if (!wdsByMAcc[m]) wdsByMAcc[m] = {};
-            wdsByMAcc[m][accId] = (wdsByMAcc[m][accId] || 0) + Number(w.amount || 0);
-          }
-        }
-      });
-
-      // Maintain existing settled commission ledger as authoritative source of truth
-      const commEarningsByM = {};
-      invCommEarnings.forEach(e => {
-        const key = `${e.year}_${e.month_number}`;
-        commEarningsByM[key] = (commEarningsByM[key] || 0) + Number(e.amount || 0);
+      const {
+        depsByMAcc,
+        wdsByMAcc,
+        drawWdsByM,
+        commEarningsByM
+      } = buildRecalcCashflowBuckets({
+        deposits: allDeps,
+        withdrawals: allWds,
+        commEarnings: commEarningsData,
+        accounts,
+        targetYear,
+        sourceIdSet
       });
 
       // Find this investor's history
@@ -161,7 +153,7 @@ export default async function handler(req, res) {
         const existing = history?.find(h => h.month_number === m);
         const prevM = m > 1 ? m - 1 : 12;
         const isPrevMonthFinalizedAndLocked = m > 1 
-          ? (fundRetLockedByM[prevM] === true)
+          ? (fundRetLockedByM[prevM] === true || apLockedByM[prevM] === true)
           : true; // Prior year settled ledger
 
         // Fail-closed guard: Unfinalized/unlocked prior month commissions CANNOT capitalize into later history!
@@ -190,7 +182,7 @@ export default async function handler(req, res) {
 
         // Fail-closed guard: A past calendar month is ONLY settled if its return has been explicitly finalized & locked.
         // A calendar rollover alone is NOT authorization to treat an open month as settled or to generate commissions.
-        const isMonthFinalizedAndLocked = (fundRetLockedByM[m] === true) || 
+        const isMonthFinalizedAndLocked = (fundRetLockedByM[m] === true || apLockedByM[m] === true) || 
           (existing && (existing.locked === true || String(existing.locked).toLowerCase() === 'true'));
         const isHistoricalCompleted = isCalendarPast && isMonthFinalizedAndLocked;
         const isUnfinalizedPastMonth = isCalendarPast && !isMonthFinalizedAndLocked;
@@ -303,7 +295,8 @@ export default async function handler(req, res) {
         // must not be modified by routine recalculation. Only an explicit audited correction workflow
         // may alter locked historical accounting.
         const isPeriodLocked = (
-          isHistoricalCompleted || 
+          isHistoricalCompleted ||
+          (apLockedByM[m] === true) ||
           (existing && (existing.locked === true || String(existing.locked).toLowerCase() === 'true')) ||
           fundRetLockedByM[m] === true
         );
@@ -347,7 +340,9 @@ export default async function handler(req, res) {
       console.log(`[RecalculateAll] Explicit audited correction executed by ${session.user?.email || 'admin'}: ${auditReason}`);
       if (commissionsToInsert.length > 0) {
         // Strict Fail-Closed Guard: Verify every commission row belongs to an explicitly locked month
-        const unauthorizedComms = commissionsToInsert.filter(c => fundRetLockedByM[c.month_number] !== true);
+        const unauthorizedComms = commissionsToInsert.filter(
+          (c) => fundRetLockedByM[c.month_number] !== true && apLockedByM[c.month_number] !== true
+        );
         if (unauthorizedComms.length > 0) {
           throw new Error(
             `UNAUTHORIZED_COMMISSION_GENERATION: Cannot generate commissions for unfinalized/unlocked month(s): ` +

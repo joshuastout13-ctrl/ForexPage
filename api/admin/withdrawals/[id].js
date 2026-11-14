@@ -2,6 +2,7 @@ import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { calculateAvailableWithdrawalEquity, canonicalizeWithdrawalPeriod } from "../../../lib/withdrawal-validation.js";
 import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../lib/period-lock-guard.js";
 
 export default async function handler(req, res) {
   const session = verifyAdminSession(req);
@@ -23,6 +24,11 @@ export default async function handler(req, res) {
       if (body.year !== undefined) updates.year = parseInt(body.year, 10);
       if (body.accountId !== undefined || body.account_id !== undefined) updates.account_id = body.accountId || body.account_id;
       if (body.investorId !== undefined || body.investor_id !== undefined) updates.investor_id = body.investorId || body.investor_id;
+      const hasIsDraw = body.is_draw !== undefined || body.isDraw !== undefined;
+      const isDrawVal = hasIsDraw
+        ? (body.is_draw === true || body.is_draw === "true" || body.isDraw === true || body.isDraw === "true")
+        : null;
+      if (hasIsDraw) updates.is_draw = isDrawVal;
 
       let period = null;
       const hasPeriodUpdate = body.month !== undefined || body.year !== undefined ||
@@ -43,9 +49,13 @@ export default async function handler(req, res) {
         });
       }
 
+      if (period) {
+        await assertPeriodUnlocked(supabase, { year: period.year, monthNumber: period.monthNumber, effectiveDate: period.effectiveDate }, "update_withdrawal");
+      }
+
       // 1. Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock)
       try {
-        const rpcArgs = {
+        const baseRpcArgs = {
           p_withdrawal_id: id,
           p_amount: updates.amount !== undefined ? updates.amount : null,
           p_status: updates.status !== undefined ? updates.status : null,
@@ -54,13 +64,28 @@ export default async function handler(req, res) {
         };
 
         if (period) {
-          rpcArgs.p_effective_date = period.effectiveDate;
-          rpcArgs.p_year = period.year;
-          rpcArgs.p_month_number = period.monthNumber;
-          rpcArgs.p_month = period.monthName;
+          baseRpcArgs.p_effective_date = period.effectiveDate;
+          baseRpcArgs.p_year = period.year;
+          baseRpcArgs.p_month_number = period.monthNumber;
+          baseRpcArgs.p_month = period.monthName;
         }
 
-        let { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", rpcArgs);
+        const fullRpcArgs = hasIsDraw ? { ...baseRpcArgs, p_is_draw: isDrawVal } : baseRpcArgs;
+        let { data: rpcData, error: rpcError } = await supabase.rpc("update_withdrawal_atomic", fullRpcArgs);
+
+        const isParamSignatureMismatch = (err) => {
+          if (!err) return false;
+          const m = String(err.message || "");
+          const c = String(err.code || "");
+          return c === "42883" || c === "PGRST202" || m.includes("Could not find the function") || (m.includes("schema cache") && m.includes("function"));
+        };
+
+        if (rpcError && hasIsDraw && isParamSignatureMismatch(rpcError)) {
+          return res.status(503).json({
+            error: "MIGRATION_REQUIRED: Database update_withdrawal_atomic does not yet support p_is_draw. Apply 20261114 migration before setting is_draw.",
+            code: "MIGRATION_REQUIRED"
+          });
+        }
 
         if (!rpcError && rpcData) {
           return res.status(200).json({
@@ -76,6 +101,9 @@ export default async function handler(req, res) {
           const msg = rpcError.message || "";
           const code = rpcError.code || "";
 
+          if (msg.includes("PERIOD_LOCKED")) {
+            return res.status(409).json({ error: msg, code: "PERIOD_LOCKED" });
+          }
           if (msg.includes("WITHDRAWAL_EXCEEDS_AVAILABLE_EQUITY") ||
               msg.includes("INVALID_WITHDRAWAL_STATUS") ||
               msg.includes("INVALID_STATUS_TRANSITION") ||
@@ -141,6 +169,9 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       console.error("Error updating withdrawal:", error);
+      if (isPeriodLockedError(error)) {
+        return res.status(409).json({ error: error.message, code: "PERIOD_LOCKED" });
+      }
       const isAuthDbUnavailable = String(error?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 400).json({ error: error.message || "Withdrawal update failed." });
     }

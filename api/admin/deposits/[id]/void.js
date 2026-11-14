@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
 import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../../lib/financial-mutation-guard.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../../lib/period-lock-guard.js";
 
 /**
  * Admin Deposit Void API
@@ -38,13 +39,19 @@ export default async function handler(req, res) {
       // Verify the deposit exists and is not already voided
       const { data: existing, error: fetchErr } = await supabase
         .from("deposits")
-        .select("id, status, type, amount, investor_id")
+        .select("id, status, type, amount, investor_id, date, effective_accounting_date")
         .eq("id", id)
         .single();
 
       if (fetchErr || !existing) {
         return res.status(404).json({ error: `Deposit not found: ${id}` });
       }
+
+      await assertPeriodUnlocked(
+        supabase,
+        { effectiveDate: existing.effective_accounting_date, date: existing.date },
+        "void_deposit"
+      );
 
       const currentStatus = String(existing.status || "").toLowerCase();
       const currentType = String(existing.type || "").toUpperCase();
@@ -80,6 +87,9 @@ export default async function handler(req, res) {
         deposit: data[0]
       });
     } catch (err) {
+      if (isPeriodLockedError(err) || String(err?.message || "").includes("PERIOD_LOCKED")) {
+        return res.status(409).json({ error: err.message, code: "PERIOD_LOCKED" });
+      }
       const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });
     }

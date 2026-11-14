@@ -422,6 +422,58 @@ async function executeLiveFinalizationWrites({
   plan,
   nowIso
 }) {
+  // Primary atomic execution path: single Postgres transaction via finalize_monthly_accounting_v2
+  if (typeof db?.rpc === "function") {
+    const periodHistoryJson = [
+      ...plan.historyRowsToUpdate.map(item => item.row),
+      ...plan.historyRowsToCreate
+    ];
+    const rolloverHistoryJson = [
+      ...plan.rolloverRowsToUpdate.map(item => item.row),
+      ...plan.rolloverRowsToCreate
+    ];
+    const commissionEarningsJson = plan.commissionRowsToCreate;
+
+    const { data: rpcResult, error: rpcError } = await db.rpc("finalize_monthly_accounting_v2", {
+      p_year: yr,
+      p_month_number: m,
+      p_gross_return_pct: currentRun.fundReturnPct,
+      p_return_source: currentRun.returnSource,
+      p_return_status: currentRun.returnStatus,
+      p_input_hash: currentRun.inputHash,
+      p_preview_run_id: previewRunId || currentRun.previewRunId,
+      p_calculation_version: ACCOUNTING_ENGINE_VERSION,
+      p_admin_id: adminId,
+      p_period_history_json: periodHistoryJson,
+      p_rollover_history_json: rolloverHistoryJson,
+      p_commission_earnings_json: commissionEarningsJson,
+      p_supersede_reason: "Replaced by authoritative month close"
+    });
+
+    if (!rpcError && rpcResult) {
+      return {
+        accountingPeriodId: rpcResult.periodId ?? null,
+        auditId: rpcResult.auditId ?? null,
+        totalWrites:
+          Number(rpcResult.historyCount || 0) +
+          Number(rpcResult.rolloverCount || 0) +
+          Number(rpcResult.earningsCount || 0) +
+          3
+      };
+    }
+
+    const msg = String(rpcError?.message || "");
+    const isMissingRpc =
+      rpcError?.code === "PGRST202" ||
+      rpcError?.code === "42883" ||
+      /Could not find the function|does not exist/i.test(msg);
+
+    if (!isMissingRpc) {
+      throw new Error(msg || "ATOMIC_FINALIZATION_RPC_FAILED");
+    }
+  }
+
+  // Fallback path (used only when an isolated test adapter omits Postgres RPCs)
   // 1. Ensure monthly_returns row is locked
   const { error: retErr } = await db
     .from("monthly_returns")
@@ -553,6 +605,255 @@ async function executeLiveFinalizationWrites({
   return { accountingPeriodId, totalWrites };
 }
 
+export async function executePeriodFinalizationWorkflow({
+  db,
+  accountingDataLoader = loadAccountingData,
+  yr,
+  m,
+  previewRunId = null,
+  inputHash = null,
+  dryRun = true,
+  fundReturnPct = null,
+  finalizationEnabled = process.env.ACCOUNTING_FINALIZATION_ENABLED === "true",
+  allowOpenReturn = process.env.ALLOW_OPEN_RETURN_FINALIZATION === "true",
+  adminId = "system_admin"
+}) {
+  try {
+    // 4. Batch load all authoritative inputs
+    const {
+      investors, accounts, deposits, withdrawals,
+      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns,
+      cutoverAdjustments
+    } = await accountingDataLoader({ supabaseClient: db });
+
+    // 5. Server-side authoritative recalculation
+    const currentRun = calculateAccountingPeriod({
+      year: yr,
+      month: m,
+      fundReturnPct,
+      investors: investors || [],
+      accounts: accounts || [],
+      deposits: deposits || [],
+      withdrawals: withdrawals || [],
+      commissionShares: commissionShares || [],
+      monthlyHistory: monthlyHistory || [],
+      commissionEarnings: commissionEarnings || [],
+      monthlyReturns: monthlyReturns || [],
+      cutoverAdjustments: cutoverAdjustments || []
+    });
+
+    // 6. Stale Preview Protection (Check inputHash match)
+    if (inputHash && currentRun.inputHash !== inputHash) {
+      return {
+        statusCode: 409,
+        payload: {
+          error: "STALE_PREVIEW",
+          message: "Financial inputs changed after preview was generated. Please refresh preview.",
+          previewHash: inputHash,
+          currentHash: currentRun.inputHash
+        }
+      };
+    }
+
+    // 7. Validation Gate Check
+    if (!currentRun.canFinalize || currentRun.summary.flaggedCount > 0) {
+      return {
+        statusCode: 422,
+        payload: {
+          error: "VALIDATION_FAILED",
+          message: "Period cannot be finalized because validation anomalies exist.",
+          flaggedCount: currentRun.summary.flaggedCount,
+          flags: currentRun.investors.filter(i => i.status === "FLAGGED").map(i => ({ investor: i.name, reason: i.flagReason }))
+        }
+      };
+    }
+
+    // 8. Require Frozen Return State (Not OPEN)
+    const targetReturnRow = (monthlyReturns || []).find(
+      r => Number(r.year) === yr && Number(r.month_number || r.month) === m
+    );
+    const isReturnLockedInDb = Boolean(targetReturnRow && (targetReturnRow.locked === true || String(targetReturnRow.locked).toLowerCase() === "true"));
+
+    if ((currentRun.returnStatus === "OPEN" || (!dryRun && !isReturnLockedInDb)) && !allowOpenReturn) {
+      return {
+        statusCode: 422,
+        payload: {
+          error: "RETURN_NOT_FROZEN",
+          message: "Monthly return must be captured and frozen before finalization can proceed.",
+          returnStatus: currentRun.returnStatus,
+          returnLocked: isReturnLockedInDb
+        }
+      };
+    }
+
+    // 9. Idempotency & Duplicate Finalization Guard
+    const { data: existingPeriods, error: apErr } = await db
+      .from("accounting_periods")
+      .select("id,year,month_number,status")
+      .eq("year", yr)
+      .eq("month_number", m);
+    if (apErr) {
+      throw new Error(`Failed checking accounting_periods status: ${apErr.message}`);
+    }
+
+    const activeCommRowsForPeriod = (commissionEarnings || []).filter(e => {
+      if (Number(e.year) !== yr || Number(e.month_number || e.month) !== m) return false;
+      const st = String(e.status || "ACTIVE").trim().toUpperCase();
+      return st !== "SUPERSEDED" && st !== "VOID";
+    });
+    const hasFinalizedPeriodRow = (existingPeriods || []).some(
+      p => String(p.status || "").trim().toUpperCase() === "FINALIZED"
+    );
+    const hasCloseLinkedCommRows = activeCommRowsForPeriod.some(
+      e => e.accounting_period_id !== null && e.accounting_period_id !== undefined && String(e.accounting_period_id).trim() !== ""
+    );
+    const periodHistoryRows = (monthlyHistory || []).filter(
+      h => Number(h.year) === yr && Number(h.month_number || h.month) === m
+    );
+    const allPeriodHistoryLocked = periodHistoryRows.length > 0 && periodHistoryRows.every(h => h.locked === true);
+    const alreadyFinalized = hasFinalizedPeriodRow || hasCloseLinkedCommRows || (allPeriodHistoryLocked && activeCommRowsForPeriod.length > 0);
+
+    if (dryRun === false && alreadyFinalized) {
+      return {
+        statusCode: 409,
+        payload: {
+          error: "ALREADY_FINALIZED",
+          message: `Accounting period ${yr}-${String(m).padStart(2, "0")} is already finalized or contains active commission earnings rows.`
+        }
+      };
+    }
+
+    // 10. Control Equation Check & Build Close + Rollover Plan
+    const grossCap = currentRun.summary.grossEligibleCapital;
+    const grossResult = currentRun.summary.totalGrossFundResult;
+    const sourceGain = currentRun.summary.totalSourceGainLoss;
+    const recipientComm = currentRun.summary.totalRecipientCommissions;
+    const isControlReconciled = Math.abs(grossResult - (sourceGain + recipientComm)) < 0.05;
+    if (!isControlReconciled) {
+      return {
+        statusCode: 422,
+        payload: {
+          error: "CONTROL_EQUATION_FAILED",
+          message: `Control equation discrepancy detected: gross(${grossResult}) !== source(${sourceGain}) + comm(${recipientComm}).`
+        }
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    const monthName = formatMonthName(yr, m);
+    const plan = buildPeriodCloseAndRolloverPlan({
+      yr,
+      m,
+      currentRun,
+      investors,
+      accounts,
+      deposits,
+      withdrawals,
+      monthlyHistory,
+      nowIso
+    });
+
+    const nextYear = m === 12 ? yr + 1 : yr;
+    const nextMonth = m === 12 ? 1 : m + 1;
+
+    const baseManifest = {
+      previewStatus: dryRun === false ? "FINALIZED" : "SHADOW_ONLY",
+      isDryRun: dryRun !== false,
+      alreadyFinalized,
+      engineVersion: ACCOUNTING_ENGINE_VERSION,
+      inputHash: currentRun.inputHash,
+      previewRunId: previewRunId || currentRun.previewRunId,
+      period: currentRun.period,
+      returnMetadata: {
+        returnPct: currentRun.fundReturnPct,
+        source: currentRun.returnSource,
+        status: currentRun.returnStatus,
+        capturedAt: currentRun.returnCapturedAt
+      },
+      controlEquations: {
+        grossEligibleCapital: grossCap,
+        totalGrossFundResult: grossResult,
+        totalSourceGainLoss: sourceGain,
+        totalRecipientCommissions: recipientComm,
+        controlCheck: "RECONCILED"
+      },
+      nextMonthIncomingCommissionCreditsManifest: {
+        targetYear: nextYear,
+        targetMonth: nextMonth,
+        totalIncomingCredits: plan.totalIncomingCreditsNextMonth
+      }
+    };
+
+    // Dry-run path: zero writes
+    if (dryRun !== false || !finalizationEnabled) {
+      return {
+        statusCode: 200,
+        payload: {
+          status: "SUCCESS_DRY_RUN",
+          message: "Dry run finalization completed successfully with ZERO database writes.",
+          manifest: {
+            ...baseManifest,
+            whatWouldChange: {
+              monthlyHistoryRowsToCreate: plan.historyRowsToCreate.length,
+              monthlyHistoryRowsToUpdate: plan.historyRowsToUpdate.length,
+              commissionEarningsRowsToCreate: plan.commissionRowsToCreate.length,
+              rolloverHistoryRowsToCreate: plan.rolloverRowsToCreate.length,
+              rolloverHistoryRowsToUpdate: plan.rolloverRowsToUpdate.length,
+              accountingPeriodStatusChange: `OPEN -> FINALIZED (${yr}-${m})`,
+              auditRunRow: 1,
+              totalDatabaseWritesPerformed: 0
+            }
+          }
+        }
+      };
+    }
+
+    // 11. Live Execution Path
+    const execResult = await executeLiveFinalizationWrites({
+      db,
+      yr,
+      m,
+      monthName,
+      currentRun,
+      previewRunId,
+      adminId,
+      plan,
+      nowIso
+    });
+
+    return {
+      statusCode: 200,
+      payload: {
+        status: "SUCCESS_FINALIZED",
+        message: `${monthName} ${yr} finalized and rolled over cleanly into ${formatMonthName(nextYear, nextMonth)} ${nextYear}.`,
+        manifest: {
+          ...baseManifest,
+          accountingPeriodId: execResult.accountingPeriodId,
+          changesApplied: {
+            monthlyHistoryRowsCreated: plan.historyRowsToCreate.length,
+            monthlyHistoryRowsUpdated: plan.historyRowsToUpdate.length,
+            commissionEarningsRowsCreated: plan.commissionRowsToCreate.length,
+            rolloverHistoryRowsCreated: plan.rolloverRowsToCreate.length,
+            rolloverHistoryRowsUpdated: plan.rolloverRowsToUpdate.length,
+            accountingPeriodStatusChange: `OPEN -> FINALIZED (${yr}-${m})`,
+            auditRunRow: 1,
+            totalDatabaseWritesPerformed: execResult.totalWrites
+          }
+        }
+      }
+    };
+  } catch (error) {
+    const msg = String(error?.message || "");
+    if (msg.startsWith("MANUAL_HISTORY_COLLISION")) {
+      return { statusCode: 409, payload: { error: "MANUAL_HISTORY_COLLISION", message: msg } };
+    }
+    if (msg.includes("PERIOD_ALREADY_FINALIZED")) {
+      return { statusCode: 409, payload: { error: "ALREADY_FINALIZED", message: msg } };
+    }
+    return { statusCode: 500, payload: { error: "FINALIZATION_FAILED", message: msg } };
+  }
+}
+
 export default async function handler(req, res, deps = {}) {
   const db = deps.supabase || supabase;
   const accountingDataLoader = deps.loadAccountingData || loadAccountingData;
@@ -604,207 +905,18 @@ export default async function handler(req, res, deps = {}) {
     });
   }
 
-  try {
-    // 4. Batch load all authoritative inputs
-    const {
-      investors, accounts, deposits, withdrawals,
-      commissionShares, monthlyHistory, commissionEarnings, monthlyReturns,
-      cutoverAdjustments
-    } = await accountingDataLoader({ supabaseClient: db });
-
-    // 5. Server-side authoritative recalculation
-    const currentRun = calculateAccountingPeriod({
-      year: yr,
-      month: m,
-      fundReturnPct,
-      investors: investors || [],
-      accounts: accounts || [],
-      deposits: deposits || [],
-      withdrawals: withdrawals || [],
-      commissionShares: commissionShares || [],
-      monthlyHistory: monthlyHistory || [],
-      commissionEarnings: commissionEarnings || [],
-      monthlyReturns: monthlyReturns || [],
-      cutoverAdjustments: cutoverAdjustments || []
-    });
-
-    // 6. Stale Preview Protection (Check inputHash match)
-    if (inputHash && currentRun.inputHash !== inputHash) {
-      return res.status(409).json({
-        error: "STALE_PREVIEW",
-        message: "Financial inputs changed after preview was generated. Please refresh preview.",
-        previewHash: inputHash,
-        currentHash: currentRun.inputHash
-      });
-    }
-
-    // 7. Validation Gate Check
-    if (!currentRun.canFinalize || currentRun.summary.flaggedCount > 0) {
-      return res.status(422).json({
-        error: "VALIDATION_FAILED",
-        message: "Period cannot be finalized because validation anomalies exist.",
-        flaggedCount: currentRun.summary.flaggedCount,
-        flags: currentRun.investors.filter(i => i.status === "FLAGGED").map(i => ({ investor: i.name, reason: i.flagReason }))
-      });
-    }
-
-    // 8. Require Frozen Return State (Not OPEN)
-    const targetReturnRow = (monthlyReturns || []).find(
-      r => Number(r.year) === yr && Number(r.month_number || r.month) === m
-    );
-    const isReturnLockedInDb = Boolean(targetReturnRow && (targetReturnRow.locked === true || String(targetReturnRow.locked).toLowerCase() === "true"));
-    const allowOpenReturn = process.env.ALLOW_OPEN_RETURN_FINALIZATION === "true";
-
-    if ((currentRun.returnStatus === "OPEN" || (!dryRun && !isReturnLockedInDb)) && !allowOpenReturn) {
-      return res.status(422).json({
-        error: "RETURN_NOT_FROZEN",
-        message: "Monthly return must be captured and frozen before finalization can proceed.",
-        returnStatus: currentRun.returnStatus,
-        returnLocked: isReturnLockedInDb
-      });
-    }
-
-    // 9. Idempotency & Duplicate Finalization Guard
-    const { data: existingPeriods, error: apErr } = await db
-      .from("accounting_periods")
-      .select("id,year,month_number,status")
-      .eq("year", yr)
-      .eq("month_number", m);
-    if (apErr) {
-      throw new Error(`Failed checking accounting_periods status: ${apErr.message}`);
-    }
-
-    const activeCommRowsForPeriod = (commissionEarnings || []).filter(e => {
-      if (Number(e.year) !== yr || Number(e.month_number || e.month) !== m) return false;
-      const st = String(e.status || "ACTIVE").trim().toUpperCase();
-      return st !== "SUPERSEDED" && st !== "VOID";
-    });
-    const hasFinalizedPeriodRow = (existingPeriods || []).some(
-      p => String(p.status || "").trim().toUpperCase() === "FINALIZED"
-    );
-    const alreadyFinalized = hasFinalizedPeriodRow || activeCommRowsForPeriod.length > 0;
-
-    if (dryRun === false && alreadyFinalized) {
-      return res.status(409).json({
-        error: "ALREADY_FINALIZED",
-        message: `Accounting period ${yr}-${String(m).padStart(2, "0")} is already finalized or contains active commission earnings rows.`
-      });
-    }
-
-    // 10. Control Equation Check & Build Close + Rollover Plan
-    const grossCap = currentRun.summary.grossEligibleCapital;
-    const grossResult = currentRun.summary.totalGrossFundResult;
-    const sourceGain = currentRun.summary.totalSourceGainLoss;
-    const recipientComm = currentRun.summary.totalRecipientCommissions;
-    const isControlReconciled = Math.abs(grossResult - (sourceGain + recipientComm)) < 0.05;
-    if (!isControlReconciled) {
-      return res.status(422).json({
-        error: "CONTROL_EQUATION_FAILED",
-        message: `Control equation discrepancy detected: gross(${grossResult}) !== source(${sourceGain}) + comm(${recipientComm}).`
-      });
-    }
-
-    const nowIso = new Date().toISOString();
-    const monthName = formatMonthName(yr, m);
-    const plan = buildPeriodCloseAndRolloverPlan({
-      yr,
-      m,
-      currentRun,
-      investors,
-      accounts,
-      deposits,
-      withdrawals,
-      monthlyHistory,
-      nowIso
-    });
-
-    const nextYear = m === 12 ? yr + 1 : yr;
-    const nextMonth = m === 12 ? 1 : m + 1;
-
-    const baseManifest = {
-      previewStatus: dryRun === false ? "FINALIZED" : "SHADOW_ONLY",
-      isDryRun: dryRun !== false,
-      alreadyFinalized,
-      engineVersion: ACCOUNTING_ENGINE_VERSION,
-      inputHash: currentRun.inputHash,
-      previewRunId: previewRunId || currentRun.previewRunId,
-      period: currentRun.period,
-      returnMetadata: {
-        returnPct: currentRun.fundReturnPct,
-        source: currentRun.returnSource,
-        status: currentRun.returnStatus,
-        capturedAt: currentRun.returnCapturedAt
-      },
-      controlEquations: {
-        grossEligibleCapital: grossCap,
-        totalGrossFundResult: grossResult,
-        totalSourceGainLoss: sourceGain,
-        totalRecipientCommissions: recipientComm,
-        controlCheck: "RECONCILED"
-      },
-      nextMonthIncomingCommissionCreditsManifest: {
-        targetYear: nextYear,
-        targetMonth: nextMonth,
-        totalIncomingCredits: plan.totalIncomingCreditsNextMonth
-      }
-    };
-
-    // Dry-run path: zero writes
-    if (dryRun !== false || !finalizationEnabled) {
-      return res.status(200).json({
-        status: "SUCCESS_DRY_RUN",
-        message: "Dry run finalization completed successfully with ZERO database writes.",
-        manifest: {
-          ...baseManifest,
-          whatWouldChange: {
-            monthlyHistoryRowsToCreate: plan.historyRowsToCreate.length,
-            monthlyHistoryRowsToUpdate: plan.historyRowsToUpdate.length,
-            commissionEarningsRowsToCreate: plan.commissionRowsToCreate.length,
-            rolloverHistoryRowsToCreate: plan.rolloverRowsToCreate.length,
-            rolloverHistoryRowsToUpdate: plan.rolloverRowsToUpdate.length,
-            accountingPeriodStatusChange: `OPEN -> FINALIZED (${yr}-${m})`,
-            auditRunRow: 1,
-            totalDatabaseWritesPerformed: 0
-          }
-        }
-      });
-    }
-
-    // 11. Live Execution Path
-    const execResult = await executeLiveFinalizationWrites({
-      db,
-      yr,
-      m,
-      monthName,
-      currentRun,
-      previewRunId,
-      adminId: auth.adminId,
-      plan,
-      nowIso
-    });
-
-    return res.status(200).json({
-      status: "SUCCESS_FINALIZED",
-      message: `${monthName} ${yr} finalized and rolled over cleanly into ${formatMonthName(nextYear, nextMonth)} ${nextYear}.`,
-      manifest: {
-        ...baseManifest,
-        accountingPeriodId: execResult.accountingPeriodId,
-        changesApplied: {
-          monthlyHistoryRowsCreated: plan.historyRowsToCreate.length,
-          monthlyHistoryRowsUpdated: plan.historyRowsToUpdate.length,
-          commissionEarningsRowsCreated: plan.commissionRowsToCreate.length,
-          rolloverHistoryRowsCreated: plan.rolloverRowsToCreate.length,
-          rolloverHistoryRowsUpdated: plan.rolloverRowsToUpdate.length,
-          accountingPeriodStatusChange: `OPEN -> FINALIZED (${yr}-${m})`,
-          auditRunRow: 1,
-          totalDatabaseWritesPerformed: execResult.totalWrites
-        }
-      }
-    });
-  } catch (error) {
-    if (String(error?.message || "").startsWith("MANUAL_HISTORY_COLLISION")) {
-      return res.status(409).json({ error: "MANUAL_HISTORY_COLLISION", message: error.message });
-    }
-    return res.status(500).json({ error: "FINALIZATION_FAILED", message: error.message });
-  }
+  const outcome = await executePeriodFinalizationWorkflow({
+    db,
+    accountingDataLoader,
+    yr,
+    m,
+    previewRunId,
+    inputHash,
+    dryRun,
+    fundReturnPct,
+    finalizationEnabled,
+    allowOpenReturn: process.env.ALLOW_OPEN_RETURN_FINALIZATION === "true",
+    adminId: auth.adminId
+  });
+  return res.status(outcome.statusCode).json(outcome.payload);
 }

@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { paginatedRead } from "../../../lib/supabase.js";
+import { isDrawFulfillmentWithdrawal } from "../../../lib/accounting-engine.js";
 import Decimal from "decimal.js";
 import ExcelJS from "exceljs";
 
@@ -43,17 +44,32 @@ export default async function handler(req, res) {
       paginatedRead("commission_earnings", { queryModifier: q => q.eq("year", year) }),
       paginatedRead("commission_earnings", { queryModifier: q => q.eq("year", year - 1).eq("month_number", 12) }),
       paginatedRead("deposits", { queryModifier: q => q.not("type", "ilike", "VOID") }),
-      paginatedRead("withdrawals", { queryModifier: q => q.in("status", ["Approved", "Completed"]) })
+      paginatedRead("withdrawals", { queryModifier: q => q.in("status", ["Approved", "Completed", "Pending", "pending"]) })
     ]);
     history.sort((a, b) => Number(a.month_number) - Number(b.month_number));
+
+    const activeDeposits = (deposits || []).filter(d => {
+      const typeUpper = String(d.type || "").trim().toUpperCase();
+      const statusLower = String(d.status || "").trim().toLowerCase();
+      const treatment = String(d.accounting_treatment || "NEW_CASH").trim().toUpperCase();
+      if (typeUpper === "VOID" || typeUpper === "HISTORICAL_PROVENANCE") return false;
+      if (treatment === "HISTORICAL_PROVENANCE") return false;
+      if (String(d.idempotency_key || "").startsWith("hist_prov_")) return false;
+      if (statusLower && !["confirmed", "completed", "approved"].includes(statusLower)) return false;
+      return true;
+    });
+
+    const isActiveEarning = e => !e.status || String(e.status).trim().toUpperCase() === "ACTIVE";
+    const activeEarningsTargetYear = (earningsTargetYear || []).filter(isActiveEarning);
+    const activeEarningsPrevYearDec = (earningsPrevYearDec || []).filter(isActiveEarning);
 
     const returnMap = {};
     (returns || []).forEach(r => { returnMap[r.month_number] = new Decimal(r.gross_return_pct || 0); });
 
-    // Index unique commission_earnings rows by ID to avoid duplicate counting
+    // Index unique ACTIVE commission_earnings rows by ID to avoid duplicate counting
     const earningsById = {};
-    (earningsTargetYear || []).forEach(e => { earningsById[e.id] = e; });
-    (earningsPrevYearDec || []).forEach(e => { earningsById[e.id] = e; });
+    activeEarningsTargetYear.forEach(e => { earningsById[e.id] = e; });
+    activeEarningsPrevYearDec.forEach(e => { earningsById[e.id] = e; });
 
     // Map earnings by recipient and earned month
     const earningsByRecipientAndMonth = {};
@@ -81,8 +97,8 @@ export default async function handler(req, res) {
     const affectedInvestorsSet = new Set();
     const affectedInvestorMonthsSet = new Set();
 
-    // Unique ledger principal sum for the year
-    (earningsTargetYear || []).forEach(e => {
+    // Unique active ledger principal sum for the year
+    activeEarningsTargetYear.forEach(e => {
       totalUniqueLedgerPrincipal = totalUniqueLedgerPrincipal.add(new Decimal(e.amount));
     });
 
@@ -90,13 +106,16 @@ export default async function handler(req, res) {
     const classifiedLedgerRows = {};
 
     for (const inv of (investors || [])) {
+      if (inv.active === false || String(inv.role || "").toLowerCase() === "admin") {
+        continue;
+      }
       if (filterInvestorId && inv.id !== filterInvestorId && inv.portal_username !== filterInvestorId) {
         continue;
       }
       totalInvestorsChecked++;
 
       const invHistory = (history || []).filter(h => h.investor_id === inv.id || h.investor_id === inv.portal_username);
-      const invDeposits = (deposits || []).filter(d => d.investor_id === inv.id || d.investor_id === inv.portal_username);
+      const invDeposits = activeDeposits.filter(d => d.investor_id === inv.id || d.investor_id === inv.portal_username);
       const invWithdrawals = (withdrawals || []).filter(w => w.investor_id === inv.id || w.investor_id === inv.portal_username);
 
       const splitPct = new Decimal(inv.split_pct || 100);
@@ -129,16 +148,25 @@ export default async function handler(req, res) {
 
         // Deposits & withdrawals in month m
         const mDeps = invDeposits.filter(d => {
-          const dt = new Date(d.date);
+          const eff = d.effective_accounting_date || d.date;
+          if (!eff) return false;
+          const dt = new Date(eff);
           return dt.getUTCFullYear() === year && dt.getUTCMonth() + 1 === m;
         }).reduce((s, d) => s.add(new Decimal(d.amount)), new Decimal(0));
 
-        const mWds = invWithdrawals.filter(w => {
-          if (w.effective_year === year || (!w.effective_year && m <= 8)) {
-            return Number(w.month_number) === m;
+        const matchingMWds = invWithdrawals.filter(w => {
+          if (w.effective_accounting_date || w.request_date) {
+            const eff = String(w.effective_accounting_date || w.request_date).slice(0, 10);
+            const dt = new Date(eff);
+            return dt.getUTCFullYear() === year && dt.getUTCMonth() + 1 === m;
           }
-          return false;
-        }).reduce((s, w) => s.add(new Decimal(w.amount || 0)), new Decimal(0));
+          const wYear = Number(w.year || w.effective_year || year);
+          return wYear === year && Number(w.month_number) === m;
+        });
+        const mWds = matchingMWds.reduce((s, w) => s.add(new Decimal(w.amount || 0)), new Decimal(0));
+        const mDrawFulfilled = matchingMWds
+          .filter(w => isDrawFulfillmentWithdrawal(w))
+          .reduce((s, w) => s.add(new Decimal(w.amount || 0)), new Decimal(0));
 
         const fundRetPct = returnMap[m] || new Decimal(0);
 
@@ -175,7 +203,8 @@ export default async function handler(req, res) {
             const grossLoss = eligibleCapital.mul(fundRetPct.div(100));
             ownGain = roundMoney(grossLoss.mul(splitDec));
           }
-          calcEnding = eligibleCapital.add(ownGain).sub(draw);
+          const effectiveDraw = Decimal.max(0, draw.sub(mDrawFulfilled));
+          calcEnding = eligibleCapital.add(ownGain).sub(effectiveDraw);
         }
 
         const balanceDiff = (storedEnding !== null && calcEnding !== null) ? storedEnding.sub(calcEnding) : null;

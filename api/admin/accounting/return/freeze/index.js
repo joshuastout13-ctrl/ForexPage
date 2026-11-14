@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../../../lib/adminAuth.js";
 import { supabase } from "../../../../../lib/supabase.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../../../lib/period-lock-guard.js";
 
 /**
  * Return Freeze API Endpoint
@@ -61,6 +62,7 @@ export default async function handler(req, res, deps = {}) {
     if (!db) {
       throw new Error("Supabase client is not configured.");
     }
+    await assertPeriodUnlocked(db, { year: yr, monthNumber: m }, "freeze_monthly_return");
     const monthName = new Date(Date.UTC(yr, m - 1, 1)).toLocaleString("en-US", {
       month: "long",
       timeZone: "UTC"
@@ -93,6 +95,9 @@ export default async function handler(req, res, deps = {}) {
     });
   } catch (err) {
     console.error("[Return Freeze Error]:", err.message);
+    if (isPeriodLockedError(err) || String(err?.message || "").includes("PERIOD_LOCKED")) {
+      return res.status(409).json({ error: "PERIOD_LOCKED", message: err.message });
+    }
     return res.status(500).json({ error: "Internal Server Error", message: err.message });
   }
 }

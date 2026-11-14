@@ -135,7 +135,15 @@ async function runP0RegressionSuite() {
     asOfDate: "2026-11-02T12:00:00Z"
   };
 
-  const svaldesDash = await buildInvestorDashboard("svaldes", svaldesPreloaded);
+  const svaldesDashUnfinalized = await buildInvestorDashboard("svaldes", svaldesPreloaded);
+  assert.strictEqual(svaldesDashUnfinalized.summary.bookedCommissionsEarnedMonth, 0, "svaldes booked October commission must be $0.00 when unfinalized, never fabricated");
+  assert.strictEqual(svaldesDashUnfinalized.summary.commissionsEarnedMonth, null, "svaldes verified October commission fails closed while October is unfinalized");
+
+  const svaldesFinalizedPreloaded = {
+    ...svaldesPreloaded,
+    returnsSheet: baseReturns.map(r => (r.month_number === 10 ? { ...r, gross_return_pct: 3.05, locked: true } : r))
+  };
+  const svaldesDash = await buildInvestorDashboard("svaldes", svaldesFinalizedPreloaded);
   assert.strictEqual(svaldesDash.summary.commissionsEarnedMonth, 0, "svaldes October commission must be $0.00, never fabricated");
   assert.strictEqual(svaldesDash.summary.commissionsEarnedYear, 0, "svaldes YTD commission must be $0.00, never fabricated");
   console.log("   ✓ Unbooked / pre-start commission rules never fabricate commission dollar amounts\n");

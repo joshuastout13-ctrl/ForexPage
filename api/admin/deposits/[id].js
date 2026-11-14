@@ -1,11 +1,12 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { assertAuthoritativeProductionDb, assertAuditActor } from "../../../lib/financial-mutation-guard.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../lib/period-lock-guard.js";
 
 /**
  * Admin Deposit API — Edit single deposit
  *
- * PATCH /api/admin/deposits/[id]
+ * POST / PATCH / PUT /api/admin/deposits/[id]
  *
  * Supports updating: investor_id, account_id, date, effective_accounting_date,
  * amount, type, notes, accounting_treatment, status.
@@ -19,12 +20,29 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: "Missing deposit ID" });
 
-  // ─── PATCH / PUT: Edit deposit ────────────────────────────────────────────
-  if (req.method === "PATCH" || req.method === "PUT") {
+  // ─── POST / PATCH / PUT: Edit deposit ─────────────────────────────────────
+  if (req.method === "PATCH" || req.method === "PUT" || req.method === "POST") {
     try {
       await assertAuthoritativeProductionDb("update_deposit");
       const auditActor = assertAuditActor(
         session?.adminId || session?.userId || req.body?.updated_by,
+        "update_deposit"
+      );
+
+      const { data: existingDep, error: fetchErr } = await supabase
+        .from("deposits")
+        .select("id, date, effective_accounting_date, status, type, amount")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (fetchErr) throw fetchErr;
+      if (!existingDep) {
+        return res.status(404).json({ error: `Deposit not found: ${id}` });
+      }
+
+      await assertPeriodUnlocked(
+        supabase,
+        { effectiveDate: existingDep.effective_accounting_date, date: existingDep.date },
         "update_deposit"
       );
 
@@ -91,6 +109,17 @@ export default async function handler(req, res) {
       // Always write updated_at and capture who made the change
       updates.updated_at = new Date().toISOString();
 
+      if (updates.effective_accounting_date !== undefined || updates.date !== undefined) {
+        await assertPeriodUnlocked(
+          supabase,
+          {
+            effectiveDate: updates.effective_accounting_date ?? existingDep.effective_accounting_date,
+            date: updates.date ?? existingDep.date
+          },
+          "update_deposit_target_period"
+        );
+      }
+
       const { data, error: updateErr } = await supabase
         .from("deposits")
         .update(updates)
@@ -99,8 +128,11 @@ export default async function handler(req, res) {
 
       if (updateErr) throw updateErr;
 
-      return res.status(200).json({ success: true, deposit: data[0] });
+      return res.status(200).json({ success: true, deposit: data[0], updated_by: auditActor });
     } catch (err) {
+      if (isPeriodLockedError(err) || String(err?.message || "").includes("PERIOD_LOCKED")) {
+        return res.status(409).json({ error: err.message, code: "PERIOD_LOCKED" });
+      }
       const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });
     }
@@ -108,7 +140,7 @@ export default async function handler(req, res) {
 
   // ─── DELETE: Permanently blocked ─────────────────────────────────────────
   if (req.method === "DELETE") {
-    res.setHeader("Allow", ["PATCH", "PUT"]);
+    res.setHeader("Allow", ["POST", "PATCH", "PUT"]);
     return res.status(405).json({
       error: "METHOD_NOT_ALLOWED: Physical deletion of financial deposit records is permanently " +
         "disabled to preserve ledger audit integrity. " +
@@ -117,6 +149,6 @@ export default async function handler(req, res) {
     });
   }
 
-  res.setHeader("Allow", ["PATCH", "PUT"]);
+  res.setHeader("Allow", ["POST", "PATCH", "PUT"]);
   res.status(405).json({ error: "Method not allowed" });
 }

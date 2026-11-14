@@ -1,5 +1,9 @@
 import { verifyAdminSession } from "../../../../lib/adminAuth.js";
 import { supabase } from "../../../../lib/supabase.js";
+import {
+  executeCommissionShareLifecycleAction,
+  validateCommissionShareMutation
+} from "../../../../lib/commission-share-validation.js";
 
 export default async function handler(req, res) {
   try {
@@ -12,57 +16,48 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
       const action = req.body?.action || req.query?.action;
-      if (action === "deactivate") {
-        const { data, error } = await supabase
-          .from("commission_shares")
-          .update({ 
-            status: "cancelled",
-            effective_end_date: new Date().toISOString().split('T')[0],
-            updated_at: new Date()
-          })
-          .eq("id", id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        return res.status(200).json({ share: data });
-      }
-      
-      if (action === "reactivate") {
-        const { data, error } = await supabase
-          .from("commission_shares")
-          .update({ 
-            status: "active",
-            effective_end_date: null,
-            updated_at: new Date()
-          })
-          .eq("id", id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        return res.status(200).json({ share: data });
+      if (action === "deactivate" || action === "reactivate") {
+        const effectiveEndDate = req.body?.effectiveEndDate || req.body?.effective_end_date || null;
+        const share = await executeCommissionShareLifecycleAction(supabase, {
+          id,
+          action,
+          effectiveEndDate
+        });
+        return res.status(200).json({ share });
       }
     }
 
     if (req.method === "PATCH") {
+      const { data: existing, error: fetchErr } = await supabase
+        .from("commission_shares")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (fetchErr) throw fetchErr;
+      if (!existing) return res.status(404).json({ error: `Commission share not found: ${id}` });
+
       const updates = {};
-      if (req.body.commissionPercent !== undefined) updates.commission_percent = req.body.commissionPercent;
+      if (req.body.commissionPercent !== undefined) updates.commission_percent = Number(req.body.commissionPercent);
       if (req.body.effectiveStartDate !== undefined) updates.effective_start_date = req.body.effectiveStartDate;
       if (req.body.effectiveEndDate !== undefined) updates.effective_end_date = req.body.effectiveEndDate || null;
       if (req.body.status !== undefined) updates.status = req.body.status;
       if (req.body.sourceInvestorId !== undefined) updates.source_investor_id = req.body.sourceInvestorId;
-      if (req.body.accountId !== undefined) updates.source_account_id = req.body.accountId;
-      
+      if (req.body.accountId !== undefined) updates.source_account_id = req.body.accountId || null;
+
       if (req.body.recipientUsername) {
         const { data: recipient } = await supabase
           .from("investors")
           .select("id")
           .or(`portal_username.ilike.${req.body.recipientUsername},email.ilike.${req.body.recipientUsername},id.eq.${req.body.recipientUsername}`)
-          .single();
-        if (recipient) updates.recipient_investor_id = recipient.id;
+          .maybeSingle();
+        if (!recipient) return res.status(404).json({ error: "Recipient investor not found" });
+        updates.recipient_investor_id = recipient.id;
       }
-      
+
+      const candidate = { ...existing, ...updates };
+      await validateCommissionShareMutation(supabase, candidate, { existing, excludeId: id });
+
       updates.updated_at = new Date();
 
       const { data, error } = await supabase
@@ -79,6 +74,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     console.error("[Admin Commission Shares [id] API]", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    const statusCode = error?.status || (String(error?.message || "").includes("PERIOD_LOCKED") ? 409 : 500);
+    res.status(statusCode).json({ error: error.message || "Internal server error", code: error?.code });
   }
 }

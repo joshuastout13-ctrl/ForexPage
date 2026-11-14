@@ -77,6 +77,12 @@ export default async function handler(req, res) {
       const newId = body.id || `acc_${crypto.randomBytes(4).toString("hex")}`;
       const splitPct = Number(body.splitPct !== undefined ? body.splitPct : 100);
       const commissionRules = Array.isArray(body.commissionRules) ? body.commissionRules : [];
+      if (commissionRules.length > 0) {
+        return res.status(400).json({
+          error: "LEGACY_COMMISSION_RULES_DEPRECATED: Manage commission shares via /api/admin/commission-shares instead of commissionRules.",
+          code: "LEGACY_COMMISSION_RULES_DEPRECATED"
+        });
+      }
 
       const payload = {
         id: newId,
@@ -95,17 +101,6 @@ export default async function handler(req, res) {
 
       const { data, error } = await supabase.from("investor_accounts").insert([payload]).select();
       if (error) throw error;
-
-      // Save commission rules
-      if (commissionRules.length > 0) {
-        const rulesPayload = commissionRules.map(rule => ({
-          investor_id: body.investorId,
-          account_id: newId,
-          recipient_id: rule.recipientId,
-          percent: Number(rule.percent)
-        }));
-        await supabase.from("commission_rules").insert(rulesPayload);
-      }
 
       return res.status(200).json({ success: true, account: data[0] });
     } catch (err) {

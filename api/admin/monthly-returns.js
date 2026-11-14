@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../lib/adminAuth.js";
 import { supabase } from "../../lib/supabase.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../lib/period-lock-guard.js";
 
 const MONTH_MAP = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -31,6 +32,8 @@ export default async function handler(req, res) {
         throw new Error("Year and valid Month are required");
       }
 
+      await assertPeriodUnlocked(supabase, { year, monthNumber }, "update_monthly_return");
+
       const grossReturnPct = Number(body.grossReturnPct ?? body.gross_return_pct ?? 0);
 
       const updates = {
@@ -54,6 +57,9 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true, monthlyReturn: data[0] });
     } catch (err) {
+      if (isPeriodLockedError(err) || String(err?.message || "").includes("PERIOD_LOCKED")) {
+        return res.status(409).json({ error: err.message, code: "PERIOD_LOCKED" });
+      }
       return res.status(500).json({ error: err.message });
     }
   }

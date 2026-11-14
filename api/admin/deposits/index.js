@@ -5,6 +5,7 @@ import {
   assertAuditActor,
   buildDeterministicIdempotencyKey
 } from "../../../lib/financial-mutation-guard.js";
+import { assertPeriodUnlocked, isPeriodLockedError } from "../../../lib/period-lock-guard.js";
 import crypto from "node:crypto";
 
 /**
@@ -98,6 +99,8 @@ export default async function handler(req, res) {
         const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
         effDate = `${y}-${m}-01`;
       }
+
+      await assertPeriodUnlocked(supabase, { effectiveDate: effDate }, "create_deposit");
 
       // ── Resolve investor + account ────────────────────────────────────────
       let investorId = body.investorId || body.investor_id;
@@ -248,6 +251,9 @@ export default async function handler(req, res) {
 
       if (rpcErr) {
         const msg = String(rpcErr.message || "");
+        if (msg.includes("PERIOD_LOCKED")) {
+          return res.status(409).json({ error: msg, code: "PERIOD_LOCKED" });
+        }
         if (msg.includes("IDEMPOTENCY_KEY_PAYLOAD_MISMATCH")) {
           return res.status(409).json({
             error: msg,
@@ -307,6 +313,9 @@ export default async function handler(req, res) {
         });
       }
     } catch (err) {
+      if (isPeriodLockedError(err)) {
+        return res.status(409).json({ error: err.message, code: "PERIOD_LOCKED" });
+      }
       const isAuthDbUnavailable = String(err?.message || "").includes("AUTHORITATIVE_PRODUCTION_DB_UNAVAILABLE");
       return res.status(isAuthDbUnavailable ? 503 : 500).json({ error: err.message });
     }

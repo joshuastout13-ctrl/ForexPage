@@ -1,5 +1,6 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase, readSupabaseTable } from "../../../lib/supabase.js";
+import { hashPassword, isBcryptHash } from "../../../lib/password.js";
 import crypto from "node:crypto";
 
 export default async function handler(req, res) {
@@ -55,19 +56,23 @@ export default async function handler(req, res) {
       }
 
       if (commissionRules.length > 0) {
-        const totalCommissions = commissionRules.reduce((sum, rule) => sum + Number(rule.percent), 0);
-        if (splitPct + totalCommissions > 100.01) {
-          throw new Error(`Total split (${splitPct}%) and commission rules (${totalCommissions}%) cannot exceed 100%`);
-        }
+        return res.status(400).json({
+          error: "LEGACY_COMMISSION_RULES_DEPRECATED: Use /api/admin/commission-shares (or /bulk) to configure commission shares.",
+          code: "LEGACY_COMMISSION_RULES_DEPRECATED"
+        });
       }
-      
+
+      const rawPwd = body.tempPassword !== undefined ? body.tempPassword : body.password;
+      const cleanPwd = String(rawPwd || "").trim();
+      const hashedPwd = cleanPwd ? (isBcryptHash(cleanPwd) ? cleanPwd : hashPassword(cleanPwd)) : "";
+
       const investorPayload = {
         id: newId,
         first_name: body.firstName || "",
         last_name: body.lastName || "",
         email: body.email || "",
         portal_username: body.portalUsername || newId,
-        temp_password: body.tempPassword || body.password || "",
+        temp_password: hashedPwd,
         active: body.active !== false, // Default true
         split_pct: splitPct,
         monthly_draw: Number(body.monthlyDraw || 0),
@@ -116,21 +121,6 @@ export default async function handler(req, res) {
           console.error("Failed to create investor account:", aError.message);
         } else {
            accData = aData;
-        }
-      }
-
-      // Create commission rules if any
-      if (commissionRules.length > 0) {
-        const rulesPayload = commissionRules.map(rule => ({
-          investor_id: newId,
-          account_id: accId,
-          recipient_id: rule.recipientId,
-          percent: Number(rule.percent)
-        }));
-        
-        const { error: rulesError } = await supabase.from("commission_rules").insert(rulesPayload);
-        if (rulesError) {
-          console.error("Failed to create commission rules:", rulesError.message);
         }
       }
 
