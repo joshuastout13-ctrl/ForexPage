@@ -271,7 +271,121 @@ async function runTests() {
     console.log("  PASS 5: Admin accounts and consistency endpoints use paginatedRead and forward cutovers/shares.");
   }
 
-  console.log("=== ALL 5 P0 NOVEMBER REGRESSION TESTS PASSED ===");
+  // 6. Accounting period engine regression: Nov 1 & Dec 1 starters ignore $0 PRE_START prior month rows
+  {
+    const novPeriod = calculateAccountingPeriod({
+      year: 2026,
+      month: 11,
+      fundReturnPct: 1.25,
+      returnSource: "MYFXBOOK_COMPLETED_MONTH",
+      returnStatus: "FINAL_RETURN_CAPTURED",
+      investors: [
+        { id: "inv_nov1", portal_username: "nov1user", first_name: "Nov", last_name: "Starter", split_pct: 75, monthly_draw: 0, start_date: "2026-11-01", active: true }
+      ],
+      accounts: [
+        { id: "acc_nov1", investor_id: "inv_nov1", starting_capital: 20000, status: "Active" }
+      ],
+      deposits: [],
+      withdrawals: [],
+      commissionShares: [
+        { id: "cs_nov1", source_investor_id: "inv_nov1", recipient_investor_id: "inv_stout", commission_percent: 25, effective_start_date: "2026-11-01", status: "active" }
+      ],
+      monthlyHistory: [
+        { investor_id: "inv_nov1", year: 2026, month_number: 10, opening_balance: 0, ending_balance: 0, locked: true, notes: "PRE_START" },
+        { investor_id: "inv_nov1", year: 2026, month_number: 11, opening_balance: 0, ending_balance: 0, locked: false, notes: "OPEN_PLACEHOLDER" }
+      ],
+      commissionEarnings: [],
+      monthlyReturns: [{ year: 2026, month_number: 10, gross_return_pct: 1.84, locked: true }]
+    });
+    const novInv = novPeriod.investors[0];
+    assert.strictEqual(novInv.priorEndingBalance, 20000, "Nov 1 starter must seed $20,000 priorEndingBalance despite $0 PRE_START Oct row");
+    assert.strictEqual(novInv.endingBalance, 20187.5, "Nov 1 starter must earn +1.25% * 75% split -> $20,187.50");
+
+    const decPeriod = calculateAccountingPeriod({
+      year: 2026,
+      month: 12,
+      fundReturnPct: 3.0,
+      returnSource: "MYFXBOOK_COMPLETED_MONTH",
+      returnStatus: "FINAL_RETURN_CAPTURED",
+      investors: [
+        { id: "inv_dec1", portal_username: "dec1user", first_name: "Dec", last_name: "Starter", split_pct: 50, monthly_draw: 0, start_date: "2026-12-01", active: true }
+      ],
+      accounts: [
+        { id: "acc_dec1", investor_id: "inv_dec1", starting_capital: 150000, status: "Active" }
+      ],
+      deposits: [],
+      withdrawals: [],
+      commissionShares: [
+        { id: "cs_dec1", source_investor_id: "inv_dec1", recipient_investor_id: "inv_stout", commission_percent: 50, effective_start_date: "2026-12-01", status: "active" }
+      ],
+      monthlyHistory: [
+        { investor_id: "inv_dec1", year: 2026, month_number: 11, opening_balance: 0, ending_balance: 0, locked: true, notes: "PRE_START" },
+        { investor_id: "inv_dec1", year: 2026, month_number: 12, opening_balance: 0, ending_balance: 0, locked: false, notes: "OPEN_PLACEHOLDER" }
+      ],
+      commissionEarnings: [],
+      monthlyReturns: [{ year: 2026, month_number: 11, gross_return_pct: 1.25, locked: true }]
+    });
+    const decInv = decPeriod.investors[0];
+    assert.strictEqual(decInv.priorEndingBalance, 150000, "Dec 1 starter must seed $150,000 priorEndingBalance despite $0 PRE_START Nov row");
+    assert.strictEqual(decInv.endingBalance, 152250, "Dec 1 starter must earn +3.0% * 50% split -> $152,250.00");
+    console.log("  PASS 6: Accounting period engine seeds Nov 1 & Dec 1 starters across $0 PRE_START prior rows.");
+  }
+
+  // 7. Year-boundary rollover regression: 2026-12 -> 2027-01 capitalized commissions, draws, cashflows, and Jan 2027 starters
+  {
+    const returns2026And2027 = [
+      ...MONTHS.map((m, idx) => ({
+        year: 2026, month_number: idx + 1, month: m, gross_return_pct: 1.0, locked: true
+      })),
+      { year: 2026, month_number: 12, month: "December", gross_return_pct: 3.0, locked: true },
+      { year: 2027, month_number: 1, month: "January", gross_return_pct: 0, locked: false }
+    ];
+    const decLockedHist = [
+      ...makeLockedHistory("inv_rec", Array(11).fill(95000)),
+      { investor_id: "inv_rec", year: 2026, month_number: 12, opening_balance: 98000, deposits: 0, withdrawals: 0, gross_return_pct: 3.0, recurring_draw: 1000, ending_balance: 100000, locked: true },
+      { investor_id: "inv_rec", year: 2027, month_number: 1, opening_balance: 100500, deposits: 2500, withdrawals: 0, recurring_draw: 1000, ending_balance: 102000, locked: false }
+    ];
+    const preloaded = {
+      rawInvestors: [
+        { id: "inv_rec", portal_username: "recuser", first_name: "Rec", last_name: "User", split_pct: 100, monthly_draw: 1000, start_date: "2026-01-01", active: true },
+        { id: "inv_jan27", portal_username: "jan27", first_name: "Jan27", last_name: "Starter", split_pct: 100, monthly_draw: 0, start_date: "2027-01-01", active: true }
+      ],
+      accounts: [
+        { id: "acc_rec", investor_id: "inv_rec", starting_capital: 95000, status: "Active", is_commission: true },
+        { id: "acc_jan27", investor_id: "inv_jan27", starting_capital: 50000, status: "Active" }
+      ],
+      returnsSheet: returns2026And2027,
+      depositsSheet: [
+        { id: "d_aug26", investor_id: "inv_rec", date: "2026-08-01", effective_accounting_date: "2026-08-01", amount: 10000, status: "confirmed", accounting_treatment: "NEW_CASH" },
+        { id: "d_jan27", investor_id: "inv_rec", date: "2027-01-01", effective_accounting_date: "2027-01-01", amount: 2500, status: "confirmed", accounting_treatment: "NEW_CASH" }
+      ],
+      withdrawalsSheet: [],
+      historyTable: decLockedHist,
+      commissionEarningsTable: [
+        { recipient_id: "inv_rec", source_investor_id: "inv_src", year: 2026, month_number: 12, amount: 500, status: "ACTIVE", created_at: "2027-01-01T00:05:00Z" }
+      ],
+      commissionSharesTable: [],
+      commissionRulesTable: [],
+      cutovers: [],
+      live: { today: "+0.50%", week: "+0.50%", month: "+0.50%", year: "+0.50%" }
+    };
+
+    const recJan = await buildInvestorDashboard("inv_rec", preloaded, { asOfDate: "2027-01-02T20:00:00Z" });
+    assert.strictEqual(recJan.summary.currentBalance, 102000, "Jan 2027 currentBalance must capitalize Dec commission (+500), add Jan deposit (+2500), and deduct Jan draw (-1000)");
+    assert.strictEqual(recJan.summary.commissionsEarnedMonth, 500, "Jan 2027 must report Dec 2026 earned commissions as last completed month");
+    assert.strictEqual(recJan.summary.externalDepositsYtd, 10000, "Jan 2027 must keep full 2026 YTD deposits (not truncate maxMonth to 1)");
+    assert.strictEqual(recJan.live.lastMonth, "+3.00%", "Jan 2027 must report Dec 2026 as lastMonth");
+    assert.strictEqual(recJan.liveDollarGains.month, 515, "Jan 2027 live gain base must equal $103,000 (opening $100,500 + $2,500 deposit) * 0.50%");
+
+    const jan27Before = await buildInvestorDashboard("inv_jan27", preloaded, { asOfDate: "2026-12-15T20:00:00Z" });
+    assert.strictEqual(jan27Before.summary.currentBalance, 0, "Jan 2027 starter must be $0 in Dec 2026");
+
+    const jan27Open = await buildInvestorDashboard("inv_jan27", preloaded, { asOfDate: "2027-01-02T20:00:00Z" });
+    assert.strictEqual(jan27Open.summary.currentBalance, 50000, "Jan 2027 starter must report $50,000 once Jan 2027 opens");
+    console.log("  PASS 7: Year-boundary 2026-12 -> 2027-01 dashboard rollover & Jan 2027 starter logic verified.");
+  }
+
+  console.log("=== ALL 7 P0 NOVEMBER & YEAR-ROLLOVER REGRESSION TESTS PASSED ===");
 }
 
 runTests().catch(err => {
