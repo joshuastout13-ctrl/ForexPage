@@ -941,24 +941,37 @@ async function runTestSuite() {
     process.env.AUTO_MONTH_END_CLOSE_ENABLED = "false";
     {
       // Checking Nov 2026 while clock is 2026-12-01 -> shadow preview mode (0 DB writes)
+      // Also verify HTTP query/body asOfDate overrides are ignored in production cron handler.
       const { req, res } = makeReqRes({
         method: "POST",
         query: { asOfDate: "2026-12-01T12:00:00Z" },
         headers: { authorization: "Bearer cron_secret_e2e" }
       });
-      await cronMonthEndCloseHandler(req, res, { supabase: db });
+      await cronMonthEndCloseHandler(req, res, { supabase: db, asOfDate: "2026-12-01T12:00:00Z" });
       assert.equal(res.statusCode, 200, JSON.stringify(res.payload));
       assert.equal(res.payload.mode, "SHADOW_PREVIEW_ONLY");
       assert.equal(res.payload.targetMonth, 11);
     }
     {
+      // HTTP-supplied asOfDate/body overrides must NOT allow premature Nov close while injected clock is 2026-11-15
+      const { req, res } = makeReqRes({
+        method: "POST",
+        query: { year: "2026", month: "11", asOfDate: "2026-12-01T12:00:00Z" },
+        body: { asOfDate: "2026-12-01T12:00:00Z" },
+        headers: { authorization: "Bearer cron_secret_e2e" }
+      });
+      await cronMonthEndCloseHandler(req, res, { supabase: db, asOfDate: "2026-11-15T12:00:00Z" });
+      assert.equal(res.statusCode, 422);
+      assert.equal(res.payload.error, "PERIOD_NOT_HISTORICAL_SETTLED");
+    }
+    {
       // Already finalized M10 -> skipped idempotently
       const { req, res } = makeReqRes({
         method: "POST",
-        query: { year: "2026", month: "10", asOfDate: "2026-12-01T12:00:00Z" },
+        query: { year: "2026", month: "10" },
         headers: { authorization: "Bearer cron_secret_e2e" }
       });
-      await cronMonthEndCloseHandler(req, res, { supabase: db });
+      await cronMonthEndCloseHandler(req, res, { supabase: db, asOfDate: "2026-12-01T12:00:00Z" });
       assert.equal(res.statusCode, 200);
       assert.equal(res.payload.skipped, true);
       assert.equal(res.payload.reason, "ALREADY_FINALIZED");

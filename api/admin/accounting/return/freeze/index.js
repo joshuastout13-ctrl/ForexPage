@@ -1,6 +1,7 @@
 import { verifyAdminSession } from "../../../../../lib/adminAuth.js";
 import { supabase } from "../../../../../lib/supabase.js";
 import { assertPeriodUnlocked, isPeriodLockedError } from "../../../../../lib/period-lock-guard.js";
+import { evaluateMonthState, MonthState } from "../../../../../lib/month-state.js";
 
 /**
  * Return Freeze API Endpoint
@@ -46,6 +47,10 @@ export default async function handler(req, res, deps = {}) {
   const m = Number(month);
   const returnVal = parseFloat(grossReturnPct);
 
+  if (!Number.isInteger(yr) || !Number.isInteger(m) || m < 1 || m > 12) {
+    return res.status(400).json({ error: "INVALID_PERIOD", message: "Invalid year or month parameter." });
+  }
+
   if (isNaN(returnVal)) {
     return res.status(400).json({ error: "Invalid grossReturnPct number" });
   }
@@ -55,6 +60,17 @@ export default async function handler(req, res, deps = {}) {
     return res.status(422).json({
       error: "UNAPPROVED_RETURN_SOURCE",
       message: "Only completed Myfxbook historical month data (MYFXBOOK_COMPLETED_MONTH) qualifies for freeze. Live estimate cannot be frozen."
+    });
+  }
+
+  // 4. Authoritative America/Los_Angeles Period-State Guard (No client/request override)
+  const asOfDate = deps.asOfDate ?? null;
+  const monthState = evaluateMonthState(yr, m, asOfDate);
+  if (monthState !== MonthState.HISTORICAL_SETTLED) {
+    return res.status(422).json({
+      error: "PERIOD_NOT_HISTORICAL_SETTLED",
+      monthState,
+      message: `Cannot freeze return for incomplete period ${yr}-${String(m).padStart(2, "0")}: America/Los_Angeles state is ${monthState}.`
     });
   }
 
