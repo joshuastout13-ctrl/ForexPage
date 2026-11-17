@@ -22,6 +22,8 @@ import finalizeHandler from "../api/admin/accounting/finalize/index.js";
 import cronMonthEndCloseHandler from "../api/cron/month-end-close.js";
 import paymentWebhookHandler from "../api/webhooks/payment-provider.js";
 import { executeDailyFinancialReconciliation } from "../lib/daily-reconciliation-engine.js";
+import { assertPeriodUnlocked } from "../lib/period-lock-guard.js";
+import { getFinalizedPeriods } from "../lib/commission-share-validation.js";
 
 const { Pool } = pg;
 // Match PostgREST/Supabase JSON wire format: DATE as 'YYYY-MM-DD' strings (avoid local TZ shift) and NUMERIC as numbers
@@ -124,13 +126,15 @@ function createPgSupabaseWithRpcAdapter(pool) {
       this.returnSelect = false;
       this.singleRow = false;
       this.maybeSingleRow = false;
+      this.selectCols = "*";
     }
 
-    select() {
+    select(cols = "*") {
       if (["insert", "update", "upsert", "delete"].includes(this.mode)) {
         this.returnSelect = true;
       } else {
         this.mode = "select";
+        this.selectCols = cols || "*";
       }
       return this;
     }
@@ -257,7 +261,11 @@ function createPgSupabaseWithRpcAdapter(pool) {
           } else if (this.limitVal !== null) {
             limitSql = `LIMIT ${this.limitVal}`;
           }
-          const sql = `SELECT * FROM ${this.table} ${where} ${orderSql} ${limitSql}`;
+          let colsSql = "*";
+          if (this.selectCols && this.selectCols !== "*" && !this.selectCols.includes("!") && !this.selectCols.includes("(")) {
+            colsSql = this.selectCols.split(",").map((s) => sanitizeIdent(s.trim())).join(", ");
+          }
+          const sql = `SELECT ${colsSql} FROM ${this.table} ${where} ${orderSql} ${limitSql}`;
           const { rows } = await pool.query(sql, params);
           if (this.singleRow || this.maybeSingleRow) {
             return { data: rows[0] || null, error: null };
@@ -914,7 +922,17 @@ async function runTestSuite() {
       assert.equal(res.statusCode, 409);
       assert.equal(res.payload.error, "PERIOD_LOCKED");
     }
-    console.log("   PASS: PERIOD_LOCKED SQL & API guards reject post-close cashflow backdating.");
+    await assert.rejects(
+      assertPeriodUnlocked(db, { effectiveDate: "2026-10-15" }, "test_locked"),
+      (err) => err?.code === "PERIOD_LOCKED" && err?.status === 409
+    );
+    const unlockedNov = await assertPeriodUnlocked(db, { effectiveDate: "2026-11-01" }, "void_deposit");
+    assert.equal(unlockedNov.unlocked, true);
+    const unlockedDec = await assertPeriodUnlocked(db, { effectiveDate: "2026-12-01" }, "create_deposit");
+    assert.equal(unlockedDec.unlocked, true);
+    const finalizedList = await getFinalizedPeriods(db);
+    assert.ok(finalizedList.some((p) => p.year === 2026 && p.month_number === 10));
+    console.log("   PASS: PERIOD_LOCKED SQL & API guards reject post-close cashflow backdating (without monthly_returns.status).");
 
     // -------------------------------------------------------------------------
     // 8. Scheduled Month-End Close Cron Idempotency & Auto-Close Gate
