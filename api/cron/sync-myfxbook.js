@@ -23,7 +23,13 @@ import {
  * 4. Strict Freshness Validation (refuses to mark SUCCESS on cached or invalid data)
  * 5. Permanent Audit Records (historical monitoring evidence preserved immutably)
  */
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
+  const getLive = deps.getMyfxbookLive || getMyfxbookLive;
+  const claimSlot = deps.claimDailySyncSlot || claimDailySyncSlot;
+  const finalizeSuccess = deps.finalizeDailySyncSuccess || finalizeDailySyncSuccess;
+  const finalizeFailure = deps.finalizeDailySyncFailure || finalizeDailySyncFailure;
+  const alertDispatcher = deps.dispatchAdministratorAlert || dispatchAdministratorAlert;
+
   // 1. Verify Authorization (Vercel Cron security)
   const authHeader = req.headers.authorization;
   const isVercelCron = req.headers['x-vercel-cron'] === '1';
@@ -45,14 +51,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const isForced = req.query?.force === "true";
-    const simulatedDate = req.query?.simulatedDate ? new Date(req.query.simulatedDate) : new Date();
+    // Dependency-injected simulation clock only; ignore HTTP query/body simulatedDate, asOfDate, or force overrides.
+    const clockInput = deps.simulatedDate ?? deps.asOfDate ?? null;
+    const simulatedDate = clockInput ? new Date(clockInput) : new Date();
+    if (isNaN(simulatedDate.getTime())) {
+      releaseLocalSyncLock();
+      return res.status(400).json({ error: "INVALID_DATE", message: "Invalid injected simulation clock." });
+    }
 
     // 3. Timezone Window Verification (America/Los_Angeles)
     const { window, pacificDateStr, hour, minute } = determineSyncWindow(simulatedDate);
 
-    // If outside 12:30 AM / 1:30 AM Pacific window and not forced, safely exit
-    if (window === "OUTSIDE_WINDOW" && !isForced) {
+    // If outside 12:30 AM / 1:30 AM Pacific window, safely exit
+    if (window === "OUTSIDE_WINDOW") {
       releaseLocalSyncLock();
       console.log(`[Cron] Sync skipped: Current Pacific time (${hour}:${String(minute).padStart(2, '0')}) is outside the 12:30 AM / 1:30 AM midnight window.`);
       return res.status(200).json({
@@ -66,9 +77,9 @@ export default async function handler(req, res) {
 
     // 4. Atomic Database-Level Daily Claim (Cross-Instance Concurrency & Credit Protection)
     const instanceId = req.headers['x-vercel-id'] || `inst_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const claimResult = await claimDailySyncSlot({ pacificDateStr, windowType: window, instanceId });
+    const claimResult = await claimSlot({ pacificDateStr, windowType: window, instanceId });
 
-    if (!claimResult.claimed && !isForced) {
+    if (!claimResult.claimed) {
       releaseLocalSyncLock();
       console.log(`[Cron] Sync skipped for ${pacificDateStr} (${window} window): Atomic DB claim rejected: ${claimResult.reason}. Preserving Scrape.do credits.`);
       return res.status(200).json({
@@ -88,7 +99,7 @@ export default async function handler(req, res) {
     }
 
     // 5. Execute Live Scrape Ingestion
-    const data = await getMyfxbookLive();
+    const data = await getLive();
 
     // 6. Fail-Closed Verification: Confirm live scraping succeeded with genuine fresh data
     if (!data.isLiveScraped) {
@@ -96,7 +107,7 @@ export default async function handler(req, res) {
       console.error(`[Cron] Myfxbook synchronization failed in ${window} window: ${errorDetails}`);
 
       // Atomically record failure in myfxbook_sync_claims and audit_runs
-      await finalizeDailySyncFailure({
+      await finalizeFailure({
         pacificDateStr,
         windowType: window,
         errorMessage: errorDetails,
@@ -104,9 +115,9 @@ export default async function handler(req, res) {
         instanceId
       });
 
-      // Dispatch administrator alert if BACKUP failed (both windows exhausted) or if forced
-      if (window === "BACKUP" || isForced) {
-        await dispatchAdministratorAlert({
+      // Dispatch administrator alert if BACKUP failed (both windows exhausted)
+      if (window === "BACKUP") {
+        await alertDispatcher({
           subject: `[ALERT] 4XTrack Daily Myfxbook Sync Failed (Primary & Backup Exhausted)`,
           body: `<h3>Daily Myfxbook Synchronization Alert</h3>
             <p>Both Primary (12:30 AM) and Backup (1:30 AM) Pacific synchronizations failed to capture daily Myfxbook trading data for ${pacificDateStr}.</p>
@@ -140,7 +151,7 @@ export default async function handler(req, res) {
     }
 
     // 7. Successful Ingestion: Record Atomic Database Claim Completion & Historical Audit
-    await finalizeDailySyncSuccess({
+    await finalizeSuccess({
       pacificDateStr,
       windowType: window,
       data,
@@ -170,7 +181,7 @@ export default async function handler(req, res) {
     releaseLocalSyncLock();
     console.error("[Cron] Sync fatal error:", error.message);
 
-    await dispatchAdministratorAlert({
+    await alertDispatcher({
       subject: `[CRITICAL] 4XTrack Daily Myfxbook Sync Fatal Error`,
       body: `<h3>Daily Myfxbook Synchronization Fatal Error</h3>
         <p>An unexpected fatal exception occurred during daily Myfxbook synchronization:</p>

@@ -41,7 +41,8 @@ export default async function handler(req, res, deps = {}) {
   const alertDispatcher = deps.dispatchAdministratorAlert || dispatchAdministratorAlert;
 
   try {
-    const asOfDate = req.query?.asOfDate || req.body?.asOfDate || null;
+    // Dependency-injected simulation clock only; ignore HTTP query/body overrides.
+    const asOfDate = deps.asOfDate ?? null;
     const fundDate = getFundAccountingDate(asOfDate);
 
     const reqYear = req.query?.year ?? req.body?.year;
@@ -125,7 +126,8 @@ export default async function handler(req, res, deps = {}) {
       dryRun: true,
       finalizationEnabled: false,
       allowOpenReturn: !isReturnLocked,
-      adminId: adminSession?.adminId || "cron_month_end_close"
+      adminId: adminSession?.adminId || "cron_month_end_close",
+      asOfDate
     });
 
     if (previewOutcome.statusCode !== 200) {
@@ -198,7 +200,8 @@ export default async function handler(req, res, deps = {}) {
       dryRun: false,
       finalizationEnabled: true,
       allowOpenReturn: false,
-      adminId: adminSession?.adminId || "cron_month_end_close"
+      adminId: adminSession?.adminId || "cron_month_end_close",
+      asOfDate
     });
 
     if (liveOutcome.statusCode !== 200) {

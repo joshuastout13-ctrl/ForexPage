@@ -5,6 +5,7 @@ import { supabase } from "../../../../lib/supabase.js";
 import { calculateAccountingPeriod } from "../../../../lib/accounting-period-engine.js";
 import { isDepositExcluded, isDrawFulfillmentWithdrawal } from "../../../../lib/accounting-engine.js";
 import { loadAccountingData } from "../../../../lib/paginated-read.js";
+import { evaluateMonthState, MonthState } from "../../../../lib/month-state.js";
 
 export const ACCOUNTING_ENGINE_VERSION = "2.0.0";
 
@@ -616,9 +617,24 @@ export async function executePeriodFinalizationWorkflow({
   fundReturnPct = null,
   finalizationEnabled = process.env.ACCOUNTING_FINALIZATION_ENABLED === "true",
   allowOpenReturn = process.env.ALLOW_OPEN_RETURN_FINALIZATION === "true",
-  adminId = "system_admin"
+  adminId = "system_admin",
+  asOfDate = null
 }) {
   try {
+    // Authoritative America/Los_Angeles period-state guard before any data load or mutation.
+    // No client or environment override is permitted for incomplete periods.
+    const monthState = evaluateMonthState(yr, m, asOfDate);
+    if (monthState !== MonthState.HISTORICAL_SETTLED) {
+      return {
+        statusCode: 422,
+        payload: {
+          error: "PERIOD_NOT_HISTORICAL_SETTLED",
+          monthState,
+          message: `Cannot finalize incomplete period ${yr}-${String(m).padStart(2, "0")}: America/Los_Angeles state is ${monthState}.`
+        }
+      };
+    }
+
     // 4. Batch load all authoritative inputs
     const {
       investors, accounts, deposits, withdrawals,
@@ -898,6 +914,17 @@ export default async function handler(req, res, deps = {}) {
     });
   }
 
+  // 4. Authoritative America/Los_Angeles Period-State Guard before any DB read/mutation (no request override)
+  const asOfDate = deps.asOfDate ?? null;
+  const monthState = evaluateMonthState(yr, m, asOfDate);
+  if (monthState !== MonthState.HISTORICAL_SETTLED) {
+    return res.status(422).json({
+      error: "PERIOD_NOT_HISTORICAL_SETTLED",
+      monthState,
+      message: `Cannot finalize incomplete period ${yr}-${String(m).padStart(2, "0")}: America/Los_Angeles state is ${monthState}.`
+    });
+  }
+
   if (!db) {
     return res.status(503).json({
       error: "DATABASE_UNAVAILABLE",
@@ -916,7 +943,8 @@ export default async function handler(req, res, deps = {}) {
     fundReturnPct,
     finalizationEnabled,
     allowOpenReturn: process.env.ALLOW_OPEN_RETURN_FINALIZATION === "true",
-    adminId: auth.adminId
+    adminId: auth.adminId,
+    asOfDate
   });
   return res.status(outcome.statusCode).json(outcome.payload);
 }
