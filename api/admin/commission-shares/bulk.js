@@ -2,7 +2,8 @@ import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { getFinalizedPeriods, ruleAppliesToPeriod } from "../../../lib/commission-share-validation.js";
 
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
+  const db = deps.supabase || supabase;
   try {
     const session = verifyAdminSession(req);
     if (!session) {
@@ -20,14 +21,14 @@ export default async function handler(req, res) {
     }
 
     // Look up source investor
-    let { data: sourceInv } = await supabase
+    let { data: sourceInv } = await db
       .from("investors")
       .select("id, split_pct, portal_username")
       .eq("id", sourceInvestorId)
       .maybeSingle();
 
     if (!sourceInv) {
-      const { data: srcByUsername } = await supabase
+      const { data: srcByUsername } = await db
         .from("investors")
         .select("id, split_pct, portal_username")
         .ilike("portal_username", sourceInvestorId)
@@ -38,20 +39,26 @@ export default async function handler(req, res) {
     const invSplit = sourceInv ? Number(sourceInv.split_pct || 100) : 100;
     const maxPool = 100 - invSplit;
 
-    const nowIso = new Date().toISOString().split('T')[0];
+    const nowIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());
 
     // Fetch existing shares for this source investor BEFORE writing anything
-    const { data: existingShares, error: exErr } = await supabase
+    const sourceAliases = Array.from(new Set(
+      [sourceInvestorId, sourceInv?.id, sourceInv?.portal_username]
+        .filter((v) => v !== null && v !== undefined && String(v).trim() !== "")
+        .map((v) => String(v).trim())
+    ));
+    const orFilter = sourceAliases.map((v) => `source_investor_id.eq.${v}`).join(",");
+    const { data: existingShares, error: exErr } = await db
       .from("commission_shares")
       .select("*")
-      .or(`source_investor_id.eq.${sourceInvestorId},source_investor_id.eq.${sourceInv ? sourceInv.id : ''},source_investor_id.eq.${sourceInv ? sourceInv.portal_username : ''}`);
+      .or(orFilter);
 
     if (exErr) throw exErr;
 
-    const existingMap = new Map((existingShares || []).map(s => [s.id, s]));
+    const existingMap = new Map((existingShares || []).map(s => [String(s.id), s]));
     const canonicalSourceId = sourceInv ? sourceInv.id : sourceInvestorId;
     const accountFilter = accountId || null;
-    const finalizedPeriods = await getFinalizedPeriods(supabase);
+    const finalizedPeriods = await getFinalizedPeriods(db);
 
     // Resolve recipients and build full candidate list before applying any DB writes
     const resolvedItems = [];
@@ -59,14 +66,14 @@ export default async function handler(req, res) {
       const recId = item.recipientId || item.recipientUsername;
       let recipientObj = null;
       if (recId) {
-        const { data: r1 } = await supabase.from("investors").select("id").eq("id", recId).maybeSingle();
+        const { data: r1 } = await db.from("investors").select("id").eq("id", recId).maybeSingle();
         recipientObj = r1;
         if (!recipientObj) {
-          const { data: r2 } = await supabase.from("investors").select("id").ilike("portal_username", recId).maybeSingle();
+          const { data: r2 } = await db.from("investors").select("id").ilike("portal_username", recId).maybeSingle();
           recipientObj = r2;
         }
         if (!recipientObj) {
-          const { data: r3 } = await supabase.from("investors").select("id").ilike("email", recId).maybeSingle();
+          const { data: r3 } = await db.from("investors").select("id").ilike("email", recId).maybeSingle();
           recipientObj = r3;
         }
       }
@@ -97,7 +104,7 @@ export default async function handler(req, res) {
       }
 
       resolvedItems.push({
-        id: item.id || null,
+        id: item.id ? String(item.id) : null,
         source_investor_id: canonicalSourceId,
         source_account_id: accountFilter,
         recipient_investor_id: recipientObj.id,
@@ -112,10 +119,12 @@ export default async function handler(req, res) {
     const removedShares = [];
     for (const [exId, exShare] of existingMap.entries()) {
       if (!payloadIds.has(exId) && exShare.status !== "cancelled" && exShare.status !== "ended") {
+        const exStart = String(exShare.effective_start_date || nowIso).slice(0, 10);
+        const safeEnd = exStart > nowIso ? exStart : nowIso;
         removedShares.push({
           ...exShare,
           status: "ended",
-          effective_end_date: nowIso
+          effective_end_date: safeEnd
         });
       }
     }
@@ -154,7 +163,7 @@ export default async function handler(req, res) {
 
     // Resulting state for non-cancelled shares on the same (source_account_id)
     const unchangedShares = (existingShares || []).filter(
-      s => !payloadIds.has(s.id) && !removedShares.some(r => r.id === s.id)
+      s => !payloadIds.has(String(s.id)) && !removedShares.some(r => String(r.id) === String(s.id))
     );
     const resultingActiveOrEnded = [...resolvedItems, ...removedShares, ...unchangedShares].filter(
       s => String(s.status || "").toLowerCase() !== "cancelled"
@@ -202,7 +211,7 @@ export default async function handler(req, res) {
     // Apply verified writes
     for (const item of resolvedItems) {
       if (item.id && existingMap.has(item.id)) {
-        const { error: updErr } = await supabase
+        const { error: updErr } = await db
           .from("commission_shares")
           .update({
             recipient_investor_id: item.recipient_investor_id,
@@ -215,7 +224,7 @@ export default async function handler(req, res) {
           .eq("id", item.id);
         if (updErr) throw updErr;
       } else {
-        const { error: insErr } = await supabase
+        const { error: insErr } = await db
           .from("commission_shares")
           .insert({
             source_investor_id: item.source_investor_id,
@@ -232,11 +241,11 @@ export default async function handler(req, res) {
 
     // End (never cancel) any active shares omitted from payload
     for (const rem of removedShares) {
-      const { error: endErr } = await supabase
+      const { error: endErr } = await db
         .from("commission_shares")
         .update({
           status: "ended",
-          effective_end_date: nowIso,
+          effective_end_date: rem.effective_end_date,
           updated_at: new Date()
         })
         .eq("id", rem.id);

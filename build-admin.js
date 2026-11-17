@@ -1539,48 +1539,58 @@ let state = {
           <div class="form-group"><label>Notes / Reason</label><input id="field_notes" placeholder="Manual adjustment" /></div>
         \`;
       } else if (tab === 'commission_shares') {
-        const sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id : '');
-        const sourceInv = (state.data.investors || []).find(i => 
-          String(i.id).toLowerCase() === String(sourceInvId).toLowerCase() ||
-          String(i.portal_username).toLowerCase() === String(sourceInvId).toLowerCase()
+        const sourceInvId = extraData?.sourceInvestorId || (item ? (item.source_investor_id || item.investor_id) : '');
+        const sourceInv = (state.data.investors || []).find(i =>
+          String(i.id || '').toLowerCase() === String(sourceInvId).toLowerCase() ||
+          String(i.portal_username || '').toLowerCase() === String(sourceInvId).toLowerCase()
         );
         const sourceUsername = sourceInv ? (sourceInv.portal_username || sourceInv.id) : sourceInvId;
         const sourceName = sourceInv ? \`\${sourceInv.first_name || ''} \${sourceInv.last_name || ''}\`.trim() || sourceUsername : sourceUsername;
-
-        const currentShares = (state.data.commission_shares || []).filter(s => 
-          String(s.source_investor_id || '').toLowerCase() === String(sourceInvId).toLowerCase() ||
-          String(s.source_investor_id || '').toLowerCase() === String(sourceUsername).toLowerCase()
+        const sourceAliases = new Set(
+          [sourceInvId, sourceUsername, sourceInv?.id, sourceInv?.portal_username]
+            .filter(Boolean)
+            .map(v => String(v).trim().toLowerCase())
         );
 
-        const recOptions = (state.data.investors || [])
-          .filter(i => String(i.id).toLowerCase() !== String(sourceInvId).toLowerCase() && String(i.portal_username || '').toLowerCase() !== String(sourceUsername).toLowerCase())
-          .map(i => \`<option value="\${i.portal_username || i.id}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('');
+        const currentShares = (state.data.commission_shares || []).filter(s => {
+          const shareSrc = String(s.source_investor_id || s.investor_id || '').trim().toLowerCase();
+          return sourceAliases.has(shareSrc) && String(s.status || 'active').toLowerCase() !== 'cancelled';
+        });
+
+        const recCandidates = (state.data.investors || []).filter(i =>
+          !sourceAliases.has(String(i.id || '').trim().toLowerCase()) &&
+          !sourceAliases.has(String(i.portal_username || '').trim().toLowerCase())
+        );
 
         let sharesRowsHtml = '';
         if (currentShares.length > 0) {
-          sharesRowsHtml = currentShares.map((s, idx) => {
-            const isInactive = s.status === 'cancelled' || s.status === 'ended';
+          sharesRowsHtml = currentShares.map((s) => {
+            const shareRecKey = String(s.recipient_investor_id || s.recipient_id || '').trim().toLowerCase();
+            const sharePctVal = s.commission_percent !== undefined ? s.commission_percent : (s.percent !== undefined ? s.percent : 0);
+            const shareStartVal = s.effective_start_date ? String(s.effective_start_date).slice(0, 10) : '2000-01-01';
+            const shareEndVal = s.effective_end_date ? String(s.effective_end_date).slice(0, 10) : '';
+            const shareStatus = String(s.status || 'active').toLowerCase();
             return \`
               <div class="bulk-share-row" data-share-id="\${s.id}" style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 40px; gap:8px; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px;">
                 <div>
                   <select class="bulk-rec-id" style="font-size:13px; padding:6px;">
-                    \${(state.data.investors || []).map(i => \`<option value="\${i.portal_username || i.id}" \${(s.recipient_investor_id === i.id || s.recipient_investor_id === i.portal_username) ? 'selected' : ''}>\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('')}
+                    \${recCandidates.map(i => \`<option value="\${i.portal_username || i.id}" \${(String(i.id || '').trim().toLowerCase() === shareRecKey || String(i.portal_username || '').trim().toLowerCase() === shareRecKey) ? 'selected' : ''}>\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('')}
                   </select>
                 </div>
                 <div>
-                  <input class="bulk-pct-input" type="number" step="0.1" value="\${s.commission_percent || s.percent || 0}" style="font-size:13px; padding:6px;" placeholder="%" />
+                  <input class="bulk-pct-input" type="number" step="0.1" value="\${sharePctVal}" style="font-size:13px; padding:6px;" placeholder="%" />
                 </div>
                 <div>
-                  <input class="bulk-start-date" type="date" value="\${s.effective_start_date || '2000-01-01'}" style="font-size:12px; padding:6px;" />
+                  <input class="bulk-start-date" type="date" value="\${shareStartVal}" style="font-size:12px; padding:6px;" />
                 </div>
                 <div>
-                  <input class="bulk-end-date" type="date" value="\${s.effective_end_date || ''}" style="font-size:12px; padding:6px;" placeholder="No end date" />
+                  <input class="bulk-end-date" type="date" value="\${shareEndVal}" style="font-size:12px; padding:6px;" placeholder="No end date" />
                 </div>
                 <div>
                   <select class="bulk-status" style="font-size:12px; padding:6px;">
-                    <option value="active" \${s.status === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="ended" \${s.status === 'ended' ? 'selected' : ''}>Ended</option>
-                    <option value="cancelled" \${s.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                    <option value="active" \${shareStatus === 'active' ? 'selected' : ''}>Active</option>
+                    <option value="ended" \${shareStatus === 'ended' ? 'selected' : ''}>Ended</option>
+                    <option value="cancelled" \${shareStatus === 'cancelled' ? 'selected' : ''}>Cancelled</option>
                   </select>
                 </div>
                 <div style="text-align:center;">
@@ -1591,12 +1601,22 @@ let state = {
           }).join('');
         }
 
+        const sourceControlHtml = sourceUsername
+          ? \`<input type="hidden" id="bulk_source_investor_id" value="\${escapeHtml(sourceUsername)}" />
+             <div style="background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
+               <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">Source Investor</div>
+               <div style="font-size:16px; font-weight:700; color:#fff;">\${escapeHtml(sourceName)}</div>
+             </div>\`
+          : \`<div class="form-group">
+               <label>Source Investor</label>
+               <select id="bulk_source_investor_id" onchange="if(this.value) openModal('commission_shares', 'add', null, { sourceInvestorId: this.value })">
+                 <option value="">Select source investor...</option>
+                 \${(state.data.investors || []).map(i => \`<option value="\${escapeHtml(i.portal_username || i.id)}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${escapeHtml(i.portal_username || i.id)})</option>\`).join('')}
+               </select>
+             </div>\`;
+
         html = \`
-          <input type="hidden" id="bulk_source_investor_id" value="\${sourceUsername}" />
-          <div style="background:rgba(79,140,255,0.08); border:1px solid rgba(127,179,255,0.2); border-radius:12px; padding:14px; margin-bottom:16px;">
-            <div style="font-size:12px; color:var(--muted); text-transform:uppercase;">Source Investor</div>
-            <div style="font-size:16px; font-weight:700; color:#fff;">\${escapeHtml(sourceName)}</div>
-          </div>
+          \${sourceControlHtml}
 
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h4 style="margin:0; font-size:14px;">Commission Recipients & Rules</h4>
@@ -1614,8 +1634,11 @@ let state = {
       if (tab === 'commission_shares') {
         document.getElementById('btnAddShareRow')?.addEventListener('click', () => {
           const container = document.getElementById('bulkSharesContainer');
-          const recOptions = (state.data.investors || []).map(i => \`<option value="\${i.portal_username || i.id}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('');
-          const todayStr = new Date().toISOString().split('T')[0];
+          const curSrc = String(document.getElementById('bulk_source_investor_id')?.value || '').trim().toLowerCase();
+          const recOptions = (state.data.investors || [])
+            .filter(i => String(i.id || '').trim().toLowerCase() !== curSrc && String(i.portal_username || '').trim().toLowerCase() !== curSrc)
+            .map(i => \`<option value="\${i.portal_username || i.id}">\${escapeHtml(i.first_name || '')} \${escapeHtml(i.last_name || '')} (\${i.portal_username || i.id})</option>\`).join('');
+          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
 
           const newRow = document.createElement('div');
           newRow.className = 'bulk-share-row';

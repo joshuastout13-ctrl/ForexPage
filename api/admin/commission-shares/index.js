@@ -2,7 +2,8 @@ import { verifyAdminSession } from "../../../lib/adminAuth.js";
 import { supabase } from "../../../lib/supabase.js";
 import { validateCommissionShareMutation } from "../../../lib/commission-share-validation.js";
 
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
+  const db = deps.supabase || supabase;
   try {
     const session = verifyAdminSession(req);
     if (!session) {
@@ -11,9 +12,9 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const [{ data: sharesData }, { data: rulesData }, { data: investorsData }] = await Promise.all([
-        supabase.from("commission_shares").select("*"),
-        supabase.from("commission_rules").select("*"),
-        supabase.from("investors").select("id, portal_username, first_name, last_name, email")
+        db.from("commission_shares").select("*"),
+        db.from("commission_rules").select("*"),
+        db.from("investors").select("id, portal_username, first_name, last_name, email")
       ]);
 
       const invMap = new Map((investorsData || []).map(i => [String(i.id).toLowerCase(), i]));
@@ -30,13 +31,17 @@ export default async function handler(req, res) {
         const rec = invMap.get(String(i.recipient_investor_id || "").toLowerCase());
         return {
           id: i.id,
+          source_investor_id: i.source_investor_id,
           investor_id: src ? (src.portal_username || src.id) : i.source_investor_id,
+          source_account_id: i.source_account_id || null,
           account_id: i.source_account_id || "All",
+          recipient_investor_id: i.recipient_investor_id,
           recipient_id: i.recipient_investor_id,
           recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : i.recipient_investor_id,
+          commission_percent: i.commission_percent,
           percent: i.commission_percent,
-          effective_start_date: i.effective_start_date,
-          effective_end_date: i.effective_end_date,
+          effective_start_date: i.effective_start_date ? String(i.effective_start_date).slice(0, 10) : null,
+          effective_end_date: i.effective_end_date ? String(i.effective_end_date).slice(0, 10) : null,
           status: i.status || "active",
           notes: i.notes || ""
         };
@@ -49,14 +54,20 @@ export default async function handler(req, res) {
           return !sourceInvsWithShares.has(srcKey);
         })
         .map(r => {
-          const src = invMap.get(String(r.investor_id || r.source_investor_id || "").toLowerCase());
-          const rec = invMap.get(String(r.recipient_id || r.recipient_investor_id || "").toLowerCase());
+          const rawSrcId = r.investor_id || r.source_investor_id;
+          const rawRecId = r.recipient_id || r.recipient_investor_id;
+          const src = invMap.get(String(rawSrcId || "").toLowerCase());
+          const rec = invMap.get(String(rawRecId || "").toLowerCase());
           return {
             id: r.id,
-            investor_id: src ? (src.portal_username || src.id) : (r.investor_id || r.source_investor_id),
+            source_investor_id: rawSrcId,
+            investor_id: src ? (src.portal_username || src.id) : rawSrcId,
+            source_account_id: r.account_id || r.source_account_id || null,
             account_id: r.account_id || r.source_account_id || "All",
-            recipient_id: r.recipient_id || r.recipient_investor_id,
-            recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : (r.recipient_id || r.recipient_investor_id),
+            recipient_investor_id: rawRecId,
+            recipient_id: rawRecId,
+            recipient_name: rec ? (rec.portal_username || rec.first_name || rec.id) : rawRecId,
+            commission_percent: r.percent || r.commission_percent,
             percent: r.percent || r.commission_percent,
             effective_start_date: null,
             effective_end_date: null,
