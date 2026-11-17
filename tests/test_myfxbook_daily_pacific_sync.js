@@ -155,10 +155,11 @@ async function runTestSuite() {
 
   // When Backup window triggers for that test date, it must skip without scraping
   const { req: backupReq, res: backupRes } = createMockReqRes({
-    headers: { "x-vercel-cron": "1" },
-    query: { simulatedDate: `${testPacificDate}T08:30:00Z` } // Backup window in PDT
+    headers: { "x-vercel-cron": "1" }
   });
-  await handler(backupReq, backupRes);
+  await handler(backupReq, backupRes, {
+    simulatedDate: `${testPacificDate}T08:30:00Z` // Backup window in PDT
+  });
   check(backupRes.getStatusCode() === 200, "3.1. Backup trigger returns HTTP 200");
   check(backupRes.getData()?.skipped === true, "3.2. Backup execution flags skipped: true");
   check(backupRes.getData()?.reason === "BACKUP_SKIPPED_PRIMARY_SUCCEEDED", "3.3. Backup skip reason is BACKUP_SKIPPED_PRIMARY_SUCCEEDED");

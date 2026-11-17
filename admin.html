@@ -1355,10 +1355,10 @@ let state = {
             </td>
           </tr>`).join('');
       } else if (state.tab === 'performance') {
-        hd.innerHTML = `<tr><th>Metric</th><th>Value %</th><th>Source</th><th>Last Updated</th><th>Actions</th></tr>`;
+        hd.innerHTML = `<tr><th>Metric</th><th>Value %</th><th>Source / Mode</th><th>Last Updated</th><th>Actions</th></tr>`;
         bd.innerHTML = d.map(i => `<tr>
             <td>${i.metric}</td><td><div style="font-weight:600">${i.value_pct !== undefined ? i.value_pct : (i.value || '0.00')}%</div></td>
-            <td>${i.source || ''}</td><td class="date-nowrap">${i.last_updated || ''}</td>
+            <td>${escapeHtml(i.source || '')} ${i.is_override ? '<span class="badge pending" style="margin-left:6px;">Manual Override</span>' : '<span class="badge active" style="margin-left:6px;">Auto Sync</span>'}</td><td class="date-nowrap">${i.last_updated || ''}</td>
             <td class="date-nowrap">
               <div class="btn-group">
                 <button class="btn-action btn-action-edit action-btn" data-action="edit" data-id="${i.metric}">Edit</button>
@@ -1649,8 +1649,12 @@ let state = {
         html = `
           <div class="form-group"><label>Metric</label><input id="field_metric" value="${escapeHtml(metricName)}" readonly style="opacity:0.7;" /></div>
           <div class="form-group"><label>Value % (e.g. 0.37 for +0.37%)</label><input id="field_value_pct" type="number" step="0.01" value="${currVal}" required /></div>
-          <div class="form-group"><label>Source</label><input id="field_source" value="Admin Manual Override" /></div>
-          <div class="form-group"><label>Notes / Reason</label><input id="field_notes" placeholder="Manual adjustment" /></div>
+          <div class="form-group"><label>Source</label><input id="field_source" value="${escapeHtml(item?.source || 'Admin Manual Override')}" /></div>
+          <div class="form-group"><label>Notes / Reason</label><input id="field_notes" value="${escapeHtml(item?.notes || '')}" placeholder="Manual adjustment" /></div>
+          <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+            <input id="field_is_override" type="checkbox" ${item?.is_override ? 'checked' : ''} style="width:auto;" />
+            <label for="field_is_override" style="margin:0; cursor:pointer;">Lock as Manual Override <span style="color:var(--muted);font-weight:400;font-size:12px">(uncheck to allow hourly Myfxbook auto-sync)</span></label>
+          </div>
         `;
       } else if (tab === 'commission_shares') {
         const sourceInvId = extraData?.sourceInvestorId || (item ? item.source_investor_id : '');
@@ -1945,7 +1949,7 @@ let state = {
             metric: document.getElementById('field_metric')?.value,
             valuePct: parseFloat(document.getElementById('field_value_pct')?.value || '0'),
             source: document.getElementById('field_source')?.value || 'Admin Manual Override',
-            isOverride: true,
+            isOverride: !!document.getElementById('field_is_override')?.checked,
             notes: document.getElementById('field_notes')?.value || ''
           };
         }

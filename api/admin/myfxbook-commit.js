@@ -1,14 +1,15 @@
 import { verifyAdminSession } from "../../lib/adminAuth.js";
-import { supabase } from "../../lib/supabase.js";
+import { supabase, syncOpenMonthlyReturn } from "../../lib/supabase.js";
 
 /**
  * Admin endpoint: Commits the admin-approved Myfxbook metrics to the
- * live_performance table. Called after the admin clicks "Accept" on
- * the preview modal.
+ * live_performance table and syncs the active open monthly return row.
  *
  * Body: { today, week, month, year }  (percentage strings like "+0.37%")
  */
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
+  const db = deps.supabase || supabase;
+  const syncMonth = deps.syncOpenMonthlyReturn || syncOpenMonthlyReturn;
   const session = verifyAdminSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
 
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
       { key: "year",  metric: "This Year", value: year }
     ];
 
-    if (supabase) {
+    if (db) {
       const updates = mapping.map(m => {
         const cleanVal = String(m.value || "0.00%").replace(/[+%\s]/g, "");
         return {
@@ -38,11 +39,14 @@ export default async function handler(req, res) {
         };
       });
 
-      const { error } = await supabase
+      const { error } = await db
         .from("live_performance")
         .upsert(updates, { onConflict: "metric" });
 
       if (error) throw error;
+      if (month !== undefined && month !== null && month !== "" && month !== "N/A" && month !== "NOT FOUND") {
+        await syncMonth(month, null, db);
+      }
       console.log(`[Admin] Committed ${updates.length} Myfxbook metrics approved by ${session.name || "admin"}`);
     }
 
