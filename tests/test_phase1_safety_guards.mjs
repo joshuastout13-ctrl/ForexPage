@@ -161,7 +161,7 @@ async function runTests() {
       headers: { authorization: "Bearer test_phase1_cron_secret_offline" }
     });
     await syncMyfxbookHandler(outsideReq, outsideRes, {
-      simulatedDate: "2026-11-05T18:00:00Z", // 10:00 AM PST (OUTSIDE_WINDOW) via deps
+      simulatedDate: "2026-11-07T18:00:00Z", // Saturday 10:00 AM PST (market closed) via deps
       claimDailySyncSlot: async () => {
         syncClaimCalls += 1;
         return { claimed: true };
@@ -173,7 +173,7 @@ async function runTests() {
     });
     assert.strictEqual(outsideRes.statusCode, 200);
     assert.strictEqual(outsideRes.payload.skipped, true);
-    assert.strictEqual(outsideRes.payload.reason, "OUTSIDE_PACIFIC_MIDNIGHT_WINDOW");
+    assert.strictEqual(outsideRes.payload.reason, "MARKET_CLOSED_OUTSIDE_TRADING_HOURS");
     assert.strictEqual(syncClaimCalls, 0, "HTTP simulatedDate/force must not reach claimDailySyncSlot outside window");
     assert.strictEqual(syncLiveCalls, 0, "HTTP simulatedDate/force must not trigger getMyfxbookLive outside window");
 
