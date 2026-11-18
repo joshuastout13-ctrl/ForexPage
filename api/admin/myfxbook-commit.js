@@ -28,13 +28,15 @@ export default async function handler(req, res, deps = {}) {
     ];
 
     if (db) {
+      const nowIso = new Date().toISOString();
       const updates = mapping.map(m => {
         const cleanVal = String(m.value || "0.00%").replace(/[+%\s]/g, "");
         return {
           metric: m.metric,
           value_pct: cleanVal,
           source: "Myfxbook (Admin Approved)",
-          last_updated: new Date().toISOString(),
+          last_updated: nowIso,
+          updated_at: nowIso,
           is_override: false
         };
       });

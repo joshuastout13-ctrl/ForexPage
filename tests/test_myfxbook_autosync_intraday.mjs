@@ -12,6 +12,7 @@ process.env.CRON_SECRET = "test_autosync_cron_secret";
 
 import { createSession } from "../lib/auth.js";
 import { updateLivePerformance } from "../lib/supabase.js";
+import { getMyfxbookLive, fetchScrapeDoMetrics } from "../lib/myfxbook.js";
 import cronSyncHandler from "../api/cron/sync-myfxbook.js";
 import commitHandler from "../api/admin/myfxbook-commit.js";
 import {
@@ -143,13 +144,25 @@ function createInMemorySyncDb() {
 async function runTests() {
   console.log("=== Myfxbook Automatic Intraday + Midnight Sync Test Suite ===");
 
-  // 1. vercel.json runs sync-myfxbook hourly (:30 * * * *)
+  // 1. vercel.json runs sync-myfxbook every 3 hours aligned to Pacific midnight settlement
   {
     const vercelCfg = JSON.parse(fs.readFileSync(path.join(__dirname, "../vercel.json"), "utf8"));
     const syncCron = vercelCfg.crons.find((c) => c.path === "/api/cron/sync-myfxbook");
     assert(syncCron, "vercel.json must configure /api/cron/sync-myfxbook cron");
-    assert.strictEqual(syncCron.schedule, "30 * * * *", "Cron schedule must trigger hourly to allow automatic intraday updates");
-    console.log("  PASS [1]: vercel.json configures hourly /api/cron/sync-myfxbook schedule");
+    assert.strictEqual(
+      syncCron.schedule,
+      "30 2,5,8,11,14,17,20,23 * * *",
+      "Cron schedule must trigger every 3 hours while hitting 08:30 UTC midnight window year-round"
+    );
+    const hours = syncCron.schedule.split(" ")[1].split(",").map(Number);
+    assert.strictEqual(hours.length, 8, "Every-3-hour schedule must run 8 ticks per UTC day");
+    for (let i = 0; i < hours.length; i += 1) {
+      const next = hours[(i + 1) % hours.length];
+      const delta = (next - hours[i] + 24) % 24;
+      assert.strictEqual(delta, 3, "Every cron tick must be spaced strictly 3 hours apart");
+    }
+    assert(hours.includes(8), "08:30 UTC must be included to hit PRIMARY in PST and BACKUP in PDT");
+    console.log("  PASS [1]: vercel.json configures every-3-hour /api/cron/sync-myfxbook aligned with PST/PDT midnight");
   }
 
   // 2. Window & market hours routing preserves PDT/PST midnight behavior + enables intraday trading hours
@@ -207,14 +220,16 @@ async function runTests() {
     assert.strictEqual(c2.claimed, false);
     assert.strictEqual(c2.reason, "BACKUP_SKIPPED_PRIMARY_SUCCEEDED");
 
-    // C. 01:40 PST INTRADAY (10m after prior) -> skipped by cooldown
-    const t2 = Date.parse("2026-11-16T09:40:00Z");
-    // Cooldown vs 00:30: wait 00:30 -> 01:40 is 70m, so test cooldown at 01:05 (35m after PRIMARY)
-    const cCool = await claimSyncSlot({ pacificDateStr: dateStr, windowType: "INTRADAY", instanceId: "inst_cool", nowMs: Date.parse("2026-11-16T09:05:00Z"), db });
-    assert.strictEqual(cCool.claimed, false);
-    assert.strictEqual(cCool.reason, "INTRADAY_COOLDOWN_ACTIVE");
+    // C. 01:05 PST INTRADAY (+35m) and 02:30 PST (+2h) -> skipped by 2.5h cooldown (150 min)
+    const cCoolShort = await claimSyncSlot({ pacificDateStr: dateStr, windowType: "INTRADAY", instanceId: "inst_cool_1", nowMs: Date.parse("2026-11-16T09:05:00Z"), db });
+    assert.strictEqual(cCoolShort.claimed, false);
+    assert.strictEqual(cCoolShort.reason, "INTRADAY_COOLDOWN_ACTIVE");
 
-    // D. Monday 10:30 AM PST (18:30 UTC) -> claims INTRADAY automatically and updates Today / This Week!
+    const cCool2h = await claimSyncSlot({ pacificDateStr: dateStr, windowType: "INTRADAY", instanceId: "inst_cool_2", nowMs: Date.parse("2026-11-16T10:30:00Z"), db });
+    assert.strictEqual(cCool2h.claimed, false);
+    assert.strictEqual(cCool2h.reason, "INTRADAY_COOLDOWN_ACTIVE");
+
+    // D. Monday 03:30 AM PST (11:30 UTC, +3h) -> claims INTRADAY automatically and updates Today / This Week!
     let scrapeCount = 0;
     const { req: dayReq, res: dayRes } = makeReqRes({
       method: "GET",
@@ -223,7 +238,7 @@ async function runTests() {
     });
     await cronSyncHandler(dayReq, dayRes, {
       supabase: db,
-      simulatedDate: "2026-11-16T18:30:00Z", // Monday 10:30 AM PST
+      simulatedDate: "2026-11-16T11:30:00Z", // Monday 03:30 AM PST (+3h from PRIMARY)
       getMyfxbookLive: async () => {
         scrapeCount += 1;
         return {
@@ -233,7 +248,7 @@ async function runTests() {
           year: "+35.11%",
           source: "Myfxbook (Scrape.do)",
           isLiveScraped: true,
-          fetchedAt: "2026-11-16T18:30:02Z"
+          fetchedAt: "2026-11-16T11:30:02Z"
         };
       }
     });
@@ -254,7 +269,7 @@ async function runTests() {
     });
     await cronSyncHandler(dupReq, dupRes, {
       supabase: db,
-      simulatedDate: "2026-11-16T18:35:00Z",
+      simulatedDate: "2026-11-16T11:35:00Z",
       getMyfxbookLive: async () => {
         scrapeCount += 1;
         return { isLiveScraped: true };
@@ -265,7 +280,7 @@ async function runTests() {
     assert.strictEqual(dupRes.payload.reason, "INTRADAY_COOLDOWN_ACTIVE");
     assert.strictEqual(scrapeCount, 1);
 
-    // F. 1st failed intraday scrape records FAILED cleanly without spamming alert
+    // F. 1st failed intraday scrape (+3h at 14:30 UTC) records FAILED cleanly without spamming alert
     let alertCount = 0;
     const { req: failReq, res: failRes } = makeReqRes({
       method: "GET",
@@ -273,7 +288,7 @@ async function runTests() {
     });
     await cronSyncHandler(failReq, failRes, {
       supabase: db,
-      simulatedDate: "2026-11-16T19:30:00Z",
+      simulatedDate: "2026-11-16T14:30:00Z",
       getMyfxbookLive: async () => ({
         isLiveScraped: false,
         scrapeErrors: ["Scrape.do returned HTML without parseable period metrics"]
@@ -286,8 +301,8 @@ async function runTests() {
     assert.strictEqual(db.claims.get(dateStr).status, "FAILED");
     assert.strictEqual(alertCount, 0, "Single transient intraday failure must not alert yet");
 
-    // G. 2nd consecutive failed intraday scrape dispatches ONE alert; 3rd does NOT spam
-    for (const ts of ["2026-11-16T20:30:00Z", "2026-11-16T21:30:00Z"]) {
+    // G. 2nd & 3rd consecutive failed intraday scrapes (+3h ticks at 17:30Z, 20:30Z) dispatch ONE alert total
+    for (const ts of ["2026-11-16T17:30:00Z", "2026-11-16T20:30:00Z"]) {
       const { req: rF, res: sF } = makeReqRes({ method: "GET", headers: { "x-vercel-cron": "1" } });
       await cronSyncHandler(rF, sF, {
         supabase: db,
@@ -299,11 +314,11 @@ async function runTests() {
     }
     assert.strictEqual(alertCount, 1, "Consecutive intraday failure must send exactly ONE alert per outage streak");
 
-    // H. Next successful sync clears error streak and updates metrics again
+    // H. Next successful sync (+3h at 23:30 UTC) clears error streak and updates metrics again
     const { req: recReq, res: recRes } = makeReqRes({ method: "GET", headers: { "x-vercel-cron": "1" } });
     await cronSyncHandler(recReq, recRes, {
       supabase: db,
-      simulatedDate: "2026-11-16T22:30:00Z",
+      simulatedDate: "2026-11-16T23:30:00Z",
       getMyfxbookLive: async () => ({
         today: "+0.22%",
         week: "+0.29%",
@@ -311,13 +326,27 @@ async function runTests() {
         year: "+35.30%",
         source: "Myfxbook (Scrape.do)",
         isLiveScraped: true,
-        fetchedAt: "2026-11-16T22:30:02Z"
+        fetchedAt: "2026-11-16T23:30:02Z"
       })
     });
     assert.strictEqual(recRes.statusCode, 200);
     assert.strictEqual(db.claims.get(dateStr).error_message, null);
 
-    console.log("  PASS [3]: Hourly automatic intraday refresh, cooldown credit protection, HTTP override ignore, error-only streak alerting, and recovery verified");
+    // I. Missing CRON_SECRET must fail closed even against "Bearer undefined"
+    const prevSecret = process.env.CRON_SECRET;
+    delete process.env.CRON_SECRET;
+    try {
+      const { req: undefReq, res: undefRes } = makeReqRes({
+        method: "GET",
+        headers: { authorization: "Bearer undefined" }
+      });
+      await cronSyncHandler(undefReq, undefRes, { supabase: db });
+      assert.strictEqual(undefRes.statusCode, 401);
+    } finally {
+      process.env.CRON_SECRET = prevSecret;
+    }
+
+    console.log("  PASS [3]: Every-3-hour automatic intraday refresh, 150m cooldown credit protection, CRON_SECRET guard, HTTP override ignore, error-only streak alerting, and recovery verified");
   }
 
   // 4. updateLivePerformance respects is_override & preserves missing metrics safely
@@ -360,7 +389,8 @@ async function runTests() {
     );
     assert.strictEqual(rows.get("Today").value_pct, "0.00", "Midnight rollover resets null Today (-) to 0.00");
     assert.strictEqual(rows.get("This Month").value_pct, "1.40", "Midnight rollover still preserves This Month if missing");
-    console.log("  PASS [4]: updateLivePerformance skips manual overrides cleanly and prevents spurious 0.00% overwrites");
+    assert(rows.get("Today").last_updated && rows.get("Today").updated_at, "updateLivePerformance updates both last_updated and updated_at");
+    console.log("  PASS [4]: updateLivePerformance skips manual overrides cleanly, updates timestamps, and prevents spurious 0.00% overwrites");
   }
 
   // 5. Admin /api/admin/myfxbook-commit updates live_performance AND syncs open monthly_returns
@@ -393,11 +423,54 @@ async function runTests() {
     });
     assert.strictEqual(res.statusCode, 200);
     assert.strictEqual(upsertedRows.length, 4);
+    assert(upsertedRows[0].last_updated && upsertedRows[0].updated_at, "Admin commit sets both last_updated and updated_at");
     assert.strictEqual(syncedMonthArg, "+1.40%");
     console.log("  PASS [5]: Admin myfxbook-commit writes live_performance and syncs open monthly_returns");
   }
 
-  console.log("\nMYFXBOOK AUTOSYNC TEST RESULT: PASS (5/5)");
+  // 6. getMyfxbookLive({ skipScraper: true }) exposes real DB lastUpdated & fetchScrapeDoMetrics retries transient 502 once
+  {
+    const dbUpdatedAt = "2026-11-18T16:30:27.000Z";
+    const cached = await getMyfxbookLive({
+      skipScraper: true,
+      readTable: async () => [
+        { metric: "Today", value_pct: "0.50", last_updated: dbUpdatedAt },
+        { metric: "This Week", value_pct: "1.00", last_updated: dbUpdatedAt }
+      ]
+    });
+    assert.strictEqual(cached.today, "+0.50%");
+    assert.strictEqual(cached.lastUpdated, dbUpdatedAt);
+    assert.strictEqual(cached.fetchedAt, dbUpdatedAt, "Cached read must expose DB lastUpdated instead of fabricating new Date()");
+
+    let attempts = 0;
+    const sampleHtml = `<table><tr><td>Today</td><td><span>+0.42%</span></td></tr><tr><td>This Week</td><td><span>+0.92%</span></td></tr><tr><td>This Month</td><td><span>+2.18%</span></td></tr><tr><td>This Year</td><td><span>+36.15%</span></td></tr></table>`;
+    const scraped = await fetchScrapeDoMetrics({
+      token: "test_token",
+      retryDelayMs: 0,
+      fetchFn: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          return { ok: false, status: 502, text: async () => "Bad Gateway" };
+        }
+        return { ok: true, status: 200, text: async () => sampleHtml };
+      }
+    });
+    assert.strictEqual(attempts, 2, "Transient 502 triggers 1 automatic retry");
+    assert.strictEqual(scraped.today, "+0.42%");
+    assert.strictEqual(scraped.month, "+2.18%");
+    console.log("  PASS [6]: getMyfxbookLive preserves real DB lastUpdated and retries transient Scrape.do 502 once");
+  }
+
+  // 7. index.html shows real sync timestamp on Account & Fund Performance without stale 4:00 PM PST copy
+  {
+    const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
+    assert(!html.includes("Data refreshes daily at 4:00 PM PST"), "Stale 4:00 PM PST copy must be removed");
+    assert(html.includes('id="accountLiveMeta"'), "Account Performance card must render real sync timestamp");
+    assert(html.includes("formatLiveSyncLabel(live.lastUpdated || live.fetchedAt)"), "UI must format real DB sync timestamp instead of new Date()");
+    console.log("  PASS [7]: index.html displays real last-synced timestamp and 3-hour cadence copy");
+  }
+
+  console.log("\nMYFXBOOK AUTOSYNC TEST RESULT: PASS (7/7)");
 }
 
 runTests().catch((err) => {

@@ -15,7 +15,7 @@ import {
  * Scheduled Automatic Ingestion (America/Los_Angeles):
  * - Primary Midnight Window: 12:30 AM Pacific daily
  * - Backup Midnight Window:  1:30 AM Pacific daily (if Primary failed/unrecorded)
- * - Intraday Market Hours:   Hourly refresh during active trading (Sun 14:00 PT - Fri 17:00 PT),
+ * - Intraday Market Hours:   Every 3 hours during active trading (Sun 14:00 PT - Fri 17:00 PT),
  *                            protected by cooldown & atomic DB claim locking to avoid duplicate scrapes.
  */
 export default async function handler(req, res, deps = {}) {
@@ -27,8 +27,9 @@ export default async function handler(req, res, deps = {}) {
 
   // 1. Verify Authorization (Vercel Cron security)
   const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
   const isVercelCron = req.headers['x-vercel-cron'] === '1';
-  const isAuthorized = isVercelCron || (authHeader && authHeader === `Bearer ${process.env.CRON_SECRET}`);
+  const isAuthorized = isVercelCron || Boolean(cronSecret && authHeader && authHeader === `Bearer ${cronSecret}`);
 
   if (!isAuthorized) {
     console.warn("[Cron] Unauthorized access attempt blocked. Header missing or secret mismatch.");
@@ -114,6 +115,7 @@ export default async function handler(req, res, deps = {}) {
       const shouldDispatchAlert = mode === "BACKUP" || isRepeatedIntradayError;
 
       // Record failure in myfxbook_sync_claims and audit_runs
+      const completionNowMs = clockInput ? nowMs : Date.now();
       await finalizeFailure({
         pacificDateStr,
         windowType: mode,
@@ -121,7 +123,7 @@ export default async function handler(req, res, deps = {}) {
         errors: data.scrapeErrors || [errorDetails],
         instanceId,
         alerted: Boolean(shouldDispatchAlert || claimResult.alreadyAlerted),
-        nowMs,
+        nowMs: completionNowMs,
         db: deps.supabase
       });
 
@@ -163,12 +165,13 @@ export default async function handler(req, res, deps = {}) {
     }
 
     // 7. Successful Ingestion: Record Atomic Database Claim Completion & Historical Audit
+    const completionNowMs = clockInput ? nowMs : Date.now();
     await finalizeSuccess({
       pacificDateStr,
       windowType: mode,
       data,
       instanceId,
-      nowMs,
+      nowMs: completionNowMs,
       db: deps.supabase
     });
 

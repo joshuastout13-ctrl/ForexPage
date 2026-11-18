@@ -833,6 +833,7 @@
             <div style="font-size:11px; color:var(--muted); margin-top:14px; line-height:1.4; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
               Performance begins when this account became active in 4xtrack and does not include historical performance not tracked in this tool.
             </div>
+            <div id="accountLiveMeta" class="muted" style="font-size:11px; margin-top:8px; text-align:center;"></div>
           </div>
 
           <!-- Fund Performance (Gross Fund Returns) -->
@@ -846,9 +847,6 @@
               <!-- Gross metrics injected here -->
             </div>
             <div id="liveMeta" class="muted" style="margin-top:20px; font-size:12px; text-align:center;"></div>
-            <div class="muted" style="margin-top:6px; font-size:11px; opacity:0.6; text-align:center;">
-              Data refreshes daily at 4:00 PM PST
-            </div>
           </div>
         </div>
       </div>
@@ -1312,9 +1310,29 @@
         `).join("");
       }
 
+      const formatLiveSyncLabel = (isoTs) => {
+        if (!isoTs) return "Auto-updates every 3 hours";
+        const d = new Date(isoTs);
+        if (isNaN(d.getTime())) return "Auto-updates every 3 hours";
+        const formatted = d.toLocaleString("en-US", {
+          timeZone: "America/Los_Angeles",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZoneName: "short"
+        });
+        return `Last synced: ${formatted} · Auto-updates every 3h`;
+      };
+
+      const syncLabel = formatLiveSyncLabel(live.lastUpdated || live.fetchedAt);
+      const accountLiveMeta = document.getElementById("accountLiveMeta");
+      if (accountLiveMeta) {
+        accountLiveMeta.textContent = syncLabel;
+      }
       const liveMeta = document.getElementById("liveMeta");
       if (liveMeta) {
-        liveMeta.textContent = `Last sync: ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles" })} PST`;
+        liveMeta.textContent = syncLabel;
       }
     }
 
