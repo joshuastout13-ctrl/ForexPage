@@ -3,8 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildInvestorDashboard } from "../lib/dashboard.js";
 import { calculateAccountingPeriod } from "../lib/accounting-period-engine.js";
+import recalculateAllHandler from "../api/admin/historical-data/recalculate-all.js";
+import recalculateHandler from "../api/admin/historical-data/recalculate.js";
+import { createSession } from "../lib/auth.js";
 
 process.env.DATA_SOURCE = "supabase";
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || "test-session-secret";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -385,7 +389,417 @@ async function runTests() {
     console.log("  PASS 7: Year-boundary 2026-12 -> 2027-01 dashboard rollover & Jan 2027 starter logic verified.");
   }
 
-  console.log("=== ALL 7 P0 NOVEMBER & YEAR-ROLLOVER REGRESSION TESTS PASSED ===");
+  // 8. Nov-1 starter (jgeisler $150k, locked M10 $0, corrupted open M11/M12 $0) & Dec-1 starter vs fail-closed unfinalized Oct-1
+  {
+    const returnsJanToDec = Array.from({ length: 12 }, (_, idx) => ({
+      year: 2026,
+      month_number: idx + 1,
+      month: [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ][idx],
+      gross_return_pct: idx < 10 ? 1.5 : 0,
+      locked: idx < 10
+    }));
+
+    const jgeislerHistoryCorrupted = [
+      {
+        id: "hist_jg_10",
+        investor_id: "inv_85d68e7f",
+        year: 2026,
+        month_number: 10,
+        month: "October",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: true,
+        notes: null
+      },
+      {
+        id: "hist_jg_11",
+        investor_id: "inv_85d68e7f",
+        year: 2026,
+        month_number: 11,
+        month: "November",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: false,
+        updated_at: "2026-11-19T15:32:55.052Z",
+        notes: null
+      },
+      {
+        id: "hist_jg_12",
+        investor_id: "inv_85d68e7f",
+        year: 2026,
+        month_number: 12,
+        month: "December",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: false,
+        updated_at: "2026-11-19T15:32:55.052Z",
+        notes: null
+      }
+    ];
+
+    const decStarterHistoryCorrupted = [
+      {
+        id: "hist_dm_10",
+        investor_id: "inv_dmehringer",
+        year: 2026,
+        month_number: 10,
+        month: "October",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: true,
+        notes: null
+      },
+      {
+        id: "hist_dm_11",
+        investor_id: "inv_dmehringer",
+        year: 2026,
+        month_number: 11,
+        month: "November",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: false,
+        notes: null
+      },
+      {
+        id: "hist_dm_12",
+        investor_id: "inv_dmehringer",
+        year: 2026,
+        month_number: 12,
+        month: "December",
+        opening_balance: 0,
+        deposits: 0,
+        withdrawals: 0,
+        recurring_draw: 0,
+        ending_balance: 0,
+        is_manual: false,
+        locked: false,
+        notes: null
+      }
+    ];
+
+    const preloaded = {
+      asOfDate: "2026-11-19T20:00:00Z",
+      rawInvestors: [
+        {
+          id: "inv_85d68e7f",
+          portal_username: "jgeisler",
+          first_name: "Jason",
+          last_name: "Geisler",
+          split_pct: 50,
+          monthly_draw: 0,
+          start_date: "2026-11-01",
+          active: true,
+          show_fund_performance: false
+        },
+        {
+          id: "inv_dmehringer",
+          portal_username: "dmehringer",
+          first_name: "D",
+          last_name: "Mehringer",
+          split_pct: 50,
+          monthly_draw: 0,
+          start_date: "2026-12-01",
+          active: true,
+          show_fund_performance: false
+        },
+        {
+          id: "inv_oct_unfinal",
+          portal_username: "octunfinal",
+          first_name: "O",
+          last_name: "Pending",
+          split_pct: 50,
+          monthly_draw: 0,
+          start_date: "2026-10-01",
+          active: true,
+          show_fund_performance: true
+        }
+      ],
+      accounts: [
+        { id: "acc_jg", investor_id: "inv_85d68e7f", starting_capital: 150000, split_pct: 50, status: "Active" },
+        { id: "acc_dm", investor_id: "inv_dmehringer", starting_capital: 5000, split_pct: 50, status: "Active" },
+        { id: "acc_oct", investor_id: "inv_oct_unfinal", starting_capital: 25000, split_pct: 50, status: "Active" }
+      ],
+      returnsSheet: returnsJanToDec,
+      depositsSheet: [],
+      withdrawalsSheet: [],
+      historyTable: [...jgeislerHistoryCorrupted, ...decStarterHistoryCorrupted],
+      commissionEarningsTable: [],
+      commissionSharesTable: [],
+      commissionRulesTable: [],
+      cutovers: [],
+      live: { today: "+0.24%", week: "+0.88%", month: "+2.12%", year: "+36.15%" }
+    };
+
+    const jgDash = await buildInvestorDashboard("jgeisler", preloaded, { asOfDate: "2026-11-19T20:00:00Z" });
+    const jgNov = jgDash.breakdown.find(r => r.monthNumber === 11);
+    const jgDec = jgDash.breakdown.find(r => r.monthNumber === 12);
+    assert.strictEqual(jgNov.startingBalance, 150000, "jgeisler November starting balance must self-heal to $150,000");
+    assert.strictEqual(jgNov.endingBalance, 150000, "jgeisler November ending balance must self-heal to $150,000");
+    assert.strictEqual(jgDec.startingBalance, 150000, "jgeisler December projection starting balance must self-heal to $150,000");
+    assert.strictEqual(jgDash.summary.currentBalance, 150000, "jgeisler summary currentBalance must be $150,000");
+    assert.strictEqual(jgDash.liveDollarGains.today, 180, "jgeisler Today gain must be $180 ($150k * 0.24% * 50%)");
+    assert.strictEqual(jgDash.liveDollarGains.week, 660, "jgeisler This Week gain must be $660 ($150k * 0.88% * 50%)");
+    assert.strictEqual(jgDash.liveDollarGains.month, 1590, "jgeisler This Month gain must be $1,590 ($150k * 2.12% * 50%)");
+    assert.strictEqual(jgDash.summary.totalGainUnavailable, false, "jgeisler first open month must not show YTD as unavailable");
+    assert.strictEqual(jgDash.summary.totalGain, 0, "jgeisler YTD settled gain in first open month must be $0");
+    assert.strictEqual(jgDash.summary.totalGainVerificationStatus, "OPEN_FIRST_PERIOD");
+    assert.strictEqual(jgDash.summary.totalGainScopeLabel, "First month open (November 2026)");
+    assert.ok(!jgDash.accountPerformance.year.unavailable, "jgeisler accountPerformance.year must not be unavailable");
+    assert.strictEqual(jgDash.accountPerformance.year.netDollar, 0);
+    assert.strictEqual(jgDash.accountPerformance.year.netReturnPct, 0);
+    assert.strictEqual(jgDash.accountPerformance.year.scopeLabel, "First month open (November 2026)");
+
+    const dmDash = await buildInvestorDashboard("dmehringer", preloaded, { asOfDate: "2026-11-19T20:00:00Z" });
+    const dmNov = dmDash.breakdown.find(r => r.monthNumber === 11);
+    const dmDec = dmDash.breakdown.find(r => r.monthNumber === 12);
+    assert.strictEqual(dmDash.summary.currentBalance, 0, "Dec 1 starter current balance must stay $0 in November");
+    assert.strictEqual(dmNov.startingBalance, 0, "Dec 1 starter November starting balance must stay $0");
+    assert.strictEqual(dmDec.startingBalance, 5000, "Dec 1 starter December projection starting balance must be $5,000");
+    assert.strictEqual(dmDash.summary.totalGainUnavailable, false);
+    assert.strictEqual(dmDash.summary.totalGainScopeLabel, "Starts December 2026");
+
+    // Contrast: Oct 1 starter viewed when Oct return is UNLOCKED and has no locked history must still fail closed on YTD
+    const preloadedOctUnlocked = {
+      ...preloaded,
+      historyTable: [],
+      returnsSheet: returnsJanToDec.map(r => r.month_number === 10 ? { ...r, locked: false } : r)
+    };
+    const octFailClosed = await buildInvestorDashboard("octunfinal", preloadedOctUnlocked, { asOfDate: "2026-11-19T20:00:00Z" });
+    assert.strictEqual(octFailClosed.summary.totalGainUnavailable, true, "Unfinalized completed active month must still fail closed on YTD");
+    assert.strictEqual(octFailClosed.accountPerformance.year.unavailable, true);
+    assert.strictEqual(octFailClosed.fundPerformance.year.unavailable, true);
+    assert.strictEqual(octFailClosed.summary.totalGainStatusText, "Temporarily unavailable while being verified");
+    console.log("  PASS 8: jgeisler Nov-1 healing, OPEN_FIRST_PERIOD YTD labeling, Dec-1 future start, and fail-closed guard verified.");
+  }
+
+  // 9. recalculateAllHandler & recalculateHandler preserve locked $0 pre-start months and seed active start capital
+  {
+    function createMockSupabase(initialTables) {
+      const tables = Object.fromEntries(
+        Object.entries(initialTables).map(([k, v]) => [k, v.map(row => ({ ...row }))])
+      );
+
+      function buildQuery(tableName) {
+        const filters = [];
+        let orderCol = null;
+        let orderAsc = true;
+        let isSingle = false;
+
+        function matchFilter(row, f) {
+          if (f.type === "eq") return String(row[f.col]) === String(f.val);
+          if (f.type === "in") return f.vals.map(v => String(v).toLowerCase()).includes(String(row[f.col] ?? "").toLowerCase());
+          if (f.type === "not_ilike") return String(row[f.col] ?? "").toLowerCase() !== String(f.val).toLowerCase();
+          if (f.type === "or") {
+            const parts = f.expr.split(",");
+            return parts.some(part => {
+              const firstDot = part.indexOf(".");
+              const secondDot = part.indexOf(".", firstDot + 1);
+              const col = part.slice(0, firstDot);
+              const op = part.slice(firstDot + 1, secondDot);
+              const val = part.slice(secondDot + 1);
+              if (op === "eq") return String(row[col] ?? "") === String(val);
+              if (op === "ilike") return String(row[col] ?? "").toLowerCase() === String(val).toLowerCase();
+              return false;
+            });
+          }
+          return true;
+        }
+
+        function runSelect() {
+          let rows = (tables[tableName] || []).filter(r => filters.every(f => matchFilter(r, f))).map(r => ({ ...r }));
+          if (orderCol) {
+            rows.sort((a, b) => {
+              const av = Number(a[orderCol] ?? 0);
+              const bv = Number(b[orderCol] ?? 0);
+              return orderAsc ? av - bv : bv - av;
+            });
+          }
+          if (isSingle) {
+            return { data: rows[0] || null, error: rows[0] ? null : new Error(`Not found in ${tableName}`) };
+          }
+          return { data: rows, error: null };
+        }
+
+        const q = {
+          _pendingUpsert: null,
+          select() { return q; },
+          eq(col, val) { filters.push({ type: "eq", col, val }); return q; },
+          in(col, vals) { filters.push({ type: "in", col, vals }); return q; },
+          not(col, op, val) {
+            if (op === "ilike") filters.push({ type: "not_ilike", col, val });
+            return q;
+          },
+          or(expr) { filters.push({ type: "or", expr }); return q; },
+          order(col, opts = {}) { orderCol = col; orderAsc = opts.ascending !== false; return q; },
+          single() { isSingle = true; return q; },
+          upsert(payload) {
+            const items = Array.isArray(payload) ? payload : [payload];
+            const store = tables[tableName] || (tables[tableName] = []);
+            const written = items.map(item => {
+              const idx = store.findIndex(r =>
+                r.investor_id === item.investor_id &&
+                Number(r.year) === Number(item.year) &&
+                Number(r.month_number) === Number(item.month_number)
+              );
+              const merged = idx >= 0 ? { ...store[idx], ...item } : { ...item };
+              if (idx >= 0) store[idx] = merged;
+              else store.push(merged);
+              return merged;
+            });
+            q._pendingUpsert = Array.isArray(payload) ? written : written[0];
+            return q;
+          },
+          then(resolve, reject) {
+            try {
+              if (q._pendingUpsert !== null) {
+                resolve({ data: q._pendingUpsert, error: null });
+              } else {
+                resolve(runSelect());
+              }
+            } catch (err) {
+              if (reject) reject(err);
+              else throw err;
+            }
+          }
+        };
+        return q;
+      }
+
+      return {
+        tables,
+        client: { from: (t) => buildQuery(t) },
+        paginatedRead: async (t, opts = {}) => {
+          const q = buildQuery(t);
+          if (opts.queryModifier) opts.queryModifier(q);
+          const { data } = await q;
+          return data || [];
+        }
+      };
+    }
+
+    function createMockRes() {
+      const res = { statusCode: 200, payload: null };
+      res.status = (code) => { res.statusCode = code; return res; };
+      res.json = (body) => { res.payload = body; return res; };
+      return res;
+    }
+
+    const adminToken = createSession({ adminId: "admin_1", role: "admin" });
+    const returnsLockedOct = Array.from({ length: 12 }, (_, idx) => ({
+      year: 2026,
+      month_number: idx + 1,
+      gross_return_pct: idx < 10 ? 1.5 : 0,
+      locked: idx < 10
+    }));
+
+    const mockEnv = createMockSupabase({
+      investors: [
+        { id: "inv_85d68e7f", portal_username: "jgeisler", email: "jg@example.com", split_pct: 50, monthly_draw: 0, start_date: "2026-11-01", active: true, role: "investor" },
+        { id: "inv_dm", portal_username: "dmehringer", email: "dm@example.com", split_pct: 50, monthly_draw: 0, start_date: "2026-12-01", active: true, role: "investor" }
+      ],
+      investor_accounts: [
+        { id: "acc_jg", investor_id: "inv_85d68e7f", starting_capital: 150000, split_pct: 50, status: "Active" },
+        { id: "acc_dm", investor_id: "inv_dm", starting_capital: 5000, split_pct: 50, status: "Active" }
+      ],
+      investor_monthly_history: [
+        { id: "h_jg_10", investor_id: "inv_85d68e7f", year: 2026, month_number: 10, month: "October", opening_balance: 0, ending_balance: 0, locked: true },
+        { id: "h_jg_11", investor_id: "inv_85d68e7f", year: 2026, month_number: 11, month: "November", opening_balance: 0, ending_balance: 0, locked: false },
+        { id: "h_jg_12", investor_id: "inv_85d68e7f", year: 2026, month_number: 12, month: "December", opening_balance: 0, ending_balance: 0, locked: false },
+        { id: "h_dm_10", investor_id: "inv_dm", year: 2026, month_number: 10, month: "October", opening_balance: 0, ending_balance: 0, locked: true }
+      ],
+      deposits: [],
+      withdrawals: [],
+      monthly_returns: returnsLockedOct,
+      accounting_periods: [],
+      commission_shares: [],
+      commission_rules: [],
+      commission_earnings: [],
+      account_cutover_adjustments: []
+    });
+
+    const resAll = createMockRes();
+    await recalculateAllHandler(
+      {
+        method: "POST",
+        headers: { cookie: `scff_admin_session=${adminToken}` },
+        body: { year: 2026, asOfDate: "2026-11-19T20:00:00Z" }
+      },
+      resAll,
+      { supabase: mockEnv.client, paginatedRead: mockEnv.paginatedRead }
+    );
+    assert.strictEqual(resAll.statusCode, 200, "recalculateAllHandler must succeed");
+    const jgM10 = mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_85d68e7f" && r.month_number === 10);
+    const jgM11 = mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_85d68e7f" && r.month_number === 11);
+    const jgM12 = mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_85d68e7f" && r.month_number === 12);
+    assert.strictEqual(jgM10.ending_balance, 0, "Locked Oct $0 pre-start row must remain preserved");
+    assert.strictEqual(jgM11.opening_balance, 150000, "recalculate-all must seed jgeisler Nov opening_balance to $150,000");
+    assert.strictEqual(jgM11.ending_balance, 150000, "recalculate-all must set jgeisler Nov ending_balance to $150,000");
+    assert.strictEqual(jgM12.opening_balance, 150000, "recalculate-all must carry $150,000 into Dec projection");
+
+    // Simulate Nov 30 close for Dec-1 starter (locked M11 $0 must not zero out Dec opening)
+    const dmM11 = mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_dm" && r.month_number === 11);
+    assert.strictEqual(dmM11.opening_balance, 0, "Dec-1 starter Nov pre-start must stay $0");
+    assert.strictEqual(mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_dm" && r.month_number === 12).opening_balance, 5000);
+    dmM11.locked = true;
+    const resSingle = createMockRes();
+    await recalculateHandler(
+      {
+        method: "POST",
+        headers: { cookie: `scff_admin_session=${adminToken}` },
+        body: { investorId: "inv_dm", year: 2026, asOfDate: "2026-12-01T20:00:00Z" }
+      },
+      resSingle,
+      { supabase: mockEnv.client }
+    );
+    assert.strictEqual(resSingle.statusCode, 200, "recalculateHandler must succeed for Dec-1 starter");
+    const dmM12AfterClose = mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_dm" && r.month_number === 12);
+    assert.strictEqual(dmM12AfterClose.opening_balance, 5000, "recalculateHandler must seed Dec-1 starting_capital ($5,000) even when Nov is locked $0");
+
+    // Verify single-investor recalculation for jgeisler from month 11
+    mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_85d68e7f" && r.month_number === 11).opening_balance = 0;
+    const resJgSingle = createMockRes();
+    await recalculateHandler(
+      {
+        method: "POST",
+        headers: { cookie: `scff_admin_session=${adminToken}` },
+        body: { investorId: "jgeisler", year: 2026, startMonthNumber: 11, asOfDate: "2026-11-19T20:00:00Z" }
+      },
+      resJgSingle,
+      { supabase: mockEnv.client }
+    );
+    assert.strictEqual(resJgSingle.statusCode, 200);
+    assert.strictEqual(
+      mockEnv.tables.investor_monthly_history.find(r => r.investor_id === "inv_85d68e7f" && r.month_number === 11).opening_balance,
+      150000,
+      "recalculateHandler for jgeisler must seed $150,000 even when M10 is locked $0"
+    );
+    console.log("  PASS 9: recalculateAllHandler & recalculateHandler pre-start transition seeding verified.");
+  }
+
+  console.log("=== ALL 9 P0 NOVEMBER & YEAR-ROLLOVER REGRESSION TESTS PASSED ===");
 }
 
 runTests().catch(err => {
