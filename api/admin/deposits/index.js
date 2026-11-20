@@ -1,9 +1,8 @@
 import { verifyAdminSession } from "../../../lib/adminAuth.js";
-import { supabase } from "../../../lib/supabase.js";
+import { supabase as defaultSupabase } from "../../../lib/supabase.js";
 import {
-  assertAuthoritativeProductionDb,
-  assertAuditActor,
-  buildDeterministicIdempotencyKey
+  assertAuthoritativeProductionDb as defaultAssertAuthoritativeDb,
+  assertAuditActor
 } from "../../../lib/financial-mutation-guard.js";
 import { assertPeriodUnlocked, isPeriodLockedError } from "../../../lib/period-lock-guard.js";
 import crypto from "node:crypto";
@@ -35,14 +34,17 @@ import crypto from "node:crypto";
  * STATUS LIFECYCLE: confirmed -> void (via /void endpoint) | cancelled (via PATCH)
  * Physical DELETE is permanently blocked (HTTP 405).
  */
-export default async function handler(req, res) {
+export default async function handler(req, res, deps = {}) {
   const session = verifyAdminSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
+
+  const db = deps.supabase || defaultSupabase;
+  const ensureAuthoritativeDb = deps.assertAuthoritativeProductionDb || defaultAssertAuthoritativeDb;
 
   // ─── GET: List all deposits ───────────────────────────────────────────────
   if (req.method === "GET") {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("deposits")
         .select("*")
         .order("created_at", { ascending: false });
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
   // ─── POST: Create deposit ─────────────────────────────────────────────────
   if (req.method === "POST") {
     try {
-      await assertAuthoritativeProductionDb("create_deposit");
+      await ensureAuthoritativeDb("create_deposit");
       const auditActor = assertAuditActor(
         session?.adminId || session?.userId || req.body?.created_by,
         "create_deposit"
@@ -100,14 +102,18 @@ export default async function handler(req, res) {
         effDate = `${y}-${m}-01`;
       }
 
-      await assertPeriodUnlocked(supabase, { effectiveDate: effDate }, "create_deposit");
+      // Match Postgres create_deposit_atomic: HISTORICAL_PROVENANCE and UNVERIFIED_LEGACY document
+      // historical cash basis already present in balances and are permitted for locked periods.
+      if (!["HISTORICAL_PROVENANCE", "UNVERIFIED_LEGACY"].includes(rawTreatment)) {
+        await assertPeriodUnlocked(db, { effectiveDate: effDate }, "create_deposit");
+      }
 
       // ── Resolve investor + account ────────────────────────────────────────
       let investorId = body.investorId || body.investor_id;
       let accountId = body.accountId || body.account_id;
 
       if (!investorId && accountId) {
-        const { data: acc } = await supabase
+        const { data: acc } = await db
           .from("investor_accounts")
           .select("investor_id")
           .eq("id", accountId)
@@ -115,7 +121,7 @@ export default async function handler(req, res) {
         if (acc?.investor_id) investorId = acc.investor_id;
       }
       if (investorId && !accountId) {
-        const { data: accs } = await supabase
+        const { data: accs } = await db
           .from("investor_accounts")
           .select("id")
           .eq("investor_id", investorId)
@@ -134,13 +140,12 @@ export default async function handler(req, res) {
           error: "INVALID_AMOUNT: Amount must be strictly greater than $0.00"
         });
       }
-      const amountCents = Math.round(amount * 100);
 
       // ── Prevention 1: Internal Transfer Misclassification Guard ──────────
       if (rawTreatment === "NEW_CASH") {
         const typeStr = String(body.type || "").trim().toLowerCase();
         const notesStr = String(body.notes || "").toLowerCase();
-        const isTransferType = typeStr === "transfer" || typeStr === "internal_transfer";
+        const isTransferType = typeStr === "transfer" || typeStr === "internal_transfer" || typeStr === "internal transfer";
         const isTransferNote = notesStr.includes("internal transfer") || notesStr.includes("transfer from") || notesStr.includes("transfer to");
         if (isTransferType || isTransferNote) {
           return res.status(400).json({
@@ -150,7 +155,7 @@ export default async function handler(req, res) {
       }
 
       // ── Prevention 2: Embedded Starting Capital Duplicate Guard ──────────
-      const { data: accRecord } = await supabase
+      const { data: accRecord } = await db
         .from("investor_accounts")
         .select("id, starting_capital, open_date, name")
         .eq("id", accountId)
@@ -170,6 +175,7 @@ export default async function handler(req, res) {
           if (!hasExplicitConfirm) {
             return res.status(409).json({
               error: `EMBEDDED_STARTING_CAPITAL_DUPLICATE: This deposit amount ($${amount.toFixed(2)}) and date (${entryDate}) match the account's initial starting capital ($${startCap.toFixed(2)}) and opening date (${openDateStr}). The economic effect of this funding is already embedded in the account opening balance. Posting this as NEW_CASH would duplicate the investor's balance. If this is a distinct additional external contribution beyond the starting capital, administrator confirmation is required (set confirm_additional_to_starting_capital: true). If certifying provenance of the initial capital, use accounting_treatment: 'HISTORICAL_PROVENANCE'.`,
+              code: "EMBEDDED_STARTING_CAPITAL_DUPLICATE",
               accountStartingCapital: startCap,
               accountOpenDate: openDateStr
             });
@@ -178,9 +184,9 @@ export default async function handler(req, res) {
       }
 
       // ── Prevention 3: Pre-Existing Confirmed Economic Duplicate Check ────
-      const { data: existingDupes } = await supabase
+      const { data: existingDupes } = await db
         .from("deposits")
-        .select("id, amount, date, effective_accounting_date, status, accounting_treatment, notes")
+        .select("id, amount, date, effective_accounting_date, status, accounting_treatment, notes, voided_at")
         .eq("investor_id", investorId)
         .eq("account_id", accountId)
         .eq("amount", amount)
@@ -188,16 +194,17 @@ export default async function handler(req, res) {
         .eq("accounting_treatment", rawTreatment);
 
       if (existingDupes && existingDupes.length > 0) {
-        const hasDateMatch = existingDupes.some(d => {
+        const activeDupes = existingDupes.filter(d => !d.voided_at);
+        const matchedDupe = activeDupes.find(d => {
           const dDate = String(d.date || "").slice(0, 10);
           const dEff = String(d.effective_accounting_date || "").slice(0, 10);
           return dDate === entryDate || dEff === effDate;
         });
 
-        if (hasDateMatch && !body.confirm_duplicate_economic_deposit) {
-          const matchedDupe = existingDupes[0];
+        if (matchedDupe && !body.confirm_duplicate_economic_deposit) {
           return res.status(409).json({
             error: `DUPLICATE_ECONOMIC_DEPOSIT: An active ${rawTreatment} deposit of $${amount.toFixed(2)} on ${entryDate} (effective ${effDate}) already exists for this account (Deposit ID: ${matchedDupe.id}). If this is a separate legitimate transaction, administrator confirmation is required (set confirm_duplicate_economic_deposit: true).`,
+            code: "DUPLICATE_ECONOMIC_DEPOSIT",
             existingDepositId: matchedDupe.id
           });
         }
@@ -217,25 +224,8 @@ export default async function handler(req, res) {
       }
       idempotencyKey = String(idempotencyKey).trim().slice(0, 255);
 
-      // ── Build payload ─────────────────────────────────────────────────────
-      const payload = {
-        id: body.id || `dep_${crypto.randomBytes(4).toString("hex")}`,
-        investor_id: investorId,
-        account_id: accountId,
-        date: entryDate,
-        effective_accounting_date: effDate,
-        amount,
-        accounting_treatment: rawTreatment,
-        status: rawStatus,
-        type: body.type || "Wire",
-        notes: body.notes || "",
-        created_by: auditActor,
-        updated_at: new Date().toISOString(),
-        idempotency_key: idempotencyKey
-      };
-
       // ── Authoritative Save Path: Invoke Atomic Database RPC (Under Investor Advisory Lock) ──
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc("create_deposit_atomic", {
+      const { data: rpcRes, error: rpcErr } = await db.rpc("create_deposit_atomic", {
         p_investor_id: investorId,
         p_account_id: accountId,
         p_amount: amount,
@@ -266,7 +256,7 @@ export default async function handler(req, res) {
         }
         // Unique index violation backstop
         if (msg.includes("idx_deposits_idempotency_key") || rpcErr.code === "23505") {
-          const { data: existingDep } = await supabase
+          const { data: existingDep } = await db
             .from("deposits")
             .select("*")
             .eq("idempotency_key", idempotencyKey)

@@ -418,7 +418,16 @@
         <input type="hidden" id="formAction" />
         <input type="hidden" id="formId" />
         <div id="dynamicFormFields"></div>
-        <div id="modalError" class="muted" style="color:var(--danger);margin-bottom:16px;margin-top:16px;"></div>
+        <div id="duplicateConfirmBox" class="hidden" style="margin:12px 0; padding:12px 14px; border-radius:10px; border:1px solid rgba(245,158,11,0.45); background:rgba(245,158,11,0.10);">
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="field_confirm_duplicate" style="width:auto; margin-top:3px;" />
+            <div>
+              <div style="font-weight:700; font-size:13px; color:#fbbf24;">Confirm separate legitimate transaction</div>
+              <div id="duplicateConfirmHelp" style="font-size:12px; color:var(--muted); margin-top:2px;">Only check this if this is a distinct transaction of the exact same amount in this period.</div>
+            </div>
+          </label>
+        </div>
+        <div id="modalError" class="muted" style="color:#fca5a5;margin-bottom:16px;margin-top:16px;word-break:break-word;overflow-wrap:anywhere;line-height:1.45;font-size:13px;"></div>
         <div style="margin-top:24px;text-align:right;">
           <button type="button" class="secondary closeModalBtn" style="margin-right:8px;">Cancel</button>
           <button type="submit" id="saveEntityBtn">Save Changes</button>
@@ -567,8 +576,14 @@ let state = {
     const api = {
       request: async (url, opts = {}) => {
         const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'API Request Failed');
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = new Error(json.error || `API Request Failed (HTTP ${res.status})`);
+          err.code = json.code || null;
+          err.status = res.status;
+          err.data = json;
+          throw err;
+        }
         return json;
       },
       login: (u, p) => api.request('/api/admin/login', { method: 'POST', body: JSON.stringify({ username: u, password: p }) }),
@@ -1497,6 +1512,16 @@ let state = {
       if (accEl) accEl.textContent = activeAccounts.length;
     }
 
+    function resetDuplicateConfirm() {
+      const dupBox = document.getElementById('duplicateConfirmBox');
+      const dupCb = document.getElementById('field_confirm_duplicate');
+      if (dupCb) dupCb.checked = false;
+      if (dupBox) dupBox.classList.add('hidden');
+    }
+
+    document.getElementById('dynamicFormFields')?.addEventListener('input', resetDuplicateConfirm);
+    document.getElementById('dynamicFormFields')?.addEventListener('change', resetDuplicateConfirm);
+
     function openModal(tab, action, id = null, extraData = null) {
       const modal = document.getElementById('entityModal');
       const title = document.getElementById('modalTitle');
@@ -1505,6 +1530,7 @@ let state = {
       const formId = document.getElementById('formId');
       const errorEl = document.getElementById('modalError');
       if (errorEl) errorEl.textContent = '';
+      resetDuplicateConfirm();
       
       formAction.value = action;
       formId.value = id || '';
@@ -1797,17 +1823,26 @@ let state = {
             if (res.ok) {
               const data = await res.json();
               const avail = data.availableEquity || 0;
+              const availFmt = avail.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               fbEl.style.display = 'block';
-              if (amt > avail) {
+              if (data.periodLocked) {
+                const lockLabel = (data.periodYear && data.periodMonthNumber)
+                  ? `${data.periodYear}-${String(data.periodMonthNumber).padStart(2, '0')}`
+                  : effDate.slice(0, 7);
+                fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
+                fbEl.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                fbEl.style.color = '#fca5a5';
+                fbEl.textContent = `🔒 Period ${lockLabel} is FINALIZED/LOCKED — withdrawals cannot be saved in this period (Calculated Equity: $${availFmt}).`;
+              } else if (amt > avail) {
                 fbEl.style.background = 'rgba(239, 68, 68, 0.15)';
                 fbEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
                 fbEl.style.color = '#f87171';
-                fbEl.textContent = '⚠️ Withdrawal exceeds available account equity. Available: $' + avail.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                fbEl.textContent = '⚠️ Withdrawal exceeds available account equity. Available: $' + availFmt;
               } else {
                 fbEl.style.background = 'rgba(16, 185, 129, 0.15)';
                 fbEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
                 fbEl.style.color = '#34d399';
-                fbEl.textContent = '✓ Available Account Equity: $' + avail.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                fbEl.textContent = '✓ Available Account Equity: $' + availFmt;
               }
             } else {
               const errData = await res.json().catch(() => ({}));
@@ -1891,6 +1926,7 @@ let state = {
           const selectedTreatmentEl = document.querySelector('input[name="field_accounting_treatment"]:checked');
           const accountingTreatment = selectedTreatmentEl ? selectedTreatmentEl.value : 'NEW_CASH';
           const mutationId = document.getElementById('field_mutation_id')?.value;
+          const confirmDuplicate = Boolean(document.getElementById('field_confirm_duplicate')?.checked);
           endpoint = action === 'edit' ? `/api/admin/deposits/${id}` : '/api/admin/deposits';
           method = action === 'edit' ? 'PATCH' : 'POST';
           const effAccDate = document.getElementById('field_effective_accounting_date')?.value || '';
@@ -1903,12 +1939,14 @@ let state = {
             type: document.getElementById('field_type')?.value || 'Wire',
             accounting_treatment: accountingTreatment,
             notes: document.getElementById('field_notes')?.value || '',
-            idempotency_key: mutationId || undefined
+            idempotency_key: mutationId || undefined,
+            ...(confirmDuplicate ? { confirm_duplicate_economic_deposit: true } : {})
           };
         } else if (tab === 'withdrawals') {
           const accId = document.getElementById('field_account_id')?.value;
           const targetAcc = (state.data.accounts || []).find(a => String(a.id).toLowerCase() === String(accId).toLowerCase());
           const invId = targetAcc?.investor_id || '';
+          const allowDuplicate = Boolean(document.getElementById('field_confirm_duplicate')?.checked);
           endpoint = action === 'edit' ? `/api/admin/withdrawals/${id}` : '/api/admin/withdrawals';
           method = action === 'edit' ? 'PATCH' : 'POST';
           const selMonth = document.getElementById('field_month')?.value || 'January';
@@ -1928,7 +1966,8 @@ let state = {
             status: document.getElementById('field_status')?.value || 'Pending',
             is_draw: !!document.getElementById('field_is_draw')?.checked,
             notes: document.getElementById('field_notes')?.value || '',
-            idempotency_key: document.getElementById('field_mutation_id')?.value || undefined
+            idempotency_key: document.getElementById('field_mutation_id')?.value || undefined,
+            ...(allowDuplicate ? { allow_duplicate_amount: true } : {})
           };
         } else if (tab === 'returns') {
           endpoint = '/api/admin/monthly-returns';
@@ -1990,7 +2029,25 @@ let state = {
         document.getElementById('entityModal').classList.add('hidden');
         await loadTab(tab);
       } catch (err) {
-        if (errorEl) errorEl.textContent = err.message || 'Save failed';
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Save failed';
+          errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        const errCode = err?.code || '';
+        const errMsg = String(err?.message || '');
+        if ((tab === 'deposits' && (errCode === 'DUPLICATE_ECONOMIC_DEPOSIT' || errMsg.includes('DUPLICATE_ECONOMIC_DEPOSIT'))) ||
+            (tab === 'withdrawals' && (errCode === 'DUPLICATE_ECONOMIC_TRANSACTION' || errMsg.includes('DUPLICATE_ECONOMIC_TRANSACTION')))) {
+          const dupBox = document.getElementById('duplicateConfirmBox');
+          const dupCb = document.getElementById('field_confirm_duplicate');
+          const dupHelp = document.getElementById('duplicateConfirmHelp');
+          if (dupCb) dupCb.checked = false;
+          if (dupHelp) {
+            dupHelp.textContent = tab === 'deposits'
+              ? 'An active deposit with this exact amount and date already exists. Check this box ONLY if this is a separate legitimate wire/deposit, then click Save Changes again.'
+              : 'An active withdrawal with this exact amount and month already exists. Check this box ONLY if this is a separate legitimate distribution, then click Save Changes again.';
+          }
+          if (dupBox) dupBox.classList.remove('hidden');
+        }
       } finally {
         btn.disabled = false; btn.textContent = 'Save Changes';
         document.getElementById('entityModal').classList.remove('saving-active');

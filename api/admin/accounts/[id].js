@@ -37,6 +37,14 @@ export default async function handler(req, res) {
       const { data, error } = await supabase.from("investor_accounts").update(updates).eq("id", id).select();
       if (error) throw error;
 
+      // Keep investors.start_date synchronized if open_date was explicitly edited
+      if (updates.open_date && data?.[0]?.investor_id) {
+        await supabase
+          .from("investors")
+          .update({ start_date: updates.open_date, updated_at: new Date().toISOString() })
+          .eq("id", data[0].investor_id);
+      }
+
       return res.status(200).json({ success: true, account: data[0] });
     } catch (err) {
       return res.status(500).json({ error: err.message });
