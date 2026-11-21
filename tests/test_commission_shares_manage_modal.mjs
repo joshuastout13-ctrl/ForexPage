@@ -134,6 +134,9 @@ function createInMemorySharesDb() {
 }
 
 function runAdminModalFilterFromHtml(adminHtml, stateData, sourceInvestorId) {
+  const helperMatch = adminHtml.match(/(function compareDropdownLabels[\s\S]*?)\/\* dropdown-helpers-end \*\//);
+  assert(helperMatch, "admin.html must contain shared dropdown helpers");
+
   const startMarker = "} else if (tab === 'commission_shares') {";
   const startIdx = adminHtml.indexOf(startMarker);
   assert(startIdx !== -1, "admin.html must contain commission_shares modal branch");
@@ -146,7 +149,7 @@ function runAdminModalFilterFromHtml(adminHtml, stateData, sourceInvestorId) {
     "extraData",
     "item",
     "escapeHtml",
-    `let html = '';\n${slice.replace(/\}\s*$/, "")}\nreturn { html, currentShares, sourceUsername };`
+    `${helperMatch[1]}\nlet html = '';\n${slice.replace(/\}\s*$/, "")}\nreturn { html, currentShares, sourceUsername };`
   );
   const escapeHtml = (s) => String(s ?? "");
   return fn({ data: stateData }, { sourceInvestorId }, null, escapeHtml);

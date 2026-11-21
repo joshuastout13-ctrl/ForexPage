@@ -413,10 +413,107 @@ async function runTests() {
       'allow_duplicate_amount',
       'data.periodLocked',
       'err.code = json.code',
-      'scrollIntoView'
+      'scrollIntoView',
+      'buildAccountOptionsHtml',
+      'buildInvestorOptionsHtml',
+      'buildCommissionShareStatusOptionsHtml'
     ]) {
       assert.ok(adminHtml.includes(needle), `admin.html missing ${needle}`);
     }
+
+    // 7. Verify inline <script> syntax and alphabetical dropdown sorting across admin.html
+    const vm = await import("node:vm");
+    for (const m of adminHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+      if (m[1].trim()) new vm.Script(m[1]);
+    }
+    const helperMatch = adminHtml.match(/(function compareDropdownLabels[\s\S]*?)\/\* dropdown-helpers-end \*\//);
+    assert.ok(helperMatch, "admin.html dropdown helpers block not found");
+    const sandbox = {
+      escapeHtml: (s) =>
+        String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+    };
+    vm.runInNewContext(helperMatch[1], sandbox);
+
+    const extractOptionValuesAndLabels = (html) =>
+      [...html.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)].map((m) => ({
+        value: m[1],
+        selected: /\bselected\b/.test(m[2]),
+        label: m[3]
+      }));
+
+    const sampleInvestors = [
+      { id: "inv_z", portal_username: "ziracheta", first_name: "Zulma", last_name: "Iracheta" },
+      { id: "inv_j", portal_username: "jrichards", first_name: "josh", last_name: "richards" },
+      { id: "inv_b", portal_username: "bbell", first_name: "Brandon", last_name: "Bell" },
+      { id: "inv_jc", portal_username: "jcolby", first_name: "Jim", last_name: "Colby" },
+      { id: "inv_bk", portal_username: "bkimball", first_name: "Bill and Mary", last_name: "Kimball" },
+      { id: "inv_e", portal_username: "estrongin", first_name: "Eric", last_name: "strongin" }
+    ];
+    const sampleAccounts = [
+      { id: "bbell", investor_id: "inv_b", name: "Main" },
+      { id: "jrichards", investor_id: "inv_j", name: "Main" },
+      { id: "ziracheta", investor_id: "inv_z", name: "Main" },
+      { id: "jcolby", investor_id: "inv_jc", name: "Main" },
+      { id: "alpha_orphan", investor_id: "missing_owner", name: "Alpha Orphan" }
+    ];
+
+    const accOpts = extractOptionValuesAndLabels(
+      sandbox.buildAccountOptionsHtml(sampleAccounts, sampleInvestors, "jrichards")
+    );
+    assert.deepEqual(
+      accOpts.map((o) => o.value),
+      ["alpha_orphan", "bbell", "jcolby", "jrichards", "ziracheta"]
+    );
+    assert.equal(accOpts.find((o) => o.selected)?.value, "jrichards");
+
+    const invOpts = extractOptionValuesAndLabels(
+      sandbox.buildInvestorOptionsHtml(sampleInvestors, {
+        usePortalUsername: true,
+        placeholder: "Select source investor...",
+        isSelected: (i) => i.portal_username === "estrongin"
+      })
+    );
+    assert.equal(invOpts[0].label, "Select source investor...");
+    assert.deepEqual(
+      invOpts.slice(1).map((o) => o.value),
+      ["bkimball", "bbell", "estrongin", "jcolby", "jrichards", "ziracheta"]
+    );
+    assert.equal(invOpts.find((o) => o.selected)?.value, "estrongin");
+
+    const paymentOpts = extractOptionValuesAndLabels(
+      sandbox.renderSortedOptions(
+        ["Wire", "Check", "Internal Transfer", "Cash", "Deposit"].map((t) => ({ value: t, label: t })),
+        (e) => e.value === "Wire"
+      )
+    );
+    assert.deepEqual(
+      paymentOpts.map((o) => o.value),
+      ["Cash", "Check", "Deposit", "Internal Transfer", "Wire"]
+    );
+    assert.equal(paymentOpts.find((o) => o.selected)?.value, "Wire");
+
+    const shareStatusOpts = extractOptionValuesAndLabels(sandbox.buildCommissionShareStatusOptionsHtml("active"));
+    assert.deepEqual(
+      shareStatusOpts.map((o) => o.value),
+      ["active", "cancelled", "ended"]
+    );
+    assert.equal(shareStatusOpts.find((o) => o.selected)?.value, "active");
+
+    const emailFilterMatch = adminHtml.match(/<select id="emailStatusFilter"[^>]*>([\s\S]*?)<\/select>/);
+    assert.ok(emailFilterMatch, "emailStatusFilter select missing");
+    const emailFilterOpts = extractOptionValuesAndLabels(emailFilterMatch[1]);
+    assert.deepEqual(
+      emailFilterOpts.map((o) => o.label),
+      ["Active Only", "All Status", "Inactive Only"]
+    );
+    assert.equal(emailFilterOpts.find((o) => o.selected)?.value, "active");
+
+    assert.ok(!adminHtml.includes("recCandidates.map("), "commission_shares should use buildInvestorOptionsHtml");
+    assert.ok(!adminHtml.includes("(state.data.accounts || []).map("), "modals should use buildAccountOptionsHtml");
 
     console.log("✅ ALL OFFLINE CASHFLOW GUARDS & UI REGRESSION CHECKS PASSED!");
   } finally {

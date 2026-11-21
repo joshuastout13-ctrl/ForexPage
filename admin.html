@@ -337,8 +337,8 @@
                   <div style="display:flex; gap:8px; margin-bottom:10px;">
                     <input id="emailSearchInput" placeholder="Search name, email, ID..." style="font-size:13px; padding:8px 12px;" />
                     <select id="emailStatusFilter" style="font-size:13px; padding:8px 12px; width:130px;">
-                      <option value="all">All Status</option>
                       <option value="active" selected>Active Only</option>
+                      <option value="all">All Status</option>
                       <option value="inactive">Inactive Only</option>
                     </select>
                   </div>
@@ -701,10 +701,17 @@ let state = {
              const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
           }
           if (state.data.investors && state.data.investors.length > 0) {
-            state.data.investors.sort((a, b) => {
-              const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.portal_username || a.id;
-              const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.portal_username || b.id;
-              return nameA.localeCompare(nameB);
+            state.data.investors.sort((a, b) =>
+              compareDropdownLabels(formatEntityDisplayName(a), formatEntityDisplayName(b))
+            );
+          }
+          if (state.data.accounts && state.data.accounts.length > 0) {
+            state.data.accounts.sort((a, b) => {
+              const invA = findAccountInvestor(a, state.data.investors);
+              const invB = findAccountInvestor(b, state.data.investors);
+              const labelA = invA ? `${formatEntityDisplayName(invA)} (${a.id})` : `${a.name || a.id} (${a.id})`;
+              const labelB = invB ? `${formatEntityDisplayName(invB)} (${b.id})` : `${b.name || b.id} (${b.id})`;
+              return compareDropdownLabels(labelA, labelB);
             });
           }
           updateSummaryCards();
@@ -716,6 +723,66 @@ let state = {
         document.body.classList.remove('loading-active');
       }
     }
+
+    function compareDropdownLabels(a, b) {
+      return String(a || '').trim().localeCompare(String(b || '').trim(), undefined, { sensitivity: 'base' });
+    }
+
+    function formatEntityDisplayName(inv, fallbackId = '') {
+      const full = `${inv?.first_name || ''} ${inv?.last_name || ''}`.replace(/\s+/g, ' ').trim();
+      return full || String(inv?.portal_username || inv?.id || fallbackId || '').trim();
+    }
+
+    function findAccountInvestor(acc, investors) {
+      const ownerKey = String(acc?.investor_id || '').trim().toLowerCase();
+      if (!ownerKey) return null;
+      return (investors || []).find(i =>
+        String(i.id || '').trim().toLowerCase() === ownerKey ||
+        String(i.portal_username || '').trim().toLowerCase() === ownerKey
+      ) || null;
+    }
+
+    function renderSortedOptions(entries, isSelected = () => false) {
+      return [...(entries || [])]
+        .sort((a, b) => compareDropdownLabels(a.label, b.label))
+        .map(entry => `<option value="${escapeHtml(String(entry.value ?? ''))}" ${isSelected(entry) ? 'selected' : ''}>${escapeHtml(String(entry.label ?? ''))}</option>`)
+        .join('');
+    }
+
+    function buildAccountOptionsHtml(accounts, investors, selectedAccountId = null) {
+      const selectedKey = selectedAccountId == null ? '' : String(selectedAccountId);
+      const entries = (accounts || []).map(acc => {
+        const inv = findAccountInvestor(acc, investors);
+        const invName = inv ? formatEntityDisplayName(inv) : '';
+        const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
+        return { value: acc.id, label };
+      });
+      return renderSortedOptions(entries, entry => selectedKey !== '' && String(entry.value) === selectedKey);
+    }
+
+    function buildInvestorOptionsHtml(investors, options = {}) {
+      const { usePortalUsername = false, isSelected = null, placeholder = '' } = options;
+      const entries = (investors || []).map(inv => {
+        const value = usePortalUsername ? (inv.portal_username || inv.id) : inv.id;
+        const name = formatEntityDisplayName(inv, value);
+        return { value, label: `${name} (${value})`, investor: inv };
+      });
+      const placeholderHtml = placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : '';
+      return placeholderHtml + renderSortedOptions(
+        entries,
+        typeof isSelected === 'function' ? (entry) => isSelected(entry.investor) : () => false
+      );
+    }
+
+    function buildCommissionShareStatusOptionsHtml(selectedStatus = 'active') {
+      const statusEntries = [
+        { value: 'active', label: 'Active' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'ended', label: 'Ended' }
+      ];
+      return renderSortedOptions(statusEntries, entry => entry.value === selectedStatus);
+    }
+    /* dropdown-helpers-end */
 
     /* Accounting Preview Functions */
     async function generateAccountingPreview() {
@@ -1584,22 +1651,26 @@ let state = {
           </div>
         `;
       } else if (tab === 'accounts') {
-        const invOptions = (state.data.investors || []).map(inv => `<option value="${inv.id}" ${item && item.investor_id === inv.id ? 'selected' : ''}>${escapeHtml(inv.first_name || '')} ${escapeHtml(inv.last_name || '')} (${inv.id})</option>`).join('');
+        const invOptions = buildInvestorOptionsHtml(state.data.investors, {
+          isSelected: inv => item && item.investor_id === inv.id
+        });
+        const accountStatusOptions = renderSortedOptions(
+          ['Active', 'Inactive'].map(s => ({ value: s, label: s })),
+          entry => item ? item.status === entry.value : entry.value === 'Active'
+        );
         html = `
           <div class="form-group"><label>Investor</label><select id="field_investor_id" required>${invOptions}</select></div>
           <div class="form-group"><label>Account Name</label><input id="field_name" value="${item ? escapeHtml(item.name || '') : 'Main Account'}" required /></div>
           <div class="form-group"><label>Starting Capital ($)</label><input id="field_starting_capital" type="number" step="0.01" value="${item ? (item.starting_capital || 0) : 0}" required /></div>
           <div class="form-group"><label>Split %</label><input id="field_split_pct" type="number" step="0.1" value="${item ? (item.split_pct || 100) : 100}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Active" ${item && item.status==='Active'?'selected':''}>Active</option><option value="Inactive" ${item && item.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+          <div class="form-group"><label>Status</label><select id="field_status">${accountStatusOptions}</select></div>
         `;
       } else if (tab === 'deposits') {
-        const accOptions = (state.data.accounts || []).map(acc => {
-          const inv = (state.data.investors || []).find(i => String(i.id).toLowerCase() === String(acc.investor_id).toLowerCase() || String(i.portal_username || '').toLowerCase() === String(acc.investor_id).toLowerCase());
-          const invName = inv ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : '';
-          const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
-          return `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-        }).join('');
-        const typeOptions = ['Wire', 'Check', 'Internal Transfer', 'Cash', 'Deposit'].map(t => `<option value="${t}" ${item && item.type === t ? 'selected' : ''}>${t}</option>`).join('');
+        const accOptions = buildAccountOptionsHtml(state.data.accounts, state.data.investors, item ? item.account_id : null);
+        const typeOptions = renderSortedOptions(
+          ['Wire', 'Check', 'Internal Transfer', 'Cash', 'Deposit'].map(t => ({ value: t, label: t })),
+          entry => item ? item.type === entry.value : entry.value === 'Wire'
+        );
         const currentTreatment = item ? (item.accounting_treatment || 'NEW_CASH').toUpperCase() : 'NEW_CASH';
         const mutationToken = (item && item.idempotency_key) 
           ? item.idempotency_key 
@@ -1631,12 +1702,11 @@ let state = {
           <div class="form-group"><label>Reference / Notes <span style="color:var(--muted);font-weight:400;font-size:12px">(optional)</span></label><input id="field_notes" type="text" value="${item ? escapeHtml(item.notes || '') : ''}" placeholder="Wire ref #, confirmation, context..." /></div>
         `;
       } else if (tab === 'withdrawals') {
-        const accOptions = (state.data.accounts || []).map(acc => {
-          const inv = (state.data.investors || []).find(i => String(i.id).toLowerCase() === String(acc.investor_id).toLowerCase() || String(i.portal_username || '').toLowerCase() === String(acc.investor_id).toLowerCase());
-          const invName = inv ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : '';
-          const label = invName ? `${invName} (${acc.id})` : `${acc.name || acc.id} (${acc.id})`;
-          return `<option value="${acc.id}" ${item && item.account_id === acc.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-        }).join('');
+        const accOptions = buildAccountOptionsHtml(state.data.accounts, state.data.investors, item ? item.account_id : null);
+        const withdrawalStatusOptions = renderSortedOptions(
+          ['Pending', 'Approved', 'Completed', 'Cancelled'].map(s => ({ value: s, label: s })),
+          entry => item ? item.status === entry.value : entry.value === 'Pending'
+        );
         const selectedMonth = item ? (
           item.month ||
           (item.month_number && MONTHS[item.month_number - 1]) ||
@@ -1657,7 +1727,7 @@ let state = {
           <div class="form-group"><label>Withdrawal Amount ($)</label><input id="field_amount" type="number" step="0.01" value="${item ? item.amount : ''}" required /></div>
           <div class="form-group"><label>Effective Month</label><select id="field_month" required>${monthOptions}</select></div>
           <div class="form-group"><label>Effective Year</label><input id="field_year" type="number" value="${selectedYear}" required /></div>
-          <div class="form-group"><label>Status</label><select id="field_status"><option value="Pending" ${item && item.status==='Pending'?'selected':''}>Pending</option><option value="Approved" ${item && item.status==='Approved'?'selected':''}>Approved</option><option value="Completed" ${item && item.status==='Completed'?'selected':''}>Completed</option><option value="Cancelled" ${item && item.status==='Cancelled'?'selected':''}>Cancelled</option></select></div>
+          <div class="form-group"><label>Status</label><select id="field_status">${withdrawalStatusOptions}</select></div>
           <div class="form-group">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
               <input id="field_is_draw" type="checkbox" ${item && (item.is_draw === true || String(item.notes || '').toLowerCase().includes('[draw')) ? 'checked' : ''} style="width:auto;" />
@@ -1723,7 +1793,10 @@ let state = {
               <div class="bulk-share-row" data-share-id="${s.id}" style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1fr 40px; gap:8px; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px;">
                 <div>
                   <select class="bulk-rec-id" style="font-size:13px; padding:6px;">
-                    ${recCandidates.map(i => `<option value="${i.portal_username || i.id}" ${(String(i.id || '').trim().toLowerCase() === shareRecKey || String(i.portal_username || '').trim().toLowerCase() === shareRecKey) ? 'selected' : ''}>${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${i.portal_username || i.id})</option>`).join('')}
+                    ${buildInvestorOptionsHtml(recCandidates, {
+                      usePortalUsername: true,
+                      isSelected: i => String(i.id || '').trim().toLowerCase() === shareRecKey || String(i.portal_username || '').trim().toLowerCase() === shareRecKey
+                    })}
                   </select>
                 </div>
                 <div>
@@ -1737,9 +1810,7 @@ let state = {
                 </div>
                 <div>
                   <select class="bulk-status" style="font-size:12px; padding:6px;">
-                    <option value="active" ${shareStatus === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="ended" ${shareStatus === 'ended' ? 'selected' : ''}>Ended</option>
-                    <option value="cancelled" ${shareStatus === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                    ${buildCommissionShareStatusOptionsHtml(shareStatus)}
                   </select>
                 </div>
                 <div style="text-align:center;">
@@ -1759,8 +1830,10 @@ let state = {
           : `<div class="form-group">
                <label>Source Investor</label>
                <select id="bulk_source_investor_id" onchange="if(this.value) openModal('commission_shares', 'add', null, { sourceInvestorId: this.value })">
-                 <option value="">Select source investor...</option>
-                 ${(state.data.investors || []).map(i => `<option value="${escapeHtml(i.portal_username || i.id)}">${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${escapeHtml(i.portal_username || i.id)})</option>`).join('')}
+                 ${buildInvestorOptionsHtml(state.data.investors, {
+                   usePortalUsername: true,
+                   placeholder: 'Select source investor...'
+                 })}
                </select>
              </div>`;
 
@@ -1784,9 +1857,10 @@ let state = {
         document.getElementById('btnAddShareRow')?.addEventListener('click', () => {
           const container = document.getElementById('bulkSharesContainer');
           const curSrc = String(document.getElementById('bulk_source_investor_id')?.value || '').trim().toLowerCase();
-          const recOptions = (state.data.investors || [])
-            .filter(i => String(i.id || '').trim().toLowerCase() !== curSrc && String(i.portal_username || '').trim().toLowerCase() !== curSrc)
-            .map(i => `<option value="${i.portal_username || i.id}">${escapeHtml(i.first_name || '')} ${escapeHtml(i.last_name || '')} (${i.portal_username || i.id})</option>`).join('');
+          const recInvestors = (state.data.investors || []).filter(
+            i => String(i.id || '').trim().toLowerCase() !== curSrc && String(i.portal_username || '').trim().toLowerCase() !== curSrc
+          );
+          const recOptions = buildInvestorOptionsHtml(recInvestors, { usePortalUsername: true });
           const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
 
           const newRow = document.createElement('div');
@@ -1797,7 +1871,7 @@ let state = {
             <div><input class="bulk-pct-input" type="number" step="0.1" value="${extraData?.defaultPercent || 10}" style="font-size:13px; padding:6px;" placeholder="%" /></div>
             <div><input class="bulk-start-date" type="date" value="${todayStr}" style="font-size:12px; padding:6px;" /></div>
             <div><input class="bulk-end-date" type="date" style="font-size:12px; padding:6px;" placeholder="No end date" /></div>
-            <div><select class="bulk-status" style="font-size:12px; padding:6px;"><option value="active">Active</option><option value="ended">Ended</option><option value="cancelled">Cancelled</option></select></div>
+            <div><select class="bulk-status" style="font-size:12px; padding:6px;">${buildCommissionShareStatusOptionsHtml('active')}</select></div>
             <div style="text-align:center;"><button type="button" class="secondary" onclick="this.closest('.bulk-share-row').remove()" style="padding:4px 8px; color:var(--danger); border:none;">✕</button></div>
           `;
           container.appendChild(newRow);
