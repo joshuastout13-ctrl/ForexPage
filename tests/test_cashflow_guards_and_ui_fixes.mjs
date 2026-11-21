@@ -514,6 +514,22 @@ async function runTests() {
 
     assert.ok(!adminHtml.includes("recCandidates.map("), "commission_shares should use buildInvestorOptionsHtml");
     assert.ok(!adminHtml.includes("(state.data.accounts || []).map("), "modals should use buildAccountOptionsHtml");
+    assert.ok(adminHtml.includes("matchesEntitySearch("), "admin.html tables should search investor display names cleanly");
+
+    const nelsonInv = { id: "inv_141417dc", portal_username: "nguyer", first_name: "Nelson", last_name: "Guyer" };
+    const nelsonAcc = { id: "nguyer", investor_id: "inv_141417dc", name: "Nelson Guyer Main Account" };
+    const nelsonWd = { id: "67935eb3-0ab6-4eef-a3e3-7c6c21cbdd7e", investor_id: "inv_141417dc", account_id: "nguyer", amount: 500, status: "Completed" };
+    for (const q of ["nelson", "nelson guyer", "nguyer", "67935eb3", "500", "october 2026"]) {
+      assert.equal(
+        sandbox.matchesEntitySearch(nelsonWd, q, `${nelsonWd.amount} October 2026 ${nelsonWd.status}`, [nelsonInv], [nelsonAcc]),
+        true,
+        `Withdrawals search must match "${q}"`
+      );
+    }
+    assert.equal(
+      sandbox.matchesEntitySearch(nelsonWd, "mark richards", `${nelsonWd.amount} October 2026 ${nelsonWd.status}`, [nelsonInv], [nelsonAcc]),
+      false
+    );
 
     console.log("✅ ALL OFFLINE CASHFLOW GUARDS & UI REGRESSION CHECKS PASSED!");
   } finally {

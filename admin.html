@@ -733,13 +733,31 @@ let state = {
       return full || String(inv?.portal_username || inv?.id || fallbackId || '').trim();
     }
 
-    function findAccountInvestor(acc, investors) {
-      const ownerKey = String(acc?.investor_id || '').trim().toLowerCase();
-      if (!ownerKey) return null;
+    function resolveInvestorRecord(investorOrAccountId, investors = state.data?.investors) {
+      const key = String(investorOrAccountId || '').trim().toLowerCase();
+      if (!key) return null;
       return (investors || []).find(i =>
-        String(i.id || '').trim().toLowerCase() === ownerKey ||
-        String(i.portal_username || '').trim().toLowerCase() === ownerKey
+        String(i.id || '').trim().toLowerCase() === key ||
+        String(i.portal_username || '').trim().toLowerCase() === key
       ) || null;
+    }
+
+    function findAccountInvestor(acc, investors) {
+      return resolveInvestorRecord(acc?.investor_id, investors);
+    }
+
+    function resolveEntityLabels(row, investors = state.data?.investors, accounts = state.data?.accounts) {
+      const inv = resolveInvestorRecord(row?.investor_id, investors) || resolveInvestorRecord(row?.account_id, investors);
+      const investorName = inv ? formatEntityDisplayName(inv, row?.investor_id) : String(row?.investor_id || row?.account_id || '—');
+      const accKey = String(row?.account_id || '').trim().toLowerCase();
+      const acc = (accounts || []).find(a => String(a.id || '').trim().toLowerCase() === accKey) || null;
+      return { inv, investorName, accountName: acc?.name || '' };
+    }
+
+    function matchesEntitySearch(row, searchStr, extraTerms = '', investors = state.data?.investors, accounts = state.data?.accounts) {
+      if (!searchStr) return true;
+      const { investorName, accountName } = resolveEntityLabels(row, investors, accounts);
+      return `${row?.id || ''} ${row?.investor_id || ''} ${investorName} ${row?.account_id || ''} ${accountName} ${extraTerms}`.toLowerCase().includes(searchStr);
     }
 
     function renderSortedOptions(entries, isSelected = () => false) {
@@ -1332,8 +1350,9 @@ let state = {
         }).join('');
       } else if (state.tab === 'accounts') {
         hd.innerHTML = `<tr><th>Status</th><th>Provenance</th><th>ID</th><th>Investor</th><th>Name</th><th>Balance</th><th>Comm</th><th>Open Date</th><th>Actions</th></tr>`;
-        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.name}`.toLowerCase().includes(s));
+        d = d.filter(i => matchesEntitySearch(i, s, i.name || ''));
         bd.innerHTML = d.map(i => {
+          const { investorName } = resolveEntityLabels(i);
           const provStatus = (i.external_cash_provenance_status || 'UNKNOWN').toUpperCase();
           const provBadgeClass = provStatus === 'COMPLETE' ? 'active' : (provStatus === 'PARTIAL' ? 'pending' : 'inactive');
           const isComplete = provStatus === 'COMPLETE';
@@ -1342,7 +1361,9 @@ let state = {
           return `<tr>
             <td><span class="badge ${i.status==='Active'?'active':'inactive'}">${i.status}</span></td>
             <td><span class="badge ${provBadgeClass}" title="${escapeHtml(title)}">${provStatus}</span></td>
-            <td>${i.id}</td><td>${i.investor_id}</td><td>${i.name}</td>
+            <td>${i.id}</td>
+            <td><div style="font-weight:600">${escapeHtml(investorName)}</div><div class="muted" style="font-size:11px">${escapeHtml(i.investor_id || '—')}</div></td>
+            <td>${i.name}</td>
             <td>
               <div style="font-weight:600">${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
               <div class="muted" style="font-size:11px">Start: ${money(i.starting_capital)}</div>
@@ -1358,8 +1379,12 @@ let state = {
         }).join('');
       } else if (state.tab === 'deposits') {
         hd.innerHTML = `<tr><th>Status</th><th>Treatment</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Date</th><th>Effective</th><th>Actions</th></tr>`;
-        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
+        d = d.filter(i => {
+          const effMonth = i.effective_accounting_date ? String(i.effective_accounting_date).slice(0, 7) : (i.date ? String(i.date).slice(0, 7) : '');
+          return matchesEntitySearch(i, s, `${i.amount ?? ''} ${i.date || ''} ${effMonth} ${i.status || ''}`);
+        });
         bd.innerHTML = d.map(i => {
+          const { investorName } = resolveEntityLabels(i);
           const isVoid = i.type === 'VOID' || i.status === 'void' || i.status === 'cancelled';
           const treatmentMeta = {
             HISTORICAL_PROVENANCE: {
@@ -1392,7 +1417,7 @@ let state = {
             <td><span class="badge ${isVoid ? 'inactive' : 'active'}">${statusLabel}</span></td>
             <td><span class="badge ${treatmentClass}" title="${treatmentTitle}">${treatmentLabel}</span></td>
             <td style="font-size:11px;color:var(--muted);white-space:nowrap">${i.id}</td>
-            <td style="white-space:nowrap">${i.investor_id || '—'}</td>
+            <td style="white-space:nowrap"><div style="font-weight:600">${escapeHtml(investorName)}</div><div class="muted" style="font-size:11px">${escapeHtml(i.investor_id || '—')}</div></td>
             <td style="font-size:12px;color:var(--muted);white-space:nowrap">${i.account_id || '—'}</td>
             <td style="font-weight:600;white-space:nowrap">${money(i.amount)}</td>
             <td class="date-nowrap">${displayDate}</td>
@@ -1406,15 +1431,25 @@ let state = {
           </tr>`;
         }).join('');
       } else if (state.tab === 'withdrawals') {
+        const formatWdPeriod = (row) => {
+          const displayMonth = row.month || (row.month_number && MONTHS[row.month_number - 1]) || (row.effective_accounting_date && MONTHS[parseInt(row.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
+          const displayYear = row.year || (row.effective_accounting_date ? row.effective_accounting_date.slice(0, 4) : '');
+          return { displayMonth, displayYear };
+        };
         hd.innerHTML = `<tr><th>Status</th><th>ID</th><th>Investor</th><th>Account</th><th>Amount</th><th>Effective</th><th>Actions</th></tr>`;
-        d = d.filter(i => !s || `${i.id} ${i.investor_id} ${i.account_id}`.toLowerCase().includes(s));
+        d = d.filter(i => {
+          const { displayMonth, displayYear } = formatWdPeriod(i);
+          return matchesEntitySearch(i, s, `${i.amount ?? ''} ${displayMonth} ${displayYear} ${i.status || ''}`);
+        });
         bd.innerHTML = d.map(i => {
           let cls = 'pending'; if(i.status==='Approved'||i.status==='Completed') cls='active'; if(i.status==='Cancelled') cls='inactive';
-          const displayMonth = i.month || (i.month_number && MONTHS[i.month_number - 1]) || (i.effective_accounting_date && MONTHS[parseInt(i.effective_accounting_date.slice(5, 7), 10) - 1]) || '—';
-          const displayYear = i.year || (i.effective_accounting_date ? i.effective_accounting_date.slice(0, 4) : '');
+          const { investorName } = resolveEntityLabels(i);
+          const { displayMonth, displayYear } = formatWdPeriod(i);
           return `<tr>
             <td class="date-nowrap"><span class="badge ${cls}">${i.status}</span>${(i.is_draw === true || String(i.notes || '').toLowerCase().includes('[draw')) ? ' <span class="badge pending">Draw</span>' : ''}</td>
-            <td>${i.id}${i.notes ? `<div style="font-size:11px;color:var(--muted)">${escapeHtml(i.notes)}</div>` : ''}</td><td class="date-nowrap">${i.investor_id}</td><td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${money(i.amount)}</td>
+            <td>${i.id}${i.notes ? `<div style="font-size:11px;color:var(--muted)">${escapeHtml(i.notes)}</div>` : ''}</td>
+            <td class="date-nowrap"><div style="font-weight:600">${escapeHtml(investorName)}</div><div class="muted" style="font-size:11px">${escapeHtml(i.investor_id || '—')}</div></td>
+            <td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${money(i.amount)}</td>
             <td class="date-nowrap">${displayMonth} ${displayYear}</td>
             <td class="date-nowrap">
               <div class="btn-group">
@@ -1449,10 +1484,15 @@ let state = {
           </tr>`).join('');
       } else if (state.tab === 'snapshots') {
         hd.innerHTML = `<tr><th>Investor</th><th>Account</th><th>Month</th><th>Year</th><th>Bal End</th><th>Net Draw</th></tr>`;
-        bd.innerHTML = d.map(i => `<tr>
-            <td class="date-nowrap">${i.investor_id}</td><td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${i.month}</td><td class="date-nowrap">${i.year}</td>
+        d = d.filter(i => matchesEntitySearch(i, s, `${i.month || ''} ${i.year || ''}`));
+        bd.innerHTML = d.map(i => {
+          const { investorName } = resolveEntityLabels(i);
+          return `<tr>
+            <td class="date-nowrap"><div style="font-weight:600">${escapeHtml(investorName)}</div><div class="muted" style="font-size:11px">${escapeHtml(i.investor_id || '—')}</div></td>
+            <td class="date-nowrap">${i.account_id}</td><td class="date-nowrap">${i.month}</td><td class="date-nowrap">${i.year}</td>
             <td class="date-nowrap">${money(i.ending_balance)}</td><td class="date-nowrap">${money(i.net_draw)}</td>
-          </tr>`).join('');
+          </tr>`;
+        }).join('');
       } else if (state.tab === 'history') {
         hd.innerHTML = `<tr><th>Month</th><th>Year</th><th>Open Bal</th><th>Deposits</th><th>Withdrawals</th><th>Gross %</th><th>End Bal</th><th>Notes</th></tr>`;
         bd.innerHTML = d.map(i => `<tr>
@@ -1487,8 +1527,7 @@ let state = {
 
         // Filter by search
         const filteredGroups = Object.values(groups).filter(g => {
-          if (!s) return true;
-          return `${g.investor_id} ${g.account_id}`.toLowerCase().includes(s);
+          return matchesEntitySearch({ investor_id: g.investor_id, account_id: g.account_id }, s);
         });
 
         bd.innerHTML = filteredGroups.map(g => {
