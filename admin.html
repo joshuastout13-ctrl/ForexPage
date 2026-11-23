@@ -548,7 +548,7 @@
 
   <script>
 let state = {
-      admin: null, tab: 'investors',
+      admin: null, tab: 'investors', accountsAvailable: false,
       data: { investors: [], accounts: [], deposits: [], withdrawals: [], returns: [], performance: [], snapshots: [], history: [], commission_shares: [] },
       search: '', targetId: null, targetAction: null, targetContext: null, filterInvestor: '', filterYear: new Date().getFullYear(),
       emailRecipients: [], selectedEmails: new Set(), emailLogs: [], emailSubTab: 'compose', emailFilterSearch: '', emailFilterStatus: 'active',
@@ -590,6 +590,83 @@ let state = {
       logout: () => api.request('/api/admin/logout', { method: 'POST' }),
       me: () => api.request('/api/admin/me')
     };
+
+    function isRetryableAccountsError(err) {
+      return Boolean(err && err.accountsRetryable === true && err.name !== 'AbortError');
+    }
+
+    function invalidateAdminAccountsCache() {
+      state.data.accounts = [];
+      state.accountsAvailable = false;
+      updateSummaryCards();
+    }
+
+    async function fetchAdminAccountsOnce() {
+      let res;
+      try {
+        res = await fetch('/api/admin/accounts', { headers: { 'Content-Type': 'application/json' } });
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          throw err;
+        }
+        const transportErr = new Error(err?.message || 'Network request failed');
+        transportErr.accountsRetryable = true;
+        throw transportErr;
+      }
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        const err = new Error(json.error || `API Request Failed (HTTP ${res.status})`);
+        err.code = json.code || null;
+        err.status = res.status;
+        err.data = json;
+        err.accountsRetryable = res.status >= 500;
+        throw err;
+      }
+
+      let json;
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        const err = new Error('Invalid accounts response');
+        err.accountsRetryable = false;
+        throw err;
+      }
+
+      if (!json || typeof json !== 'object' || !Array.isArray(json.accounts)) {
+        const err = new Error('Invalid accounts response');
+        err.accountsRetryable = false;
+        throw err;
+      }
+
+      const hasInvalidAccountBalance = json.accounts.some(
+        (a) => !a || typeof a !== 'object' || typeof a.current_balance !== 'number' || !Number.isFinite(a.current_balance)
+      );
+      if (hasInvalidAccountBalance) {
+        const err = new Error('Invalid account balance data');
+        err.accountsRetryable = false;
+        throw err;
+      }
+
+      return json;
+    }
+
+    async function fetchAdminAccountsWithRetry() {
+      try {
+        return await fetchAdminAccountsOnce();
+      } catch (err) {
+        if (isRetryableAccountsError(err)) {
+          try {
+            return await fetchAdminAccountsOnce();
+          } catch (retryErr) {
+            invalidateAdminAccountsCache();
+            throw retryErr;
+          }
+        }
+        invalidateAdminAccountsCache();
+        throw err;
+      }
+    }
 
     async function init() {
       const timeout = setTimeout(() => {
@@ -681,24 +758,46 @@ let state = {
           };
           
           if (tab === 'investors') {
-            const [invRes, accRes] = await Promise.all([
+            const [invOutcome, accOutcome] = await Promise.allSettled([
               api.request('/api/admin/investors'),
-              api.request('/api/admin/accounts')
+              fetchAdminAccountsWithRetry()
             ]);
-            state.data.investors = invRes.investors || [];
-            state.data.accounts = accRes.accounts || [];
+            if (accOutcome.status === 'fulfilled') {
+              state.data.accounts = accOutcome.value.accounts || [];
+              state.accountsAvailable = true;
+            }
+            if (invOutcome.status === 'fulfilled') {
+              state.data.investors = invOutcome.value.investors || [];
+            } else {
+              state.data.investors = [];
+            }
+            if (accOutcome.status === 'fulfilled' && invOutcome.status === 'rejected') {
+              updateSummaryCards();
+              throw invOutcome.reason;
+            }
+            if (accOutcome.status === 'rejected') {
+              throw accOutcome.reason;
+            }
           } else if (endpoints[tab] && (tab !== 'history' || state.filterInvestor)) {
-            const res = await api.request(endpoints[tab]);
+            const res = tab === 'accounts'
+              ? await fetchAdminAccountsWithRetry()
+              : await api.request(endpoints[tab]);
             state.data[tab] = Array.isArray(res) 
               ? res 
               : (res[tab === 'returns' ? 'monthlyReturns' : (tab === 'performance' ? 'livePerformance' : (tab === 'history' ? 'monthlyHistory' : tab))] || res[tab] || []);
+            if (tab === 'accounts') {
+              state.accountsAvailable = true;
+              updateSummaryCards();
+            }
           }
           
           if (['accounts', 'deposits', 'withdrawals', 'history', 'commission_shares'].includes(tab) && state.data.investors.length===0) {
              const invRes = await api.request('/api/admin/investors'); state.data.investors = invRes.investors || [];
           }
-          if (state.data.accounts.length===0) {
-             const accRes = await api.request('/api/admin/accounts'); state.data.accounts = accRes.accounts || [];
+          if (!state.accountsAvailable) {
+             const accRes = await fetchAdminAccountsWithRetry();
+             state.data.accounts = accRes.accounts || [];
+             state.accountsAvailable = true;
           }
           if (state.data.investors && state.data.investors.length > 0) {
             state.data.investors.sort((a, b) =>
@@ -1327,7 +1426,8 @@ let state = {
           const startCap = money(rawStart);
           const rawAsOfDate = i.start_date || primaryAcc.open_date || '';
           const asOfDate = rawAsOfDate ? String(rawAsOfDate).slice(0, 10) : '—';
-          const currBal = primaryAcc.current_balance !== undefined ? money(primaryAcc.current_balance) : (rawStart !== undefined ? money(rawStart) : 'N/A');
+          const hasValidBalance = state.accountsAvailable && typeof primaryAcc.current_balance === 'number' && Number.isFinite(primaryAcc.current_balance);
+          const currBal = hasValidBalance ? money(primaryAcc.current_balance) : '—';
           const split = primaryAcc.split_pct !== undefined ? `${primaryAcc.split_pct}%` : `${i.split_pct !== undefined ? i.split_pct : 100}%`;
           const pass = i.temp_password || i.password || i.temppasswordprototypeonly || '••••••••';
           
@@ -1365,7 +1465,7 @@ let state = {
             <td><div style="font-weight:600">${escapeHtml(investorName)}</div><div class="muted" style="font-size:11px">${escapeHtml(i.investor_id || '—')}</div></td>
             <td>${i.name}</td>
             <td>
-              <div style="font-weight:600">${money(i.current_balance !== undefined ? i.current_balance : i.starting_capital)}</div>
+              <div style="font-weight:600">${(state.accountsAvailable && typeof i.current_balance === 'number' && Number.isFinite(i.current_balance)) ? money(i.current_balance) : '—'}</div>
               <div class="muted" style="font-size:11px">Start: ${money(i.starting_capital)}</div>
             </td>
             <td>${i.is_commission ? '✅' : ''}</td><td class="date-nowrap">${openDate}</td>
@@ -1605,15 +1705,26 @@ let state = {
     }
 
     function updateSummaryCards() {
-      const accounts = state.data.accounts || [];
-      const activeAccounts = accounts.filter(a => String(a.status || 'Active').toLowerCase() === 'active');
-      const totalValue = activeAccounts.reduce((sum, a) => {
-        const bal = a.current_balance !== undefined ? Number(a.current_balance) : Number(a.starting_capital || 0);
-        return sum + (isNaN(bal) ? 0 : bal);
-      }, 0);
-      
       const valEl = document.getElementById('totalPlatformValue');
       const accEl = document.getElementById('totalPlatformAccounts');
+      if (!state.accountsAvailable) {
+        if (valEl) valEl.textContent = '—';
+        if (accEl) accEl.textContent = '—';
+        return;
+      }
+
+      const accounts = state.data.accounts || [];
+      const activeAccounts = accounts.filter(a => String(a.status || 'Active').toLowerCase() === 'active');
+      const hasIncompleteBalance = activeAccounts.some(
+        a => typeof a.current_balance !== 'number' || !Number.isFinite(a.current_balance)
+      );
+      if (hasIncompleteBalance) {
+        if (valEl) valEl.textContent = '—';
+        if (accEl) accEl.textContent = activeAccounts.length;
+        return;
+      }
+
+      const totalValue = activeAccounts.reduce((sum, a) => sum + a.current_balance, 0);
       if (valEl) valEl.textContent = money(totalValue);
       if (accEl) accEl.textContent = activeAccounts.length;
     }

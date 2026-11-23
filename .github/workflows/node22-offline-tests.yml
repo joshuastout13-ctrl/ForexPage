@@ -1,0 +1,48 @@
+name: Node 22 Offline Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    name: Node 22 Offline Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run focused offline test suites from empty working directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_ROOT="$PWD"
+          TMP_CWD="$(mktemp -d)"
+          trap 'rm -rf "$TMP_CWD"' EXIT
+          if [ -n "$(ls -A "$TMP_CWD")" ]; then
+            echo "Expected empty temporary working directory: $TMP_CWD" >&2
+            exit 1
+          fi
+          echo "Node runtime: $(node -v)"
+          echo "Empty working directory verified: $TMP_CWD"
+          cd "$TMP_CWD"
+          node "$REPO_ROOT/tests/test_supabase_pagination_contract.mjs"
+          node "$REPO_ROOT/tests/test_shared_read_error_handling.mjs"
+          node "$REPO_ROOT/tests/test_admin_accounts_refresh_recovery.mjs"
+          node "$REPO_ROOT/tests/test_phase1_safety_guards.mjs"
+          node "$REPO_ROOT/tests/test_cashflows_review_pagination.mjs"
