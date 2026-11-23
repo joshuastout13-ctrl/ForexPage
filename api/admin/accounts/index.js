@@ -10,62 +10,51 @@ export default async function handler(req, res) {
     try {
       const accounts = await paginatedRead("investor_accounts");
       accounts.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-      
-      const rules = await paginatedRead("commission_rules", {
-        queryModifier: q => q.not("account_id", "is", null)
-      }).catch(() => []);
-      if (rules) {
-        accounts.forEach(acc => {
-          acc.commissionRules = rules.filter(r => r.account_id === acc.id);
-        });
-      }
 
-      try {
-        const { buildInvestorDashboard } = await import("../../../lib/dashboard.js");
-        const { getMyfxbookLive } = await import("../../../lib/myfxbook.js");
-        
-        const [rawInvestors, returnsSheet, depositsSheet, withdrawalsSheet, historyTable, commissionEarningsTable, commissionSharesTable, commissionRulesTable, cutovers, live] = await Promise.all([
-          paginatedRead("investors"),
-          paginatedRead("monthly_returns"),
-          paginatedRead("deposits"),
-          paginatedRead("withdrawals"),
-          paginatedRead("investor_monthly_history"),
-          paginatedRead("commission_earnings"),
-          paginatedRead("commission_shares"),
-          paginatedRead("commission_rules").catch(() => []),
-          paginatedRead("account_cutover_adjustments").catch(() => []),
-          getMyfxbookLive({ skipScraper: true })
-        ]);
-        
-        const preloadedData = {
-          rawInvestors: rawInvestors || [],
-          accounts: accounts, // already fetched
-          returnsSheet: returnsSheet || [],
-          depositsSheet: depositsSheet || [],
-          withdrawalsSheet: withdrawalsSheet || [],
-          historyTable: historyTable || [],
-          commissionEarningsTable: commissionEarningsTable || [],
-          commissionSharesTable: commissionSharesTable || [],
-          commissionRulesTable: commissionRulesTable || [],
-          cutovers: cutovers || [],
-          live
-        };
+      const { buildInvestorDashboard } = await import("../../../lib/dashboard.js");
+      const { getMyfxbookLive } = await import("../../../lib/myfxbook.js");
 
-        // Calculate balances using preloaded data
-        for (let acc of accounts) {
-          try {
-            const res = await buildInvestorDashboard(acc.investor_id, preloadedData);
-            acc.current_balance = res.summary.currentBalance;
-          } catch(e) {
-            acc.current_balance = acc.starting_capital;
-          }
+      const [rawInvestors, returnsSheet, depositsSheet, withdrawalsSheet, historyTable, commissionEarningsTable, commissionSharesTable, cutovers, live] = await Promise.all([
+        paginatedRead("investors"),
+        paginatedRead("monthly_returns"),
+        paginatedRead("deposits"),
+        paginatedRead("withdrawals"),
+        paginatedRead("investor_monthly_history"),
+        paginatedRead("commission_earnings"),
+        paginatedRead("commission_shares"),
+        paginatedRead("account_cutover_adjustments"),
+        getMyfxbookLive({ skipScraper: true }).catch((err) => {
+          console.error("Failed to fetch live performance feed:", err);
+          return null;
+        })
+      ]);
+
+      const preloadedData = {
+        rawInvestors: rawInvestors || [],
+        accounts: accounts, // already fetched
+        returnsSheet: returnsSheet || [],
+        depositsSheet: depositsSheet || [],
+        withdrawalsSheet: withdrawalsSheet || [],
+        historyTable: historyTable || [],
+        commissionEarningsTable: commissionEarningsTable || [],
+        commissionSharesTable: commissionSharesTable || [],
+        cutovers: cutovers || [],
+        live
+      };
+
+      // Calculate balances using preloaded data (fail closed on any calculation error)
+      for (let acc of accounts) {
+        const dashboardRes = await buildInvestorDashboard(acc.investor_id, preloadedData);
+        const currentBalance = dashboardRes?.summary?.currentBalance;
+        if (typeof currentBalance !== "number" || !Number.isFinite(currentBalance)) {
+          throw new Error(`Failed to compute finite current_balance for account "${acc.id}"`);
         }
-      } catch (err) {
-        console.error("Failed to calculate account balances:", err);
+        acc.current_balance = currentBalance;
       }
 
       return res.status(200).json({ accounts });
     } catch (err) {
+      console.error("Failed to load admin accounts:", err);
       return res.status(500).json({ error: err.message });
     }
   }
