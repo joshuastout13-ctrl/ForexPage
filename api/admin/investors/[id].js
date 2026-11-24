@@ -47,77 +47,57 @@ export default async function handler(req, res) {
         });
       }
 
-      // Update investors table with schema resilience
-      let { data, error } = await supabase.from("investors").update(updates).eq("id", id).select();
-      if (error && error.message && error.message.includes("show_fund_performance")) {
-        delete updates.show_fund_performance;
-        const retryRes = await supabase.from("investors").update(updates).eq("id", id).select();
-        data = retryRes.data;
-        error = retryRes.error;
+      // Build associated account update payload preserving exact field mappings
+      const accUpdates = {};
+      if (body.name !== undefined) accUpdates.name = body.name;
+      if (body.startingCapital !== undefined) accUpdates.starting_capital = Number(body.startingCapital);
+      if (body.totalCashIn !== undefined) accUpdates.total_cash_in = Number(body.totalCashIn);
+      if (body.isCommission !== undefined) accUpdates.is_commission = body.isCommission === true || body.isCommission === "true";
+      if (body.splitPct !== undefined) accUpdates.split_pct = Number(body.splitPct);
+      if (body.startDate !== undefined || body.asOfDate !== undefined) {
+        accUpdates.open_date = body.startDate || body.asOfDate;
       }
-      if (error && error.message && error.message.includes("Could not find the '")) {
-        const colMatch = error.message.match(/Could not find the '([^']+)' column/);
-        if (colMatch && colMatch[1]) {
-          delete updates[colMatch[1]];
-          const retryRes = await supabase.from("investors").update(updates).eq("id", id).select();
-          data = retryRes.data;
-          error = retryRes.error;
-        }
-      }
-      if (error) throw error;
 
-      // Update associated account details if provided
-      let primaryAccId = null;
-      const { data: allAccs } = await supabase.from("investor_accounts").select("*");
-      const targetPortalUsername = body.portalUsername || (data && data[0] ? data[0].portal_username : "");
-      const existingAccs = (allAccs || []).filter(a => 
-        String(a.investor_id || '').toLowerCase() === String(id).toLowerCase() ||
-        (targetPortalUsername && String(a.investor_id || '').toLowerCase() === String(targetPortalUsername).toLowerCase()) ||
-        (targetPortalUsername && String(a.id || '').toLowerCase() === String(targetPortalUsername).toLowerCase())
+      // Preserve exact trigger condition and derived fields when creating a missing account
+      const createAccountIfMissing = body.startingCapital !== undefined && body.startingCapital !== "";
+      const createAccountPayload = createAccountIfMissing
+        ? {
+            id: body.accountId || body.portalUsername || id,
+            investor_id: id,
+            name: body.name || [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
+            starting_capital: Number(body.startingCapital || 0),
+            total_cash_in: Number(body.totalCashIn !== undefined ? body.totalCashIn : (body.startingCapital || 0)),
+            open_date: body.startDate || body.asOfDate || new Date().toISOString().split("T")[0],
+            status: "Active",
+            is_commission: body.isCommission === true || body.isCommission === "true",
+            split_pct: Number(body.splitPct !== undefined ? body.splitPct : 100),
+            notes: "Created via Admin Dashboard update"
+          }
+        : null;
+
+      if (!supabase) {
+        throw new Error("Database client unavailable.");
+      }
+
+      // Execute investor profile update and associated account update/insert atomically in one transaction
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "update_investor_profile_and_accounts_atomic",
+        {
+          p_investor_id: id,
+          p_investor_updates: updates,
+          p_account_updates: accUpdates,
+          p_target_portal_username: body.portalUsername ? String(body.portalUsername) : null,
+          p_create_account_if_missing: createAccountIfMissing,
+          p_create_account_payload: createAccountPayload
+        }
       );
 
-      if (existingAccs && existingAccs.length > 0) {
-        for (const primaryAcc of existingAccs) {
-          primaryAccId = primaryAcc.id;
-          const accUpdates = {};
-          if (body.name !== undefined) accUpdates.name = body.name;
-          if (body.startingCapital !== undefined) accUpdates.starting_capital = Number(body.startingCapital);
-          if (body.totalCashIn !== undefined) accUpdates.total_cash_in = Number(body.totalCashIn);
-          if (body.isCommission !== undefined) accUpdates.is_commission = body.isCommission === true || body.isCommission === "true";
-          if (body.splitPct !== undefined) accUpdates.split_pct = Number(body.splitPct);
-          if (body.startDate !== undefined || body.asOfDate !== undefined) {
-            accUpdates.open_date = body.startDate || body.asOfDate;
-          }
-          
-          if (Object.keys(accUpdates).length > 0) {
-            let { error: accErr } = await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
-            if (accErr && accErr.message && accErr.message.includes("Could not find the '")) {
-              const match = accErr.message.match(/Could not find the '([^']+)' column/);
-              if (match && match[1]) {
-                delete accUpdates[match[1]];
-                await supabase.from("investor_accounts").update(accUpdates).eq("id", primaryAcc.id);
-              }
-            }
-          }
-        }
-      } else if (body.startingCapital !== undefined && body.startingCapital !== "") {
-        primaryAccId = body.accountId || body.portalUsername || id;
-        const accPayload = {
-          id: primaryAccId,
-          investor_id: id,
-          name: body.name || [body.firstName, body.lastName].filter(Boolean).join(" ") || "Main Account",
-          starting_capital: Number(body.startingCapital || 0),
-          total_cash_in: Number(body.totalCashIn !== undefined ? body.totalCashIn : (body.startingCapital || 0)),
-          open_date: body.startDate || body.asOfDate || new Date().toISOString().split('T')[0],
-          status: "Active",
-          is_commission: body.isCommission === true || body.isCommission === "true",
-          split_pct: Number(body.splitPct !== undefined ? body.splitPct : 100),
-          notes: "Created via Admin Dashboard update"
-        };
-        await supabase.from("investor_accounts").insert([accPayload]);
+      if (rpcError) throw rpcError;
+      if (!rpcData || typeof rpcData !== "object" || !rpcData.investor || typeof rpcData.investor !== "object") {
+        throw new Error("Atomic investor update returned an invalid response payload.");
       }
 
-      return res.status(200).json({ success: true, investor: data[0] });
+      return res.status(200).json({ success: true, investor: rpcData.investor });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
