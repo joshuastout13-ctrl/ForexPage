@@ -515,24 +515,31 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // TEST 5: DELETE path remains unchanged and blocks deletion when financial history exists
+  // TEST 5: DELETE path stays isolated from PATCH/PUT RPC and blocks deletion when financial history exists
   // -------------------------------------------------------------------------
   {
     activeClient = createMockSupabase({
-      onFrom: (table) => ({
-        select: () => ({
-          eq: async () => ({ count: table === "deposits" ? 1 : 0, error: null }),
-          or: async () => ({ count: 0, error: null })
-        })
-      })
+      onRpc: async (fnName, params) => {
+        assert.strictEqual(fnName, "delete_draft_investor_atomic", "DELETE must invoke delete_draft_investor_atomic, not PATCH/PUT RPC");
+        assert.deepStrictEqual(params, { p_investor_id: "inv_with_history" });
+        return {
+          data: null,
+          error: {
+            message:
+              "FINANCIAL_HISTORY_IMMUTABLE: Cannot delete investor inv_with_history because 1 associated financial/audit dependencies exist (1 deposits, 0 withdrawals, 0 monthly balance history rows, 0 commission earnings, 0 commission shares, 0 snapshots, 0 audit runs, 0 cutover adjustments, 0 internal transfers, 0 legacy commission rules, 0 payment events, 0 funded accounts, 0 provenance-certified accounts). To remove access, set investor status to 'Inactive' instead."
+          }
+        };
+      }
     });
     const delCall = createMockReqRes({ method: "DELETE", id: "inv_with_history" });
     await handler(delCall.req, delCall.res);
     assert.strictEqual(delCall.res._getStatus(), 409);
     assert.match(delCall.res._getJson().error, /FINANCIAL_HISTORY_IMMUTABLE/);
-    assert.strictEqual(activeClient.rpcCalls.length, 0, "DELETE must remain unchanged and not call PATCH/PUT RPC");
+    assert.strictEqual(activeClient.rpcCalls.length, 1);
+    assert.strictEqual(activeClient.rpcCalls[0].fnName, "delete_draft_investor_atomic");
+    assert.strictEqual(activeClient.fromCalls.length, 0, "DELETE must not issue direct table queries or deletes");
 
-    console.log("  PASS [5]: DELETE handler remains unchanged (409 FINANCIAL_HISTORY_IMMUTABLE when financial records exist)");
+    console.log("  PASS [5]: DELETE handler stays isolated from PATCH/PUT RPC (409 FINANCIAL_HISTORY_IMMUTABLE via delete_draft_investor_atomic)");
   }
 
   // -------------------------------------------------------------------------
