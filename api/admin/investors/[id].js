@@ -105,43 +105,57 @@ export default async function handler(req, res) {
 
   if (req.method === "DELETE") {
     try {
+      const investorId = typeof id === "string" ? id.trim() : "";
+      if (!investorId) {
+        return res.status(400).json({ error: "Missing investor ID" });
+      }
+
       if (!supabase) {
         return res.status(503).json({ error: "Database client unavailable." });
       }
 
-      // Check for financial history existence before allowing deletion
-      const [depCheck, wdCheck, histCheck, commEarnCheck] = await Promise.all([
-        supabase.from("deposits").select("id", { count: "exact", head: true }).eq("investor_id", id),
-        supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("investor_id", id),
-        supabase.from("investor_monthly_history").select("id", { count: "exact", head: true }).eq("investor_id", id),
-        supabase.from("commission_earnings").select("id", { count: "exact", head: true }).or(`recipient_id.eq.${id},source_investor_id.eq.${id}`)
-      ]);
+      // Execute fail-closed financial/audit history checks and zero-history draft deletion atomically in one transaction
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "delete_draft_investor_atomic",
+        { p_investor_id: investorId }
+      );
 
-      const totalFinancialRecords = 
-        (depCheck.count || 0) + 
-        (wdCheck.count || 0) + 
-        (histCheck.count || 0) + 
-        (commEarnCheck.count || 0);
+      if (rpcError) {
+        const msg =
+          typeof rpcError.message === "string" && rpcError.message.trim()
+            ? rpcError.message.trim()
+            : "Atomic investor deletion failed.";
 
-      if (totalFinancialRecords > 0) {
-        return res.status(409).json({
-          error: `FINANCIAL_HISTORY_IMMUTABLE: Cannot delete investor ${id} because ${totalFinancialRecords} associated financial ledger records exist (${depCheck.count || 0} deposits, ${wdCheck.count || 0} withdrawals, ${histCheck.count || 0} monthly balance history rows, ${commEarnCheck.count || 0} commission earnings). To remove access, set investor status to 'Inactive' instead.`
-        });
+        if (/^(?:ERROR:\s*)?FINANCIAL_HISTORY_IMMUTABLE:/.test(msg)) {
+          return res.status(409).json({ error: msg, code: "FINANCIAL_HISTORY_IMMUTABLE" });
+        }
+        if (/^(?:ERROR:\s*)?AMBIGUOUS_ACCOUNT_LINKAGE:/.test(msg)) {
+          return res.status(409).json({ error: msg, code: "AMBIGUOUS_ACCOUNT_LINKAGE" });
+        }
+        if (/^(?:ERROR:\s*)?INVESTOR_NOT_FOUND:/.test(msg)) {
+          return res.status(404).json({ error: msg, code: "INVESTOR_NOT_FOUND" });
+        }
+        if (/^(?:ERROR:\s*)?INVALID_INVESTOR_ID:/.test(msg)) {
+          return res.status(400).json({ error: msg, code: "INVALID_INVESTOR_ID" });
+        }
+        return res.status(500).json({ error: msg });
       }
 
-      // 1. Delete associated non-financial metadata only for zero-history draft records
-      await supabase.from("snapshots").delete().eq("investor_id", id);
-      await supabase.from("commission_rules").delete().eq("investor_id", id);
-      await supabase.from("commission_rules").delete().eq("recipient_id", id);
-      await supabase.from("investor_accounts").delete().eq("investor_id", id);
-      
-      // 2. Delete the draft investor profile
-      const { error } = await supabase.from("investors").delete().eq("id", id);
-      if (error) throw error;
+      if (
+        !rpcData ||
+        typeof rpcData !== "object" ||
+        rpcData.status !== "DELETED" ||
+        rpcData.deleted_investor_id !== investorId
+      ) {
+        throw new Error("Atomic investor deletion returned an invalid response payload.");
+      }
 
-      return res.status(200).json({ success: true, message: "Draft investor profile deleted (zero financial history)" });
+      return res.status(200).json({
+        success: true,
+        message: "Draft investor profile deleted (zero financial history)"
+      });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err?.message || "Internal server error" });
     }
   }
 
