@@ -46,3 +46,4 @@ jobs:
           node "$REPO_ROOT/tests/test_admin_accounts_refresh_recovery.mjs"
           node "$REPO_ROOT/tests/test_phase1_safety_guards.mjs"
           node "$REPO_ROOT/tests/test_cashflows_review_pagination.mjs"
+          node "$REPO_ROOT/tests/test_admin_investor_update_atomicity.mjs"
